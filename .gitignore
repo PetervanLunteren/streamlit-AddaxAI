@@ -1,0 +1,3 @@
+.DS_Store
+backend/__pycache__/utils.cpython-311.pyc
+frontend/streamlit_log.txt

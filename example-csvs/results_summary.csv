@@ -1,0 +1,27 @@
+label,data_type,n_detections
+american crow,img,44
+virginia opossum,img,22
+woodchuck,img,22
+eastern fox squirrel,img,19
+domestic dog,img,19
+eastern gray squirrel,img,12
+wild turkey,img,11
+white-tailed deer,img,11
+eastern cottontail,img,9
+northern raccoon,img,9
+corvus species,img,8
+bird,img,6
+eastern chipmunk,img,6
+sciurus species,img,5
+vehicle,img,5
+mammal,img,3
+canis species,img,3
+carnivorous mammal,img,2
+animal,img,2
+human,img,2
+rabbit and hare family,img,2
+sciuridae family,img,2
+cat family,img,1
+cetartiodactyla order,img,1
+domestic horse,img,1
+bobcat,img,1

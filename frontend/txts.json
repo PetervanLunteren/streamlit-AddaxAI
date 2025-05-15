@@ -1,0 +1,79 @@
+{
+    "languages": {
+        "de": "🇩🇪 Deutsch",
+        "en": "🇬🇧 English",
+        "es": "🇪🇸 Español",
+        "fr": "🇫🇷 Français",
+        "nl": "🇳🇱 Nederlands",
+        "pt": "🇵🇹 Português",
+        "zh": "🇨🇳 中文",
+        "ja": "🇯🇵 日本語",
+        "haw": "🇺🇸 ʻŌlelo Hawaiʻi"
+    },
+    "analyse_txt": {
+        "en": "Add deployment",
+        "de": "Bereitstellung hinzufügen",
+        "fr": "Ajouter le déploiement",
+        "es": "Agregar implementación",
+        "nl": "Implementatie toevoegen",
+        "pt": "Adicionar implantação",
+        "zh": "添加部署",
+        "ja": "デプロイメントを追加",
+        "haw": "E hoʻohui i ka hoʻoili ʻana"
+    },
+    "verify_txt": {
+        "en": "Verify",
+        "de": "Überprüfen",
+        "fr": "Vérifier",
+        "es": "Verificar",
+        "nl": "Verifiëren",
+        "pt": "Verificar",
+        "zh": "验证",
+        "ja": "確認する",
+        "haw": "Hōʻoia"
+    },
+    "explore_txt": {
+        "en": "Explore",
+        "de": "Erkunden",
+        "fr": "Explorer",
+        "es": "Explorar",
+        "nl": "Verkennen",
+        "pt": "Explorar",
+        "zh": "探索",
+        "ja": "探検する",
+        "haw": "ʻImi"
+    },
+    "postprocess_txt": {
+        "en": "Postprocess",
+        "de": "Nachbearbeiten",
+        "fr": "Post-traitement",
+        "es": "Postprocesar",
+        "nl": "Nabewerken",
+        "pt": "Pós-processar",
+        "zh": "后处理",
+        "ja": "後処理",
+        "haw": "Hana hope"
+    },
+    "settings_txt": {
+        "en": "Settings",
+        "de": "Einstellungen",
+        "fr": "Paramètres",
+        "es": "Configuraciones",
+        "nl": "Instellingen",
+        "pt": "Configurações",
+        "zh": "设置",
+        "ja": "設定",
+        "haw": "Nā hoʻonohonoho"
+    },
+    "mode_explanation_txt": {
+        "en": "Choose the mode you want to use. In simple mode, you can quickly and easily analyze your data with default settings. In advanced mode, AddaxAI transforms into a data management platform, offering full control over model settings, human verification, data visualization, and more.",
+        "de": "Wählen Sie den Modus, den Sie verwenden möchten. Im einfachen Modus können Sie Ihre Daten schnell und einfach mit den Standardeinstellungen analysieren. Im erweiterten Modus verwandelt sich AddaxAI in eine Datenverwaltungsplattform, die volle Kontrolle über Modell-Einstellungen, menschliche Verifizierung, Datenvisualisierung und mehr bietet.",
+        "fr": "Choisissez le mode que vous souhaitez utiliser. En mode simple, vous pouvez analyser vos données rapidement et facilement avec les paramètres par défaut. En mode avancé, AddaxAI se transforme en une plateforme de gestion des données, offrant un contrôle total sur les paramètres du modèle, la vérification humaine, la visualisation des données et plus encore.",
+        "es": "Elija el modo que desea utilizar. En el modo simple, puede analizar sus datos de forma rápida y sencilla con la configuración predeterminada. En el modo avanzado, AddaxAI se transforma en una plataforma de gestión de datos, ofreciendo un control total sobre la configuración del modelo, la verificación humana, la visualización de datos y más.",
+        "nl": "Kies de modus die u wilt gebruiken. In de eenvoudige modus kunt u uw gegevens snel en eenvoudig analyseren met de standaardinstellingen. In de geavanceerde modus verandert AddaxAI in een gegevensbeheerplatform, met volledige controle over modelinstellingen, menselijke verificatie, gegevensvisualisatie en meer.",
+        "pt": "Escolha o modo que deseja usar. No modo simples, você pode analisar seus dados de forma rápida e fácil com as configurações padrão. No modo avançado, o AddaxAI se transforma em uma plataforma de gerenciamento de dados, oferecendo controle total sobre as configurações do modelo, verificação humana, visualização de dados e muito mais.",
+        "zh": "选择您想使用的模式。在简单模式下，您可以使用默认设置快速轻松地分析数据。在高级模式下，AddaxAI 变成一个数据管理平台，提供对模型设置、人工验证、数据可视化等的完全控制。",
+        "ja": "使用したいモードを選択してください。シンプルモードでは、デフォルト設定でデータを迅速かつ簡単に分析できます。高度なモードでは、AddaxAIはデータ管理プラットフォームに変わり、モデル設定、人間の検証、データの可視化などを完全に制御できます。",
+        "haw": "E koho i ke ʻano āu e makemake ai e hoʻohana. I ke ʻano maʻalahi, hiki iā ʻoe ke kālailai i kāu ʻikepili me nā hoʻonohonoho maʻamau. I ke ʻano holomua, lilo ʻo AddaxAI i kahua hoʻokele ʻikepili, e hāʻawi ana i ka mana piha ma luna o nā hoʻonohonoho hoʻohālike, hōʻoia kanaka, ʻikepili ʻikepili, a me nā mea hou aku."
+    }
+}
