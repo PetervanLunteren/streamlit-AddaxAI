@@ -34,10 +34,13 @@ conda activate env-streamlit-addaxai
 cd streamlit-AddaxAI/frontend
 streamlit run main.py >> streamlit_log.txt 2>&1 &
 ```
-8. Code is inside the `/frontend/` and `/backend/` folders
+Now you can push changes back to this repo without breaking the actual working app. The code is inside the `/frontend/` and `/backend/` folders.
 
 ## General ideas
 This streamlit app will eventually replace the [existing tkinter app](https://github.com/PetervanLunteren/addaxai). The code has become to complex and is in need of a fresh start. This streamlit version will start from scratch and will have multiple pages/tools. It will become more of a management platform where people can add metadata around their deployments and locations, so that depth estimation, maps, charts, camtrapDP exports, etc will become available. 
+
+<img width="268" alt="Screenshot 2025-05-16 at 20 07 52" src="https://github.com/user-attachments/assets/b42f8c4e-f35b-48ca-b050-ea6203f122c2" />
+
 
 The tools are in the sidebar, but this is just a mockup. If you have other thoughts, let me know! I've added some notes to each tool. 
 
