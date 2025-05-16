@@ -12,6 +12,7 @@ selected_cls_model_key = vars.get("selected_cls_model_key", "NAM-ADS-v1")
 selected_det_model_idx = vars.get("selected_det_model_idx", 0)
 selected_model_type_idx = vars.get("selected_model_type_idx", 0)
 
+st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
 
 # header
 st.header(":material/rocket_launch: AI detect", divider="grey")
