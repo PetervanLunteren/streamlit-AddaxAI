@@ -1,31 +1,3 @@
 import streamlit as st
 
-# st.set_page_config(page_title="Tool 1", page_icon="🛠️")
-
-st.title("Tool 1")
-st.write("This is Tool 1. You can add more functionality here.")
-
-
-
-
-# https://arnaudmiribel.github.io/streamlit-extras/extras/tags/
-
-
-# import streamlit as st
-
-@st.dialog("Cast your vote")
-def vote(item):
-    st.write(f"Why is {item} your favorite?")
-    reason = st.text_input("Because...")
-    if st.button("Submit"):
-        st.session_state.vote = {"item": item, "reason": reason}
-        st.rerun()
-
-if "vote" not in st.session_state:
-    st.write("Vote for your favorite")
-    if st.button("A"):
-        vote("A")
-    if st.button("B"):
-        vote("B")
-else:
-    f"You voted for {st.session_state.vote['item']} because {st.session_state.vote['reason']}"
+st.markdown("*It would be great if we could have a [repeat detection elimination](https://github.com/agentmorris/MegaDetector/tree/main/megadetector/postprocessing/repeat_detection_elimination) process to eliminate frequent static false detections. Dan Morris already has a great tool for this, but we need to figure out how to get it in streamlit. This is not a high priority, but it would be nice to have.*")
