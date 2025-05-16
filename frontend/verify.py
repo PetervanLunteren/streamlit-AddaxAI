@@ -1,31 +1,6 @@
 import streamlit as st
 
-# st.set_page_config(page_title="Tool 1", page_icon="🛠️")
+st.markdown("*This would be where the users can verify their predictions, if they want.*")
 
-st.title("Tool 1")
-st.write("This is Tool 1. You can add more functionality here.")
+st.markdown("I thought it would be nice to have ")
 
-
-
-
-# https://arnaudmiribel.github.io/streamlit-extras/extras/tags/
-
-
-# import streamlit as st
-
-@st.dialog("Cast your vote")
-def vote(item):
-    st.write(f"Why is {item} your favorite?")
-    reason = st.text_input("Because...")
-    if st.button("Submit"):
-        st.session_state.vote = {"item": item, "reason": reason}
-        st.rerun()
-
-if "vote" not in st.session_state:
-    st.write("Vote for your favorite")
-    if st.button("A"):
-        vote("A")
-    if st.button("B"):
-        vote("B")
-else:
-    f"You voted for {st.session_state.vote['item']} because {st.session_state.vote['reason']}"
