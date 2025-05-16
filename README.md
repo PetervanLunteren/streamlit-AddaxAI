@@ -31,7 +31,8 @@ git clone https://github.com/PetervanLunteren/streamlit-AddaxAI.git
 8. Open the app with
 ```
 conda activate env-streamlit-addaxai
-streamlit run streamlit-AddaxAI/frontend/main.py >> streamlit_log.txt 2>&1 &
+cd streamlit-AddaxAI/frontend
+streamlit run main.py >> streamlit_log.txt 2>&1 &
 ```
 8. Code is inside the `/frontend/` and `/backend/` folders
 
