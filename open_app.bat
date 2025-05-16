@@ -39,3 +39,5 @@ taskkill /F /IM python.exe /FI "WINDOWTITLE eq streamlit*" >nul 2>&1
 
 REM start streamlit in background and log output
 start "" /B cmd /C "streamlit run main.py >> streamlit_log.txt 2>&1"
+
+pause

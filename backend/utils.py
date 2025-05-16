@@ -38,7 +38,7 @@ def print_widget_label(label_text, icon = None, help_text = None):
 def fetch_all_model_info(type):
     
     # fetch
-    model_info_json = os.path.join(AddaxAI_files, "AddaxAI", "app", "model_info.json")
+    model_info_json = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
 
@@ -57,7 +57,7 @@ def fetch_all_model_info(type):
 
 # run a parallel tkinter script to select a folder
 def select_folder():
-    result = subprocess.run([sys.executable, os.path.join(AddaxAI_files, "AddaxAI", "app", "frontend", "folder_selector.py")], capture_output=True, text=True)
+    result = subprocess.run([sys.executable, os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "folder_selector.py")], capture_output=True, text=True)
     folder_path = result.stdout.strip()
     if folder_path != "" and result.returncode == 0:
         return folder_path
@@ -357,7 +357,7 @@ def fetch_model_info(model_name):
 
 def save_cls_classes(cls_model_key, slected_classes):
     # fetch
-    model_info_json = os.path.join(AddaxAI_files, "AddaxAI", "app", "model_info.json")
+    model_info_json = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
@@ -380,7 +380,7 @@ def save_global_vars(new_data):
         raise ValueError("Expected a dictionary as input")
 
     # fpath = os.path.join("/Users/peter/Desktop/streamlit_app/frontend", "vars.json")
-    fpath = os.path.join(AddaxAI_files, "AddaxAI", "app", "frontend", "vars.json")
+    fpath = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "vars.json")
     temp_fpath = fpath + ".tmp"  # Temporary file for atomic write
 
     # Load existing data or start with an empty dictionary
@@ -409,7 +409,7 @@ def load_vars():
     
     # Define file path
     # fpath = os.path.join("/Users/peter/Desktop/streamlit_app/frontend", "vars.json")
-    fpath = os.path.join(AddaxAI_files, "AddaxAI", "app", "frontend", "vars.json")
+    fpath = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "vars.json")
     
     # Check if the file exists and load its data
     if os.path.exists(fpath):
@@ -425,7 +425,7 @@ def load_vars():
 
 def load_txts():
     # txts_fpath = "/Users/peter/Desktop/streamlit_app/frontend/txts.json"
-    txts_fpath = os.path.join(AddaxAI_files, "AddaxAI", "app", "frontend", "txts.json")
+    txts_fpath = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "txts.json")
     with open(txts_fpath, "r", encoding="utf-8") as file:
         txts = json.load(file)
     return txts

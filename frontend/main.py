@@ -6,7 +6,7 @@ import folium
 from PIL import Image
 
 AddaxAI_files = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-st.set_page_config(initial_sidebar_state="auto", page_icon = os.path.join(AddaxAI_files, "AddaxAI", "app", "frontend", "logo_square.png")
+st.set_page_config(initial_sidebar_state="auto", page_icon = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "logo_square.png")
                    , page_title="AddaxAI")
 
 # get rid of the Streamlit menu
@@ -38,7 +38,7 @@ st.markdown(
 
 paths = [
     AddaxAI_files,
-    os.path.join(AddaxAI_files, "AddaxAI", "app"),
+    os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
 ]
 
 # Add paths to sys.path
@@ -96,17 +96,30 @@ folium.Marker([39.949610, -75.150282]).add_to(m)
 
 # save only the last 1000 lines of the log file
 # log_fpath = "/Users/peter/Desktop/streamlit_app/frontend/streamlit_log.txt"
-log_fpath = os.path.join(AddaxAI_files, "AddaxAI", "app", "frontend", "streamlit_log.txt")
-with open(log_fpath, "r", encoding="utf-8") as file:
-    log = file.readlines()
+log_fpath = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "streamlit_log.txt")
+# with open(log_fpath, "r", encoding="utf-8") as file:
+#     log = file.readlines()
+#     if len(log) > 1000:
+#         log = log[-1000:]
+# with open(log_fpath, "w", encoding="utf-8") as file:
+#     file.writelines(log)
+try: # DEBUG there seems to be a problem with the permissions here
+    with open(log_fpath, "r", encoding="utf-8") as file:
+        log = file.readlines()
     if len(log) > 1000:
         log = log[-1000:]
-with open(log_fpath, "w", encoding="utf-8") as file:
-    file.writelines(log)
+    with open(log_fpath, "w", encoding="utf-8") as file:
+        file.writelines(log)
+except PermissionError:
+    print(f"Permission denied when accessing {log_fpath}. Could not trim log file.")
+except FileNotFoundError:
+    print(f"Log file {log_fpath} not found.")
+except Exception as e:
+    print(f"Unexpected error: {e}")
 
 # page navigation
 # st.logo("/Users/peter/Desktop/streamlit_app/frontend/logo.png", size = "large")
-st.logo(os.path.join(AddaxAI_files, "AddaxAI", "app", "frontend", "logo.png"), size = "large")
+st.logo(os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "logo.png"), size = "large")
 if mode == 0: # simple mode
     analyse_sim_page = st.Page("analyse_simple.py", title=txts["analyse_txt"][lang], icon=":material/rocket_launch:")
     pg = st.navigation([analyse_sim_page])
