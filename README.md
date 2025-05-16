@@ -14,6 +14,7 @@ pip install streamlit-aggrid
 pip install folium
 pip install streamlit-folium
 pip install exifread
+pip install streamlit-tree-select
 pip install ffmpeg
 pip install gpsphoto
 pip install piexif
