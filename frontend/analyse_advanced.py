@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from backend.utils import *
+from backend.analyse_utils import class_selector
 
 # load language settings
 txts = load_txts()
@@ -221,10 +222,13 @@ else:
             # select classes
             st.divider()
             print_widget_label("Which species are present in your project area?", "pets", "Select the species that are present in your project area.")
-            selected_classes = st.multiselect(label = 'Select classes',
-                                            options = slected_model_info['all_classes'],
-                                            default = slected_model_info['selected_classes'],
-                                            label_visibility="collapsed")
+            # selected_classes = st.multiselect(label = 'Select classes', # This is the default multiselect
+            #                                 options = slected_model_info['all_classes'],
+            #                                 default = slected_model_info['selected_classes'],
+            #                                 label_visibility="collapsed")
+            selected_classes = class_selector(slected_model_info['all_classes'], # this is a custom multiselect
+                                      slected_model_info['selected_classes'])
+
 
 # model section
 st.write("")

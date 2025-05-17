@@ -15,21 +15,26 @@ pip install folium
 pip install streamlit-folium
 pip install exifread
 pip install streamlit-tree-select
+pip install streamlit-antd-components
 pip install ffmpeg
 pip install gpsphoto
 pip install piexif
 ```
 3. Install the normal AddaxAI: https://addaxdatascience.com/addaxai/#install
-4. Change directory and clone repo
+4. Change directory
 ```
-cd /Applications/AddaxAI_files/AddaxAI             (macOS)
-cd ~/AddaxAI_files/AddaxAI                         (Linux)
+# macOS
+cd /Applications/AddaxAI_files/AddaxAI
 
+# Linux
+cd ~/AddaxAI_files/AddaxAI
+```
+5. Clone this repo 
+```
 git clone https://github.com/PetervanLunteren/streamlit-AddaxAI.git
 ```
-
-7. The repo should now be cloned into `/AddaxAI_files/AddaxAI/streamlit-AddaxAI`
-8. Open the app with
+6. The repo should now be here `/AddaxAI_files/AddaxAI/streamlit-AddaxAI`
+7. Open the app with
 ```
 conda activate env-streamlit-addaxai
 cd streamlit-AddaxAI/frontend
