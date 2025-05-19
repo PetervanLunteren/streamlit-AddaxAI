@@ -34,6 +34,75 @@ def print_widget_label(label_text, icon = None, help_text = None):
 # def fetch_model_info():
 #     return sorted([subdir for subdir in os.listdir(CLS_DIR) if os.path.isdir(os.path.join(CLS_DIR, subdir))])
 
+
+# # rewrite for dict, return the key (IDENTIFY or locate
+
+#             option_caption_dict={
+#                 "IDENTIFY": {"option": "Identify",
+#                              "caption": "Detect animals and automatically identify their species."},
+#                 "LOCATE": {"option": "Locate",
+#                            "caption": "Just detect animals and show where they are — I’ll identify them myself."}
+#             },
+
+# def radio_buttons_with_captions(option_caption_list, key, scrollable, default_index):
+#     options = [pair[0] for pair in option_caption_list]
+#     captions = [pair[1] for pair in option_caption_list]
+#     with st.container(border=True, height=275 if scrollable else None):
+#         selected_option = st.radio(
+#             label=key,
+#             options=options,
+#             index=default_index,
+#             label_visibility="collapsed",
+#             captions=captions
+#         )
+#     selected_index = options.index(selected_option)
+#     return selected_index
+
+
+def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
+    # Extract option labels and captions from the dictionary
+    options = [v["option"] for v in option_caption_dict.values()]
+    captions = [v["caption"] for v in option_caption_dict.values()]
+    key_map = {v["option"]: k for k, v in option_caption_dict.items()}
+
+    # Get default index based on default_key
+    default_index = list(option_caption_dict.keys()).index(default_option)
+
+    # Create a radio button selection with captions
+    with st.container(border=True, height=275 if scrollable else None):
+        selected_option = st.radio(
+            label=key,
+            options=options,
+            index=default_index,
+            label_visibility="collapsed",
+            captions=captions
+        )
+
+    # Return the corresponding key
+    return key_map[selected_option]
+
+def select_model_widget(model_type, prev_selected_model):
+    # prepare radio button options
+    model_info = fetch_all_model_info(model_type)
+    model_options = {}
+    for key, info in model_info.items():
+        model_options[key] = {"option": info["friendly_name"],
+                                "caption": f":material/calendar_today: Released {info['release']} &nbsp;|&nbsp; "
+                                            f":material/code_blocks: Developed by {info['developer']} &nbsp;|&nbsp; "
+                                            f":material/description: {info['short_description']}"}
+    selected_model = radio_buttons_with_captions(
+        option_caption_dict=model_options,
+        key=f"{model_type}_model",
+        scrollable=True,
+        default_option=prev_selected_model)
+
+    # more info button
+    friendly_name = model_info[selected_model]["friendly_name"]
+    if st.button(f":material/info: More info about :grey-background[{friendly_name}]", key=f"{model_type}_model_info_button"):
+        show_model_info(model_info[selected_model])
+    
+    return selected_model
+
 # check which models are known and should be listed in the dpd
 def fetch_all_model_info(type):
     
@@ -55,14 +124,7 @@ def fetch_all_model_info(type):
     # return
     return sorted_det_models
 
-# run a parallel tkinter script to select a folder
-def select_folder():
-    result = subprocess.run([sys.executable, os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "folder_selector.py")], capture_output=True, text=True)
-    folder_path = result.stdout.strip()
-    if folder_path != "" and result.returncode == 0:
-        return folder_path
-    else:
-        return None
+
 
 # check if the user needs an update
 def needs_EA_update(required_version):

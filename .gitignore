@@ -1,3 +1,5 @@
 .DS_Store
 backend/__pycache__/utils.cpython-311.pyc
 frontend/streamlit_log.txt
+frontend/vars.json
+backend/__pycache__/analyse_utils.cpython-311.pyc

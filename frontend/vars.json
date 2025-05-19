@@ -1,7 +1,7 @@
 {
-    "selected_folder_str": "/Users/peter/Downloads/namib",
-    "selected_model_type_idx": 0,
+    "selected_folder_str": "/Library",
+    "selected_model_type": "IDENTIFY",
     "selected_cls_model_key": "CAM-AI4GM-v1",
-    "mode": 1,
-    "lang": "en"
+    "selected_det_model": "MD1000REDWOOD",
+    "selected_cls_model": "SWUSA-SDZWA-v3"
 }

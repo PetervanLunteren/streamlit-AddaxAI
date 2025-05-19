@@ -1,10 +1,9 @@
 {
     "cls": {
         "EUR-DF-v1.3": {
-            "friendly_name": "Deepfaune v1.3 Europe",
+            "friendly_name": "\ud83c\uddea\ud83c\uddfa Europe (Deepfaune v1.3)",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-eu:",
             "model_fname": "deepfaune-vit_large_patch14_dinov2.lvd142m.v3.pt",
             "description": "The Deepfaune initiative aims at developing 'artificial intelligence' models to automatically classify species in images and videos collected using camera-traps. The initiative is led by a core academic team from the French 'Centre National de la Recherche Scientifique' (CNRS), in collaboration with more than 50 European partners involved in wildlife research, conservation and management. The Deepfaune models can be run through a custom software freely available on the website, or through other software packages or platforms like EcoAssist. New versions of the model are published regularly, increasing classification accuracy or adding new species to the list of species that can be recognized. More information is available at: https://www.deepfaune.cnrs.fr",
             "developer": "The DeepFaune initiative",
@@ -67,10 +66,9 @@
             "min_version": "6.03"
         },
         "TAS-BB-v1": {
-            "friendly_name": "Tasmanian vertebrates",
+            "friendly_name": "\ud83c\udde6\ud83c\uddfa Tasmania",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-ta:",
             "model_fname": "tas_ens_mewc.keras",
             "description": "The MEWC model for Tasmania has been trained on 2.5 million labelled images from 96 classes. It is based on the EfficientNet v2 Small model architecture, initialised with pre-trained ImageNet base weights. The classes include all non-volant terrestrial mammals (native and introduced) that are found in Tasmania, along with over 50 of the most-commonly observed bird species seen on camera traps. Most classes represent species, but there are also some general classes like snake or insect, and an unknown/washed-out special class. Based on held-out test data, the overall classification accuracy and f1 scores are >99%, and for the common species, accuracy typically exceeds 99.5%. The results for the rarest taxa are worse, but still over 90% in almost all cases.",
             "developer": "Barry Brook",
@@ -204,10 +202,9 @@
             "min_version": "6.01"
         },
         "NAM-ADS-v1": {
-            "friendly_name": "Namibian Desert",
+            "friendly_name": "\ud83c\uddf3\ud83c\udde6 Namibian Desert",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-na:",
             "model_fname": "namib_desert_v1.pt",
             "description": "Model to identify 30 species or higher level taxons present in the desert biome of the Skeleton Coast National Park, North Namibia. The model was trained on a set of more than 850,000 images.",
             "developer": "Addax Data Science",
@@ -295,10 +292,9 @@
             "min_version": "4.4"
         },
         "EUR-DF-v1.2": {
-            "friendly_name": "Deepfaune v1.2 Europe",
+            "friendly_name": "\ud83c\uddea\ud83c\uddfa Europe (Deepfaune v1.2)",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-eu:",
             "model_fname": "deepfaune-vit_large_patch14_dinov2.lvd142m.v2.pt",
             "description": "The Deepfaune initiative aims at developing 'artificial intelligence' models to automatically classify species in images and videos collected using camera-traps. The initiative is led by a core academic team from the French 'Centre National de la Recherche Scientifique' (CNRS), in collaboration with more than 50 European partners involved in wildlife research, conservation and management. The Deepfaune models can be run through a custom software freely available on the website, or through other software packages or platforms like EcoAssist. New versions of the model are published regularly, increasing classification accuracy or adding new species to the list of species that can be recognized. More information is available at: https://www.deepfaune.cnrs.fr",
             "developer": "The DeepFaune initiative",
@@ -386,10 +382,9 @@
             "min_version": "5.19"
         },
         "EUR-DF-v1.1": {
-            "friendly_name": "Deepfaune v1.1 Europe",
+            "friendly_name": "\ud83c\uddea\ud83c\uddfa Europe (Deepfaune v1.1)",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-eu:",
             "model_fname": "deepfaune-vit_large_patch14_dinov2.lvd142m.pt",
             "description": "The Deepfaune initiative aims at developing 'artificial intelligence' models to automatically classify species in images and videos collected using camera-traps. The initiative is led by a core academic team from the French 'Centre National de la Recherche Scientifique' (CNRS), in collaboration with more than 50 European partners involved in wildlife research, conservation and management. The Deepfaune models can be run through a custom software freely available on the website, or through other software packages or platforms like EcoAssist. New versions of the model are published regularly, increasing classification accuracy or adding new species to the list of species that can be recognized. More information is available at: https://www.deepfaune.cnrs.fr",
             "developer": "The DeepFaune initiative",
@@ -469,10 +464,9 @@
             "min_version": "5.2"
         },
         "NZI-ADS-v1": {
-            "friendly_name": "New Zealand Invasives",
+            "friendly_name": "\ud83c\uddf3\ud83c\uddff New Zealand Invasives",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-nz:",
             "model_fname": "new_zealand_v1.pt",
             "description": "Model to identify 17 species or higher-level taxons present in New Zealand. The model was trained on a set of approximately 2 million camera trap images from various projects across the country. These projects were run by multiple organizations and took place in a diverse range of habitats, using a variety of trail camera brands and models. The model has an overall validation accuracy, precision, and recall of 98%. When tested on an out-of-sample test set, the model scored 95%, 96%, and 94%, respectively. The model was designed to expedite the monitoring of New Zealand's invasive species (deer, possum, pig, cat, rodent, and mustelid).",
             "developer": "Addax Data Science",
@@ -535,10 +529,9 @@
             "min_version": "5.4"
         },
         "CAM-AI4GM-v1": {
-            "friendly_name": "Colombian Amazon",
+            "friendly_name": "\ud83c\udde8\ud83c\uddf4 Colombian Amazon",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-co:",
             "model_fname": "AI4GAmazonClassification_v0.0.0.ckpt",
             "description": "This model was previously named 'Columbian Amazon'. The model is trained to classify animals into their genus taxonomic group. The training data are collected by the Department of Biological sciences at Universidad de los Andes. All the images come from the 'Magdalena Medio' region in Colombia. The dataset contains 41,904 images across 36 labeled genera, and it is distributed into 33,569 images in the training set and 8,335 images in the validation set. In our inference of the Amazon Rainforest dataset, we implement a 98% confidence threshold as part of a human-in-the-loop procedure. We observe that the model predicts 90% of the data with recognition confidence exceeding this threshold. Furthermore, within this high-confidence subset, the model achieves an average classification accuracy of 92%. This means that, after filtering out empty images with MegaDetector, only 10% of the detected animal objects require human validation.",
             "developer": "AI For Good Lab, Microsoft",
@@ -595,6 +588,13 @@
                 "Unknown"
             ],
             "selected_classes": [
+                "Dasyprocta",
+                "Bos",
+                "Pecari",
+                "Mazama",
+                "Cuniculus",
+                "Leptotila",
+                "Human",
                 "Aramides",
                 "Tinamus",
                 "Eira",
@@ -633,10 +633,9 @@
             "min_version": "5.6"
         },
         "PAM-SDZWA-v1": {
-            "friendly_name": "Peruvian Amazon",
+            "friendly_name": "\ud83c\uddf5\ud83c\uddea Peruvian Amazon",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-pe:",
             "model_fname": "Peru-Amazon_0.86.h5",
             "description": "This model was trained by Mathias Tobler from the San Diego Zoo Wildlife Alliance. Information about the source of the training dataset and model metrics is not available.",
             "developer": "San Diego Zoo Wildlife Alliance",
@@ -710,10 +709,9 @@
             "min_version": "5.9"
         },
         "PAN-SDZWA-v1": {
-            "friendly_name": "Perivuan Andes",
+            "friendly_name": "\ud83c\uddf5\ud83c\uddea Perivuan Andes",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-pe:",
             "model_fname": "andes_v1.pt",
             "description": "This model distinguishes between 53 species native to the Peruvian Andes. The training data was collected by SDZWA and comprises 201,943 images. We used a 70/20/10 Train/Val/Test split. The model reached an overall accuracy, precision, and recall of 88.9%, 88.6%, and 87.3% respectively on the test set.",
             "developer": "San Diego Zoo Wildlife Alliance",
@@ -854,10 +852,9 @@
             "min_version": "5.16"
         },
         "IRA-ADS-v1": {
-            "friendly_name": "Iran",
+            "friendly_name": "\ud83c\uddee\ud83c\uddf7 Iran",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-ir:",
             "model_fname": "iran_v1.pt",
             "description": "Model to identify 14 species or higher-level taxons present in Iran. The model was trained on a set of approximately 1 million camera trap images. The model has an overall validation accuracy, precision, and recall of 95%, 93%, and 94%, respectively. The accuracy was not tested on an out-of-sample-dataset since local images were absent. The model was designed to expedite the monitoring of the Iranian Cheetah Society.",
             "developer": "Addax Data Science",
@@ -911,10 +908,9 @@
             "min_version": "5.8"
         },
         "KIR-HEX-v1": {
-            "friendly_name": "Manas v1 Kirghizistan",
+            "friendly_name": "\ud83c\uddf0\ud83c\uddec Kirghizistan (Manas v1)",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-kg:",
             "model_fname": "best_model_Fri_Sep__1_18_50_55_2023.pt",
             "description": "This model is dedicated to the classification of the fauna from Kirghizistan. It was developped by Hex Data (https://hex-data.io) on behalf of OSI-Panthera (https://www.osi-panthera.org/). The model was trained on 42k images, with around 4k images per class, provided by the camera traps set up by OSI-Panthera. Class 'vide' (empty, in French), is used to try to set aside the few false negatives returned by MegaDetector. The rest correspond to the scientific name of the family or species detected.",
             "developer": "Hex Data",
@@ -969,10 +965,9 @@
             "min_version": "5.18"
         },
         "SWUSA-SDZWA-v3": {
-            "friendly_name": "Southwest USA v3",
+            "friendly_name": "\ud83c\uddfa\ud83c\uddf8 Southwest USA v3",
             "release": "10-2024",
             "short_description": "Model trained on a lot of stuff.",
-            "flag": ":flag-us:",
             "model_fname": "southwest_v3.pt",
             "description": "This model distinguishes between 27 species native to the Southwest United States. The training data was collected partially by SDZWA and the California Mountain Lion Project, and includes examples from the NACTI, and CCT training datasets. The training data corpus comprises 91662 images. We used a 70/20/10 Train/Val/Test split. The model reached an overall accuracy of 88% on the test set. Created by Kyra Swanson in 2023 (tswanson@sdzwa.org).",
             "developer": "San Diego Zoo Wildlife Alliance",
@@ -1025,6 +1020,11 @@
                 "weasel"
             ],
             "selected_classes": [
+                "badger",
+                "beaver",
+                "bird",
+                "boar",
+                "bobcat",
                 "cat"
             ],
             "var_cls_detec_thresh": "0.40",
