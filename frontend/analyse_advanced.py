@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-from backend.utils import load_txts, load_vars, save_global_vars, save_cls_classes, print_widget_label, fetch_all_model_info, fetch_known_locations, show_model_info, add_new_location, radio_buttons_with_captions, select_model_widget
-from backend.analyse_utils import class_selector, browse_directory_widget
+from backend.utils import load_txts, load_vars, save_global_vars, location_selector_widget, save_cls_classes, print_widget_label, multiselect_checkboxes, fetch_all_model_info, fetch_known_locations, show_model_info, add_new_location, radio_buttons_with_captions, select_model_widget
+from backend.analyse_utils import browse_directory_widget
 
 # load language settings
 txts = load_txts()
@@ -79,77 +79,61 @@ if selected_folder_str:
         st.write("")
 
         # select classification model
-        with st.container(border=True):
-            print_widget_label("Which model do you want to use to locate the animals?",
-                               help_text="Here you can select the model of your choosing.")
-            selected_cls_model = select_model_widget(
-                "cls", prev_selected_cls_model)
-        st.write("")
-
-        if selected_cls_model:
-            cls_model_info = fetch_all_model_info("cls")
-            slected_model_info = cls_model_info[selected_cls_model]
-
-            # select classes
+        if selected_det_model:
             with st.container(border=True):
-                print_widget_label("Which species are present in your project area?",
-                                   "pets", "Select the species that are present in your project area.")
-                selected_classes = class_selector(slected_model_info['all_classes'],
-                                                  slected_model_info['selected_classes'])
+                print_widget_label("Which model do you want to use to locate the animals?",
+                                   help_text="Here you can select the model of your choosing.")
+                selected_cls_model = select_model_widget(
+                    "cls", prev_selected_cls_model)
             st.write("")
+
+            # select species presence
+            if selected_cls_model:
+
+                # fetch info about the selected model
+                slected_model_info = fetch_all_model_info(
+                    "cls")[selected_cls_model]
+
+                # select classes
+                with st.container(border=True):
+                    print_widget_label("Which species are present in your project area?",
+                                       help_text="Select the species that are present in your project area.")
+                    selected_classes = multiselect_checkboxes(slected_model_info['all_classes'],
+                                                              slected_model_info['selected_classes'])
+                st.write("")
 
 # model section
 st.write("")
-st.write("")
-st.subheader(":material/photo_camera: Deployment metadata", divider="gray")
-st.write("This is where you fill in the metadata of your deployment. This information will be saved in the recognition file and can be used to filter the results later on. It is optional, but required to make maps and other visualizations. You can always change it later on.")
+st.subheader(":material/sd_card: Deployment metadata", divider="gray")
+st.write("This is where you fill in the metadata of your deployment. This information will be saved in the recognition file "
+         "and can be used to filter the results later on. It is optional, but required to make maps and other visualizations."
+         " You can always change it later on.")
 
 # location metadata
 print_widget_label(
     "What was the location of this deployment?", help_text="help text")
-locations, selected_index = fetch_known_locations()
-# location_ids = ['Location A', 'Location B', 'Location C']
-
-# st.write("DEBUG: locations", locations)
-
-if locations == []:
-    if st.button(":material/add_circle: Add location", key="add_new_location_button", use_container_width=False):
-        # add_new_location(selected_folder_str)
-        add_new_location()
-        # locations, selected_index = fetch_known_locations()
-        # selected_index = 0
-else:
-
-    location_ids = [location["id"] for location in locations]
-
-    selected_location = st.selectbox(
-        "Choose a location ID",
-        options=location_ids + ["+ Add new"],
-        index=selected_index,
-    )
-    # If "Add a new location" is selected, show a dialog with a map and text input
-    if selected_location.startswith("+ "):
-        add_new_location()
-        # add_new_location(selected_folder_str)
+selected_locationID = location_selector_widget()
+st.write(f"Selected location: {selected_locationID}")
 
 
 st.write("")
 st.write("")
 st.write("")
 if st.button(":material/rocket_launch: Let's go!", key="save_vars_button", use_container_width=True, type="primary"):
-    
+
     if selected_model_type == 'IDENTIFY':
         save_global_vars({"selected_folder_str": selected_folder_str,
-                        "selected_model_type": selected_model_type,
-                        "selected_det_model": selected_det_model,
-                        "selected_cls_model": selected_cls_model})
-        
+                          "selected_model_type": selected_model_type,
+                          "selected_det_model": selected_det_model,
+                          "selected_cls_model": selected_cls_model})
+
         st.write("DEBUG: selected_cls_model", selected_cls_model)
-        
-        save_cls_classes(selected_cls_model, selected_classes) # TODO: this is saving it to the wrong place, it should be saved to models/cls/<model_name>/variables.json
+
+        # TODO: this is saving it to the wrong place, it should be saved to models/cls/<model_name>/variables.json
+        save_cls_classes(selected_cls_model, selected_classes)
     elif selected_model_type == 'LOCATE':
         save_global_vars({"selected_folder_str": selected_folder_str,
-                        "selected_model_type": selected_model_type,
-                        "selected_det_model": selected_det_model})
+                          "selected_model_type": selected_model_type,
+                          "selected_det_model": selected_det_model})
 
     st.success("Variables saved successfully!")

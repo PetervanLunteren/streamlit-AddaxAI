@@ -18,6 +18,7 @@ pip install streamlit-tree-select
 pip install streamlit-antd-components
 pip install ffmpeg
 pip install gpsphoto
+pip install appdirs
 pip install piexif
 ```
 3. Install the normal AddaxAI: https://addaxdatascience.com/addaxai/#install
