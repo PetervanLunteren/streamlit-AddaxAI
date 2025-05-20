@@ -12,12 +12,28 @@ from collections import defaultdict
 import subprocess
 import time
 from datetime import datetime
+import os
+from pathlib import Path
+from datetime import datetime
+from PIL import Image
+from PIL.ExifTags import TAGS
+from hachoir.metadata import extractMetadata
+from hachoir.parser import createParser
+
 
 # set global variables
 AddaxAI_files = os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
 DET_DIR = os.path.join(AddaxAI_files, "models", "det")
+
+# fetch camera IDs
+config_dir = user_config_dir("AddaxAI")
+settings_file = os.path.join(config_dir, "settings.json")
+current_project = "VeluweProject"  # TODO: DEBUG this must be set in the settings file somewhere
+
+# DEBUG
+st.write(f"settings_file: {settings_file}")
 
 # set versions
 with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
@@ -57,24 +73,60 @@ def multiselect_checkboxes(classes, preselected):
     return selected_species
 
 
-# def location_selector_widget():
-#     # check if the user has any known locations
-#     locations, selected_index = fetch_known_locations()
-#     if locations == []:
-#         if st.button(":material/add_circle: Add location", key="add_new_location_button", use_container_width=False):
-#             add_new_location()
-#     else:
-#         location_ids = [location["locationID"] for location in locations]
-#         selected_location = st.selectbox(
-#             "Choose a location ID",
-#             options=location_ids + ["+ Add new"],
-#             index=selected_index,
-#         )
-#         # If "Add a new location" is selected, show a dialog with a map and text input
-#         if selected_location == "+ Add new":
-#             add_new_location()
+def fetch_known_cameras():
+    
+    if not os.path.exists(settings_file):
+        return [], 0 # No settings file yet
 
-#         return selected_location
+    with open(settings_file, "r") as f:
+        settings = json.load(f)
+
+    # Check if the project and cameras exist
+    if current_project in settings and "cameras" in settings[current_project]:
+        cameras_dict = settings[current_project]["cameras"]
+        # Convert to a list (or keep as dict if needed)
+        cameras = [
+            {"cameraID": loc_id, **loc_info}
+            for loc_id, loc_info in cameras_dict.items()
+        ]
+        return cameras, settings[current_project]['selected_camera_idx']  # Assume first one is selected by default
+    else:
+        return [], 0 # Project or cameras missing
+
+def camera_selector_widget():
+    # Initialize the popup state in session_state if it doesn't exist yet
+    if "show_add_camera_popup" not in st.session_state:
+        st.session_state.show_add_camera_popup = False
+
+    cameras, selected_index = fetch_known_cameras()
+
+    if cameras == []:
+        if st.button(":material/add_circle: Add camera", key="add_new_camera_button", use_container_width=False):
+            # Set the flag to show the popup
+            st.session_state.show_add_camera_popup = True
+
+    else:
+        camera_ids = [camera["cameraID"] for camera in cameras]
+        selected_camera = st.selectbox(
+            "Choose a camera ID",
+            options=camera_ids + ["+ Add new"],
+            index=selected_index,
+            label_visibility="collapsed",
+        )
+        if selected_camera == "+ Add new":
+            st.session_state.show_add_camera_popup = True
+        else:
+            # If user selects anything else, close popup
+            st.session_state.show_add_camera_popup = False
+
+        if st.session_state.show_add_camera_popup:
+            add_new_camera()
+
+        return selected_camera
+
+    # If no known cameras and popup should be shown
+    if st.session_state.show_add_camera_popup:
+        add_new_camera()
 
 def location_selector_widget():
     # Initialize the popup state in session_state if it doesn't exist yet
@@ -94,6 +146,7 @@ def location_selector_widget():
             "Choose a location ID",
             options=location_ids + ["+ Add new"],
             index=selected_index,
+            label_visibility="collapsed",
         )
         if selected_location == "+ Add new":
             st.session_state.show_add_location_popup = True
@@ -115,9 +168,7 @@ def print_widget_label(label_text, icon=None, help_text=None):
         line = f":material/{icon}: &nbsp; "
     else:
         line = ""
-    # st.divider()
     st.markdown(f"{line}**{label_text}**", help=help_text)
-
 
 def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
     # Extract option labels and captions from the dictionary
@@ -210,9 +261,9 @@ def needs_EA_update(required_version):
 
 
 def fetch_known_locations():
-    config_dir = user_config_dir("AddaxAI")
-    settings_file = os.path.join(config_dir, "settings.json")
-    current_project = "VeluweProject" # DEBUG this must be set in the settings file somewhere
+    # config_dir = user_config_dir("AddaxAI")
+    # settings_file = os.path.join(config_dir, "settings.json")
+    # current_project = "VeluweProject" # DEBUG this must be set in the settings file somewhere
 
     if not os.path.exists(settings_file):
         return [], 0  # No settings file yet
@@ -234,9 +285,9 @@ def fetch_known_locations():
 
 
 def add_location(location_id, lat, lon):
-    config_dir = user_config_dir("AddaxAI")
-    settings_file = os.path.join(config_dir, "settings.json")
-    current_project = "VeluweProject"  # TODO: DEBUG optionally fetch from main settings
+    # config_dir = user_config_dir("AddaxAI")
+    # settings_file = os.path.join(config_dir, "settings.json")
+    # current_project = "VeluweProject"  # TODO: DEBUG optionally fetch from main settings
 
     # Load existing settings
     if os.path.exists(settings_file):
@@ -277,6 +328,147 @@ def add_location(location_id, lat, lon):
 
 # # show popup with model information
 
+def add_camera(camera_id, comments):
+
+    # Load existing settings
+    if os.path.exists(settings_file):
+        with open(settings_file, "r") as file:
+            settings = json.load(file)
+    else:
+        settings = {}
+
+    # Get existing cameras or initialize
+    cameras = settings[current_project].get("cameras", {})
+
+    # Check if camera_id is unique
+    if camera_id in cameras:
+        raise ValueError(f"camera ID '{camera_id}' already exists.")
+
+    # Add new camera
+    cameras[camera_id] = {
+        "comments": comments,
+        "cameraID": camera_id  # redundant but keeps structure consistent
+    }
+
+    # Sort cameras (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
+    sorted_cameras = dict(sorted(cameras.items(), key=lambda item: item[0].lower()))
+    settings[current_project]["cameras"] = sorted_cameras
+    settings[current_project]["selected_camera_idx"] = list(sorted_cameras.keys()).index(camera_id) # update selected index
+
+    # Save updated settings
+    with open(settings_file, "w") as file:
+        json.dump(settings, file, indent=2)
+
+    # Return list of cameras and index of the new one
+    camera_list = list(sorted_cameras.values())
+    selected_index = camera_list.index(sorted_cameras[camera_id])
+
+    return selected_index, camera_list
+
+def get_image_datetime(file_path):
+    try:
+        image = Image.open(file_path)
+        exif_data = image._getexif()
+        if not exif_data:
+            return None
+        for tag_id, value in exif_data.items():
+            tag = TAGS.get(tag_id, tag_id)
+            if tag == 'DateTimeOriginal':
+                return datetime.strptime(value, '%Y:%m:%d %H:%M:%S')
+    except Exception:
+        pass
+    return None
+
+def get_video_datetime(file_path):
+    try:
+        parser = createParser(str(file_path))
+        if not parser:
+            return None
+        metadata = extractMetadata(parser)
+        if metadata and metadata.has("creation_date"):
+            return metadata.get("creation_date")
+    except Exception:
+        pass
+    return None
+
+def get_file_datetime(file_path):
+    # Try image EXIF
+    if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+        dt = get_image_datetime(file_path)
+        if dt:
+            return dt
+
+    # Try video metadata
+    if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
+        dt = get_video_datetime(file_path)
+        if dt:
+            return dt
+
+    # Fallback: file modified time
+    return datetime.fromtimestamp(file_path.stat().st_mtime)
+
+def check_start_datetime():
+    
+    with st.spinner("Checking start datetime..."):
+
+        # Load existing settings
+        with open(settings_file, "r") as file:
+            settings = json.load(file)
+
+        # Get existing cameras or initialize
+        deployment_folder = settings[current_project].get("selected_folder_str", {})
+        
+        folder = Path("/Users/peter/Downloads/imgs")
+        datetimes = []
+
+        for file in folder.rglob("*"):
+            if file.is_file():
+                dt = get_file_datetime(file)
+                if dt:
+                    datetimes.append(dt)
+
+        return min(datetimes) if datetimes else None
+    
+    
+    
+def datetime_selector_widget():
+    
+    
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_date = st.date_input("Date", value=None, label_visibility="collapsed")
+    with col2:
+        selected_time = st.time_input("Time", step=60, value=None, label_visibility="collapsed")
+    if selected_date and selected_time:
+        selected_datetime = datetime.combine(
+            selected_date, selected_time)
+        st.write("Selected datetime:", selected_datetime)
+        return selected_datetime
+
+@st.dialog("New camera", width="large")
+def add_new_camera():
+    
+    known_cameras, _ = fetch_known_cameras()
+
+    print_widget_label("Unique camera ID",
+                       help_text="This ID will be used to identify the camera in the system.")
+    camera_id = st.text_input("Camera ID", max_chars=20, label_visibility="collapsed")
+    
+    print_widget_label("Optionally add any comments or notes",
+                       help_text="This is a free text field where you can add any comments or notes about the camera.")
+    comments = st.text_area("Comments", height=150, label_visibility="collapsed")
+    
+    if camera_id:
+        if st.button(":material/save: Save camera", use_container_width=True):
+            if not camera_id.strip():
+                st.error("Camera ID cannot be empty.")
+            elif any(camera["cameraID"] == camera_id for camera in known_cameras):
+                st.error(
+                    f"Error: The ID '{camera_id}' is already taken. Please choose a unique ID.")
+            else:
+                add_camera(camera_id, comments)
+                st.rerun()
 
 @st.dialog("New location", width="large")
 def add_new_location():
@@ -446,10 +638,42 @@ def add_new_location():
                 new_location_id = None
                 st.session_state.lat_selected = None
                 st.session_state.lng_selected = None
-                st.session_state.metadata_checked = False
+                st.session_state.metadata_checked = False # TODO: must check metadata for location GPS points, if so, put on map
                 st.rerun() 
 
 # show popup with model information
+
+def select_folder():
+    result = subprocess.run([sys.executable, os.path.join(
+        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "folder_selector.py")], capture_output=True, text=True)
+    folder_path = result.stdout.strip()
+    if folder_path != "" and result.returncode == 0:
+        return folder_path
+    else:
+        return None
+
+
+def browse_directory_widget(selected_folder_str):
+    col1, col2 = st.columns([1, 3], vertical_alignment="center")
+    with col1:
+        if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
+            selected_folder_str = select_folder()
+    if not selected_folder_str:
+        with col2:
+            st.write('<span style="color: grey;"> None selected...</span>',
+                     unsafe_allow_html=True)
+    else:
+        with col2:
+            selected_folder_str_short = "..." + \
+                selected_folder_str[-45:] if len(
+                    selected_folder_str) > 45 else selected_folder_str
+            st.markdown(
+                f'Selected folder <code style="color:#086164; font-family:monospace;">{selected_folder_str_short}</code>', unsafe_allow_html=True)
+    
+    save_project_vars({"selected_folder_str": selected_folder_str})
+    return selected_folder_str
+
+
 
 
 @st.dialog("Model information", width="large")
@@ -537,64 +761,95 @@ def save_cls_classes(cls_model_key, slected_classes):
         json.dump(model_info, file, indent=4)
 
 
-def save_global_vars(new_data):
-    """Updates or creates a JSON file with multiple key-value pairs.
+# def save_project_vars(new_data):
+#     if not isinstance(new_data, dict):
+#         raise ValueError("Expected a dictionary as input")
 
-    - `new_data` should be a dictionary.
-    - If the file doesn't exist, it creates it.
-    - If keys exist, their values are updated.
-    - If keys don’t exist, they are added.
+#     # fpath = os.path.join("/Users/peter/Desktop/streamlit_app/frontend", "vars.json")
+#     fpath = os.path.join(AddaxAI_files, "AddaxAI",
+#                          "streamlit-AddaxAI", "frontend", "vars.json")
+#     temp_fpath = fpath + ".tmp"  # Temporary file for atomic write
+
+#     # Load existing data or start with an empty dictionary
+#     try:
+#         if os.path.exists(fpath):
+#             with open(fpath, "r", encoding="utf-8") as file:
+#                 data = json.load(file)
+#         else:
+#             data = {}
+#     except (json.JSONDecodeError, IOError):
+#         data = {}  # Handle corrupt file or read errors
+
+#     # Update data with new values
+#     data.update(new_data)
+
+#     # Write updated data to a temporary file first (atomic write)
+#     try:
+#         with open(temp_fpath, "w", encoding="utf-8") as file:
+#             json.dump(data, file, indent=4)
+#         # Replace old file only after successful write
+#         os.replace(temp_fpath, fpath)
+#     except IOError as e:
+#         st.warning(f"Error writing to file: {e}")
+        
+        
+def save_project_vars(new_data):
     """
+    Update or add key-value pairs to a specific project in a settings JSON file.
 
+    Parameters:
+    - new_data (dict): Dictionary of new or updated variables.
+    - project_name (str): The name of the project to update (e.g., "VeluweProject").
+    - settings_file (str): Full path to the settings JSON file.
+    """
     if not isinstance(new_data, dict):
-        raise ValueError("Expected a dictionary as input")
+        raise ValueError("Expected new_data to be a dictionary")
 
-    # fpath = os.path.join("/Users/peter/Desktop/streamlit_app/frontend", "vars.json")
-    fpath = os.path.join(AddaxAI_files, "AddaxAI",
-                         "streamlit-AddaxAI", "frontend", "vars.json")
-    temp_fpath = fpath + ".tmp"  # Temporary file for atomic write
-
-    # Load existing data or start with an empty dictionary
+    temp_file = settings_file + ".tmp"
+    
+    # Load full settings or initialize
     try:
-        if os.path.exists(fpath):
-            with open(fpath, "r", encoding="utf-8") as file:
-                data = json.load(file)
+        if os.path.exists(settings_file):
+            with open(settings_file, "r", encoding="utf-8") as f:
+                settings = json.load(f)
         else:
-            data = {}
+            settings = {}
     except (json.JSONDecodeError, IOError):
-        data = {}  # Handle corrupt file or read errors
+        settings = {}
+        
+    # Get project section, or initialize if missing
+    project_vars = settings.get(current_project, {})
 
-    # Update data with new values
-    data.update(new_data)
+    # Update with new data
+    project_vars.update(new_data)
 
-    # Write updated data to a temporary file first (atomic write)
+    # Save back into settings
+    settings[current_project] = project_vars
+
+    # Atomic write to prevent file corruption
     try:
-        with open(temp_fpath, "w", encoding="utf-8") as file:
-            json.dump(data, file, indent=4)
-        # Replace old file only after successful write
-        os.replace(temp_fpath, fpath)
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2)
+        os.replace(temp_file, settings_file)
     except IOError as e:
-        st.warning(f"Error writing to file: {e}")
+        raise RuntimeError(f"Error writing to settings file: {e}")
+        
 
 
-def load_vars():
+def load_project_vars():
     """Reads the data from the JSON file and returns it as a dictionary."""
 
-    # Define file path
-    # fpath = os.path.join("/Users/peter/Desktop/streamlit_app/frontend", "vars.json")
-    fpath = os.path.join(AddaxAI_files, "AddaxAI",
-                         "streamlit-AddaxAI", "frontend", "vars.json")
-
-    # Check if the file exists and load its data
-    if os.path.exists(fpath):
-        with open(fpath, "r", encoding="utf-8") as file:
-            try:
-                data = json.load(file)
-                return data
-            except json.JSONDecodeError:
-                return {}  # Return empty dictionary if the file is corrupt or empty
-    else:
-        return {}  # Return empty dictionary if the file doesn't exist
+    # Load full settings or initialize
+    try:
+        if os.path.exists(settings_file):
+            with open(settings_file, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+        else:
+            settings = {}
+    except (json.JSONDecodeError, IOError):
+        settings = {}
+    
+    return settings.get(current_project, {})
 
 
 def load_txts():

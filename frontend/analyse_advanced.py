@@ -1,11 +1,11 @@
 import streamlit as st
 import pandas as pd
-from backend.utils import load_txts, load_vars, save_global_vars, location_selector_widget, save_cls_classes, print_widget_label, multiselect_checkboxes, fetch_all_model_info, fetch_known_locations, show_model_info, add_new_location, radio_buttons_with_captions, select_model_widget
-from backend.analyse_utils import browse_directory_widget
+from datetime import datetime, timedelta
+from backend.utils import *
 
 # load language settings
 txts = load_txts()
-vars = load_vars()
+vars = load_project_vars()
 lang = vars.get("lang", "en")
 mode = vars.get("mode", 1)
 prev_selected_folder_str = vars.get("selected_folder_str", None)
@@ -36,10 +36,9 @@ with st.container(border=True):
     selected_folder_str = browse_directory_widget(prev_selected_folder_str)
 st.write("")
 
-# if a folder is selected, show the model selection and save the folder
+# if a folder is selected, show the model selection
 if selected_folder_str:
-    save_global_vars({"selected_folder_str": selected_folder_str})
-
+    
     # widget to select the model type
     with st.container(border=True):
         print_widget_label("Would you like to only locate where the animals are or also identify their species?",
@@ -102,18 +101,59 @@ if selected_folder_str:
                                                               slected_model_info['selected_classes'])
                 st.write("")
 
-# model section
-st.write("")
-st.subheader(":material/sd_card: Deployment metadata", divider="gray")
-st.write("This is where you fill in the metadata of your deployment. This information will be saved in the recognition file "
-         "and can be used to filter the results later on. It is optional, but required to make maps and other visualizations."
-         " You can always change it later on.")
+    # deployment metadata section is always shown, regardless of the model type
+    if selected_model_type:
+        st.write("")
+        st.subheader(":material/sd_card: Deployment metadata", divider="gray")
+        st.write("This is where you fill in the metadata of your deployment. This information will be saved in the recognition file "
+                 "and can be used to filter the results later on. It is optional, but required to make maps and other visualizations."
+                 " You can always change it later on.")
 
-# location metadata
-print_widget_label(
-    "What was the location of this deployment?", help_text="help text")
-selected_locationID = location_selector_widget()
-st.write(f"Selected location: {selected_locationID}")
+        # location metadata
+        with st.container(border=True):
+            print_widget_label(
+                "What was the location?", help_text="help text")
+            selected_locationID = location_selector_widget()
+        st.write("")
+
+        # camera ID metadata
+        if selected_locationID:
+            with st.container(border=True):
+                print_widget_label(
+                    "Which camera was used?", help_text="This is a unique identifier for the physical camera device itself—not the location. Since cameras can be moved between different locations over time, this ID helps track the specific camera regardless of where it’s deployed. It’s important for camtrapDP export and allows you to filter or analyze data by camera device. You can use any naming convention you like, as long as you can clearly identify which specific device it refers to.\n\nExamples: Browning51, Reconyx-A3, Peter's backup cam, etc.")
+                selected_cameraID = camera_selector_widget()
+            st.write("")
+            
+            # datetime metadata
+            if selected_cameraID:
+                with st.container(border=True):
+                    print_widget_label(
+                        "When did recording start?", help_text="help text")
+                    selected_datetime = datetime_selector_widget()
+                    st.write("")
+                    st.write("Selected datetime:", selected_datetime)
+                st.write("")
+
+
+
+st.write(check_start_datetime())
+
+# 
+# from streamlit_datetime_picker import date_time_picker, date_range_picker
+
+# dt = date_time_picker(placeholder='Enter your birthday')
+
+# Get date
+
+
+# # Get time (hour and minute only)
+# time = st.time_input("Select a time", step = 60)
+
+# # Combine
+# dt = datetime.combine(date, time)
+
+# st.write("Selected datetime (no seconds):", dt)
+                
 
 
 st.write("")
@@ -122,7 +162,7 @@ st.write("")
 if st.button(":material/rocket_launch: Let's go!", key="save_vars_button", use_container_width=True, type="primary"):
 
     if selected_model_type == 'IDENTIFY':
-        save_global_vars({"selected_folder_str": selected_folder_str,
+        save_project_vars({"selected_folder_str": selected_folder_str,
                           "selected_model_type": selected_model_type,
                           "selected_det_model": selected_det_model,
                           "selected_cls_model": selected_cls_model})
@@ -132,7 +172,7 @@ if st.button(":material/rocket_launch: Let's go!", key="save_vars_button", use_c
         # TODO: this is saving it to the wrong place, it should be saved to models/cls/<model_name>/variables.json
         save_cls_classes(selected_cls_model, selected_classes)
     elif selected_model_type == 'LOCATE':
-        save_global_vars({"selected_folder_str": selected_folder_str,
+        save_project_vars({"selected_folder_str": selected_folder_str,
                           "selected_model_type": selected_model_type,
                           "selected_det_model": selected_det_model})
 

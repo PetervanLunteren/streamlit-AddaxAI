@@ -3,3 +3,4 @@
 frontend/streamlit_log.txt
 frontend/vars.json
 pyproject.toml
+backend/__pycache__/analyse_utils.cpython-311.pyc

@@ -1,5 +1,5 @@
 from appdirs import user_config_dir
-from backend.utils import *
+
 import streamlit as st
 import sys
 import os
@@ -11,6 +11,8 @@ AddaxAI_files = os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "logo_square.png"), page_title="AddaxAI")
+
+st.write(f"AddaxAI files: {AddaxAI_files}")
 
 # get rid of the Streamlit menu
 st.markdown("""
@@ -56,6 +58,8 @@ updated_pythonpath = list(dict.fromkeys(paths + existing_pythonpath))
 
 # Set PYTHONPATH
 os.environ["PYTHONPATH"] = ":".join(updated_pythonpath)
+
+from backend.utils import *
 
 
 # Custom CSS to style the button in the header
@@ -104,6 +108,11 @@ if not os.path.exists(settings_file):
             "selected_location_idx": 0,
             "selected_camera_idx": 0,
             "selected_deployment_idx": 0,
+            # "selected_folder_str": "/Library",
+            # "selected_model_type": "IDENTIFY",
+            # "selected_cls_model_key": "CAM-AI4GM-v1",
+            # "selected_det_model": "MD1000REDWOOD",
+            # "selected_cls_model": "SWUSA-SDZWA-v3",
             "locations": {
                 "Beukenpad": {
                     "lat": 52.25807132666112,
@@ -122,13 +131,13 @@ if not os.path.exists(settings_file):
                 }
             },
             "cameras": {
-                "cam01": {
+                "AlphaCam": {
                     "cameraID": "AlphaCam",
-                    "notes": "Replaced battery 2024-11-01"
+                    "comments": "Replaced battery 2024-11-01"
                 },
-                "cam02": {
+                "BetaCam": {
                     "cameraID": "BetaCam",
-                    "notes": "Low signal area"
+                    "comments": "Low signal area"
                 }
             },
             "deployments": {
@@ -156,7 +165,7 @@ st.write(fetch_known_locations())
 
 # load language settings
 txts = load_txts()
-vars = load_vars()
+vars = load_project_vars()
 lang = vars.get("lang", "en")
 mode = vars.get("mode", 1)
 
