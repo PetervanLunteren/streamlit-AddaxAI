@@ -6,9 +6,10 @@ from backend.utils import *
 
 # load language settings
 txts = load_txts()
-vars = load_vars()
-lang = vars.get("lang", "en")
-mode = vars.get("mode", 1)
+settings, _ = load_settings()
+lang = settings["lang"]
+mode = settings["mode"]
+
 
 lang_options = txts["languages"]
 lang_idx = list(lang_options.keys()).index(lang)
@@ -20,6 +21,18 @@ lang_selected = st.selectbox(
     index=lang_idx,
     label_visibility="collapsed"
 )
+
+
+# import settings file
+settings_, settings_file = load_settings()
+
+st.write("settings_file:", settings_file)
+st.write("settings:", settings_)
+
+
+# st.write("settings_file: /Users/peter/Library/Application Support/AddaxAI/settings.json")
+
+
 
 save_btn = st.button(":material/save: Save settings", use_container_width=True,
                         type = "primary", key = "language_btn")

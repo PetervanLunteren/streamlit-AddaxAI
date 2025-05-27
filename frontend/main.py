@@ -1,3 +1,4 @@
+from backend.utils import *
 from appdirs import user_config_dir
 
 import streamlit as st
@@ -12,7 +13,7 @@ AddaxAI_files = os.path.dirname(os.path.dirname(
 st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "logo_square.png"), page_title="AddaxAI")
 
-st.write(f"AddaxAI files: {AddaxAI_files}")
+# st.write(f"AddaxAI files: {AddaxAI_files}")
 
 # get rid of the Streamlit menu
 st.markdown("""
@@ -59,8 +60,6 @@ updated_pythonpath = list(dict.fromkeys(paths + existing_pythonpath))
 # Set PYTHONPATH
 os.environ["PYTHONPATH"] = ":".join(updated_pythonpath)
 
-from backend.utils import *
-
 
 # Custom CSS to style the button in the header
 st.markdown(
@@ -101,58 +100,13 @@ os.makedirs(config_dir, exist_ok=True)
 settings_file = os.path.join(config_dir, "settings.json")
 if not os.path.exists(settings_file):
 
-    settings = {  # this is a dummy settings file
-        "lang": "EN",
-        "mode": "ADV",
-        "VeluweProject": {
-            "selected_location_idx": 0,
-            "selected_camera_idx": 0,
-            "selected_deployment_idx": 0,
-            # "selected_folder_str": "/Library",
-            # "selected_model_type": "IDENTIFY",
-            # "selected_cls_model_key": "CAM-AI4GM-v1",
-            # "selected_det_model": "MD1000REDWOOD",
-            # "selected_cls_model": "SWUSA-SDZWA-v3",
-            "locations": {
-                "Beukenpad": {
-                    "lat": 52.25807132666112,
-                    "lon": 5.868072509765626,
-                    "locationID": "Beukenpad"
-                },
-                "Heidelaan": {
-                    "lat": 52.26059305351773,
-                    "lon": 5.66070556640625,
-                    "locationID": "Heidelaan"
-                },
-                "Zandberg": {
-                    "lat": 52.20424032262008,
-                    "lon": 5.747222900390626,
-                    "locationID": "Zandberg"
-                }
-            },
-            "cameras": {
-                "AlphaCam": {
-                    "cameraID": "AlphaCam",
-                    "comments": "Replaced battery 2024-11-01"
-                },
-                "BetaCam": {
-                    "cameraID": "BetaCam",
-                    "comments": "Low signal area"
-                }
-            },
-            "deployments": {
-                "deploy001": {
-                    "locationID": "loc01",
-                    "cameraID": "cam01",
-                    "path": "/data/veluwe/deploy001"
-                },
-                "deploy002": {
-                    "locationID": "loc02",
-                    "cameraID": "cam02",
-                    "path": "/data/veluwe/deploy002"
-                }
-            }
-        }
+    # start with a clean slate
+    settings = {
+        "lang": "en",  # default language
+        "mode": 1,  # default mode (0: simple, 1: advanced)
+        "selected_folder": None,
+        "selected_project": None, 
+        "projects": {}
     }
 
     with open(settings_file, "w") as f:
@@ -160,14 +114,15 @@ if not os.path.exists(settings_file):
 
 
 # DEBUG
-st.write(fetch_known_locations())
+# st.write(fetch_known_locations())
 
 
 # load language settings
 txts = load_txts()
-vars = load_project_vars()
-lang = vars.get("lang", "en")
-mode = vars.get("mode", 1)
+# vars = load_project_vars()
+settings, _ = load_settings()
+lang = settings["lang"]
+mode = settings["mode"]
 
 # render a dummy map with a marker so that the rest of the markers this session will be rendered
 m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)

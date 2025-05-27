@@ -10,15 +10,19 @@ from appdirs import user_config_dir
 import pandas as pd
 from collections import defaultdict
 import subprocess
-import time
-from datetime import datetime
+import string
+# import time
+from datetime import datetime, time
+# from datetime import datetime
 import os
 from pathlib import Path
 from datetime import datetime
 from PIL import Image
+import random
 from PIL.ExifTags import TAGS
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
+import piexif
 
 
 # set global variables
@@ -30,10 +34,6 @@ DET_DIR = os.path.join(AddaxAI_files, "models", "det")
 # fetch camera IDs
 config_dir = user_config_dir("AddaxAI")
 settings_file = os.path.join(config_dir, "settings.json")
-current_project = "VeluweProject"  # TODO: DEBUG this must be set in the settings file somewhere
-
-# DEBUG
-st.write(f"settings_file: {settings_file}")
 
 # set versions
 with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
@@ -41,110 +41,74 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 
 # print a markdown label with an icon and help text
 
+############################
+### DEPLOYMENT UTILITIES ###
+############################
 
-def multiselect_checkboxes(classes, preselected):
-
-    # select all or none buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button(":material/check_box: Select all", use_container_width=True):
-            for species in classes:
-                st.session_state[f"species_{species}"] = True
-    with col2:
-        if st.button(":material/check_box_outline_blank: Select none", use_container_width=True):
-            for species in classes:
-                st.session_state[f"species_{species}"] = False
-
-    # checkboxes in a scrollable container
-    selected_species = []
-    with st.container(border=True, height=300):
-        for species in classes:
-            key = f"species_{species}"
-            checked = st.session_state.get(
-                key, True if species in preselected else False)
-            if st.checkbox(species, value=checked, key=key):
-                selected_species.append(species)
-
-    # log selected species
-    st.markdown(
-        f'&nbsp; You selected the presence of <code style="color:#086164; font-family:monospace;">{len(selected_species)}</code> classes', unsafe_allow_html=True)
-
-    # return list
-    return selected_species
-
-
-def fetch_known_cameras():
-    
-    if not os.path.exists(settings_file):
-        return [], 0 # No settings file yet
-
-    with open(settings_file, "r") as f:
-        settings = json.load(f)
-
-    # Check if the project and cameras exist
-    if current_project in settings and "cameras" in settings[current_project]:
-        cameras_dict = settings[current_project]["cameras"]
-        # Convert to a list (or keep as dict if needed)
-        cameras = [
-            {"cameraID": loc_id, **loc_info}
-            for loc_id, loc_info in cameras_dict.items()
-        ]
-        return cameras, settings[current_project]['selected_camera_idx']  # Assume first one is selected by default
-    else:
-        return [], 0 # Project or cameras missing
-
-def camera_selector_widget():
+def project_selector_widget():
     # Initialize the popup state in session_state if it doesn't exist yet
-    if "show_add_camera_popup" not in st.session_state:
-        st.session_state.show_add_camera_popup = False
+    if "show_add_project_popup" not in st.session_state:
+        st.session_state.show_add_project_popup = False
 
-    cameras, selected_index = fetch_known_cameras()
+    projects, selected_project = fetch_known_projects()
+    
+    # st.write(f"projects: {projects}")
 
-    if cameras == []:
-        if st.button(":material/add_circle: Add camera", key="add_new_camera_button", use_container_width=False):
+    if projects == {}:
+        if st.button(":material/add_circle: Add your first project", key="add_new_project_button", use_container_width=False):
             # Set the flag to show the popup
-            st.session_state.show_add_camera_popup = True
+            st.session_state.show_add_project_popup = True
 
     else:
-        camera_ids = [camera["cameraID"] for camera in cameras]
-        selected_camera = st.selectbox(
-            "Choose a camera ID",
-            options=camera_ids + ["+ Add new"],
+        # project_ids = [project["projectID"] for project in projects]
+        project_ids = list(projects.keys())
+        options = project_ids + ["+ Add new"]
+        selected_index = options.index(selected_project) if selected_project in options else 0
+        selected_project = st.selectbox(
+            "Choose a project ID",
+            options=options,
             index=selected_index,
             label_visibility="collapsed",
         )
-        if selected_camera == "+ Add new":
-            st.session_state.show_add_camera_popup = True
+        if selected_project == "+ Add new":
+            st.session_state.show_add_project_popup = True
         else:
             # If user selects anything else, close popup
-            st.session_state.show_add_camera_popup = False
+            st.session_state.show_add_project_popup = False
 
-        if st.session_state.show_add_camera_popup:
-            add_new_camera()
+        if st.session_state.show_add_project_popup:
+            add_new_project()
 
-        return selected_camera
+        return selected_project
 
-    # If no known cameras and popup should be shown
-    if st.session_state.show_add_camera_popup:
-        add_new_camera()
+    # If no known projects and popup should be shown
+    if st.session_state.show_add_project_popup:
+        add_new_project()
+
 
 def location_selector_widget():
     # Initialize the popup state in session_state if it doesn't exist yet
     if "show_add_location_popup" not in st.session_state:
         st.session_state.show_add_location_popup = False
 
-    locations, selected_index = fetch_known_locations()
+    locations, selected_location = fetch_known_locations()
 
-    if locations == []:
-        if st.button(":material/add_circle: Add location", key="add_new_location_button", use_container_width=False):
+    # st.write(f"locations: {locations}")
+    # st.write(f"selected_location: {selected_location}")
+
+    if locations == {}:
+        if st.button(":material/add_circle: Add first location", key="add_new_location_button", use_container_width=False):
             # Set the flag to show the popup
             st.session_state.show_add_location_popup = True
 
     else:
-        location_ids = [location["locationID"] for location in locations]
+        location_ids = list(locations.keys())
+        options = location_ids + ["+ Add new"]
+        selected_index = options.index(selected_location) if selected_location in options else 0
+        
         selected_location = st.selectbox(
             "Choose a location ID",
-            options=location_ids + ["+ Add new"],
+            options=options,
             index=selected_index,
             label_visibility="collapsed",
         )
@@ -163,157 +127,140 @@ def location_selector_widget():
     if st.session_state.show_add_location_popup:
         add_new_location()
 
-def print_widget_label(label_text, icon=None, help_text=None):
-    if icon:
-        line = f":material/{icon}: &nbsp; "
-    else:
-        line = ""
-    st.markdown(f"{line}**{label_text}**", help=help_text)
 
-def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
-    # Extract option labels and captions from the dictionary
-    options = [v["option"] for v in option_caption_dict.values()]
-    captions = [v["caption"] for v in option_caption_dict.values()]
-    key_map = {v["option"]: k for k, v in option_caption_dict.items()}
+def datetime_selector_widget():
+    
+    
+    
+    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
 
-    # Get default index based on default_key
-    default_index = list(option_caption_dict.keys()).index(default_option)
+    with col1:
+        selected_date = st.date_input("Date", value=None)
 
-    # Create a radio button selection with captions
-    with st.container(border=True, height=275 if scrollable else None):
-        selected_option = st.radio(
-            label=key,
-            options=options,
-            index=default_index,
-            label_visibility="collapsed",
-            captions=captions
+    # Format options as zero-padded strings
+    hour_options = ["--"] + [f"{i:02d}" for i in range(24)]
+    minute_options = ["--"] + [f"{i:02d}" for i in range(60)]
+    second_options = ["--"] + [f"{i:02d}" for i in range(60)]
+
+    with col2:
+        selected_hour = st.selectbox("Hour", options=hour_options)
+
+    with col3:
+        selected_minute = st.selectbox("Minute", options=minute_options)
+
+    with col4:
+        selected_second = st.selectbox("Second", options=second_options)
+
+    # Check if all values are selected properly
+    if (
+        selected_date
+        and selected_hour != "--"
+        and selected_minute != "--"
+        and selected_second != "--"
+    ):
+        selected_time = time(
+            hour=int(selected_hour),
+            minute=int(selected_minute),
+            second=int(selected_second)
         )
+        selected_datetime = datetime.combine(selected_date, selected_time)
+        st.write("Selected datetime:", selected_datetime)
+        
+        # deployment will only be added once the user has pressed the "ANALYSE" button
+        
+        return selected_datetime
 
-    # Return the corresponding key
-    return key_map[selected_option]
 
-
-def select_model_widget(model_type, prev_selected_model):
-    # prepare radio button options
-    model_info = fetch_all_model_info(model_type)
-    model_options = {}
-    for key, info in model_info.items():
-        model_options[key] = {"option": info["friendly_name"],
-                              "caption": f":material/calendar_today: Released {info['release']} &nbsp;|&nbsp; "
-                              f":material/code_blocks: Developed by {info['developer']} &nbsp;|&nbsp; "
-                              f":material/description: {info['short_description']}"}
-    selected_model = radio_buttons_with_captions(
-        option_caption_dict=model_options,
-        key=f"{model_type}_model",
-        scrollable=True,
-        default_option=prev_selected_model)
-
-    # more info button
-    friendly_name = model_info[selected_model]["friendly_name"]
-    if st.button(f":material/info: More info about :grey-background[{friendly_name}]", key=f"{model_type}_model_info_button"):
-        show_model_info(model_info[selected_model])
-
-    return selected_model
-
-# check which models are known and should be listed in the dpd
-def fetch_all_model_info(type):
-
-    # fetch
-    model_info_json = os.path.join(
-        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
-    with open(model_info_json, "r") as file:
-        model_info = json.load(file)
-
-    # sort by release date
-    sorted_det_models = dict(
-        sorted(
-            model_info[type].items(),
-            # key=lambda item: datetime.strptime(item[1].get("release", "01-1900"), "%m-%Y"), # on release date
-            key=lambda item: item[1].get(
-                "friendly_name", ""),  # on frendly name
-            reverse=False
-        )
-    )
-
-    # return
-    return sorted_det_models
-
-# check if the user needs an update
-def needs_EA_update(required_version):
-    current_parts = list(map(int, current_AA_version.split('.')))
-    required_parts = list(map(int, required_version.split('.')))
-
-    # Pad the shorter version with zeros
-    while len(current_parts) < len(required_parts):
-        current_parts.append(0)
-    while len(required_parts) < len(current_parts):
-        required_parts.append(0)
-
-    # Compare each part of the version
-    for current, required in zip(current_parts, required_parts):
-        if current < required:
-            return True  # current_version is lower than required_version
-        elif current > required:
-            return False  # current_version is higher than required_version
-
-    # All parts are equal, consider versions equal
-    return False
-
+def fetch_known_projects():
+    settings, _ = load_settings()
+    projects = settings["projects"]
+    selected_project = settings["selected_project"]
+    return projects, selected_project
 
 def fetch_known_locations():
-    # config_dir = user_config_dir("AddaxAI")
-    # settings_file = os.path.join(config_dir, "settings.json")
-    # current_project = "VeluweProject" # DEBUG this must be set in the settings file somewhere
+    settings, _ = load_settings()
+    selected_project = settings["selected_project"]
+    project = settings["projects"][selected_project]
+    selected_location = project["selected_location"]
+    locations = project["locations"]
+    return locations, selected_location
 
-    if not os.path.exists(settings_file):
-        return [], 0  # No settings file yet
+def fetch_known_deployments():
+    settings, _ = load_settings()
+    selected_project = settings["selected_project"]
+    project = settings["projects"][selected_project]
+    selected_location = project["selected_location"]
+    location = project["locations"][selected_location]
+    deployments = location["deployments"]
+    selected_deployment = location["selected_deployment"]
+    return deployments, selected_deployment
 
-    with open(settings_file, "r") as f:
-        settings = json.load(f)
+def generate_deployment_id(dt: datetime) -> str:
+    # Format datetime as YYYYMMDDHHMMSS
+    dt_str = dt.strftime("%Y%m%d%H%M%S")
+    
+    # Create a consistent 5-char hash from the datetime and some randomness
+    rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    
+    # Combine into deployment ID
+    return f"dep-{dt_str}-{rand_str}"
 
-    # Check if the project and locations exist
-    if current_project in settings and "locations" in settings[current_project]:
-        locations_dict = settings[current_project]["locations"]
-        # Convert to a list (or keep as dict if needed)
-        locations = [
-            {"locationID": loc_id, **loc_info}
-            for loc_id, loc_info in locations_dict.items()
-        ]
-        return locations, settings[current_project]['selected_location_idx']  # Assume first one is selected by default
-    else:
-        return [], 0  # Project or locations missing
+def add_deployment(datetime):
 
+    settings, _ = load_settings()
+    selected_project = settings["selected_project"]
+    project = settings["projects"][selected_project]
+    selected_location = project["selected_location"]
+    location = project["locations"][selected_location]
+    deployments = location["deployments"]
+
+    # generate a unique deployment ID
+    deployment_id = generate_deployment_id(datetime)
+
+    # Add new deployment
+    deployments[deployment_id] = {
+        "deploymentStart": datetime.isoformat(),
+        "deploymentEnd": None,  # initially set to None
+    }
+
+    # Sort deployments (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
+    sorted_deployments = dict(sorted(deployments.items(), key=lambda item: item[0].lower()))
+    settings["projects"][selected_project]["locations"][selected_location]["deployments"] = sorted_deployments
+    settings["projects"][selected_project]["locations"][selected_location]["selected_deployment"] = deployment_id
+
+    # Save updated settings
+    with open(settings_file, "w") as file:
+        json.dump(settings, file, indent=2)
+
+    # Return list of deployments and index of the new one
+    deployment_list = list(sorted_deployments.values())
+    selected_index = deployment_list.index(sorted_deployments[deployment_id])
+
+    return selected_index, deployment_list
 
 def add_location(location_id, lat, lon):
-    # config_dir = user_config_dir("AddaxAI")
-    # settings_file = os.path.join(config_dir, "settings.json")
-    # current_project = "VeluweProject"  # TODO: DEBUG optionally fetch from main settings
 
-    # Load existing settings
-    if os.path.exists(settings_file):
-        with open(settings_file, "r") as file:
-            settings = json.load(file)
-    else:
-        settings = {}
-
-    # Get existing locations or initialize
-    locations = settings[current_project].get("locations", {})
+    settings, _ = load_settings()
+    selected_project = settings["selected_project"]
+    project = settings["projects"][selected_project]
+    locations = project["locations"]
 
     # Check if location_id is unique
-    if location_id in locations:
-        raise ValueError(f"Location ID '{location_id}' already exists.")
+    if location_id in locations.keys():
+        raise ValueError(f"Location ID '{location_id}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
 
     # Add new location
     locations[location_id] = {
         "lat": lat,
         "lon": lon,
-        "locationID": location_id  # redundant but keeps structure consistent
+        "selected_deployment": None,
+        "deployments": {},
     }
 
     # Sort locations (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
     sorted_locations = dict(sorted(locations.items(), key=lambda item: item[0].lower()))
-    settings[current_project]["locations"] = sorted_locations
-    settings[current_project]["selected_location_idx"] = list(sorted_locations.keys()).index(location_id) # update selected index
+    settings["projects"][selected_project]["locations"] = sorted_locations
+    settings["projects"][selected_project]["selected_location"] = location_id
 
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -327,148 +274,67 @@ def add_location(location_id, lat, lon):
 
 
 # # show popup with model information
+def add_project(projectID, comments):
 
-def add_camera(camera_id, comments):
+    settings, settings_file = load_settings()
+    projects = settings["projects"]
+    projectIDs = projects.keys()
+    
+    # st.write(projectIDs)
 
-    # Load existing settings
-    if os.path.exists(settings_file):
-        with open(settings_file, "r") as file:
-            settings = json.load(file)
-    else:
-        settings = {}
+    # Check if project_id is unique
+    if projectID in projectIDs:
+        raise ValueError(f"project ID '{projectID}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
 
-    # Get existing cameras or initialize
-    cameras = settings[current_project].get("cameras", {})
-
-    # Check if camera_id is unique
-    if camera_id in cameras:
-        raise ValueError(f"camera ID '{camera_id}' already exists.")
-
-    # Add new camera
-    cameras[camera_id] = {
+    # Add new project
+    projects[projectID] = {
         "comments": comments,
-        "cameraID": camera_id  # redundant but keeps structure consistent
+        "selected_location": None,
+        "locations": {},
     }
 
-    # Sort cameras (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
-    sorted_cameras = dict(sorted(cameras.items(), key=lambda item: item[0].lower()))
-    settings[current_project]["cameras"] = sorted_cameras
-    settings[current_project]["selected_camera_idx"] = list(sorted_cameras.keys()).index(camera_id) # update selected index
+    # Sort projects (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
+    sorted_projects = dict(sorted(projects.items(), key=lambda item: item[0].lower()))
+    settings["projects"] = sorted_projects
+    # settings["selected_project"] = list(sorted_projects.keys()).index(projectID) # update selected index
+    settings["selected_project"] = projectID
 
     # Save updated settings
     with open(settings_file, "w") as file:
         json.dump(settings, file, indent=2)
 
-    # Return list of cameras and index of the new one
-    camera_list = list(sorted_cameras.values())
-    selected_index = camera_list.index(sorted_cameras[camera_id])
+    # Return list of projects and index of the new one
+    project_list = list(sorted_projects.values())
+    selected_index = project_list.index(sorted_projects[projectID])
 
-    return selected_index, camera_list
+    return selected_index, project_list
 
-def get_image_datetime(file_path):
-    try:
-        image = Image.open(file_path)
-        exif_data = image._getexif()
-        if not exif_data:
-            return None
-        for tag_id, value in exif_data.items():
-            tag = TAGS.get(tag_id, tag_id)
-            if tag == 'DateTimeOriginal':
-                return datetime.strptime(value, '%Y:%m:%d %H:%M:%S')
-    except Exception:
-        pass
-    return None
 
-def get_video_datetime(file_path):
-    try:
-        parser = createParser(str(file_path))
-        if not parser:
-            return None
-        metadata = extractMetadata(parser)
-        if metadata and metadata.has("creation_date"):
-            return metadata.get("creation_date")
-    except Exception:
-        pass
-    return None
-
-def get_file_datetime(file_path):
-    # Try image EXIF
-    if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
-        dt = get_image_datetime(file_path)
-        if dt:
-            return dt
-
-    # Try video metadata
-    if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
-        dt = get_video_datetime(file_path)
-        if dt:
-            return dt
-
-    # Fallback: file modified time
-    return datetime.fromtimestamp(file_path.stat().st_mtime)
-
-def check_start_datetime():
+@st.dialog("New project", width="large")
+def add_new_project():
     
-    with st.spinner("Checking start datetime..."):
+    known_projects, _ = fetch_known_projects()
 
-        # Load existing settings
-        with open(settings_file, "r") as file:
-            settings = json.load(file)
-
-        # Get existing cameras or initialize
-        deployment_folder = settings[current_project].get("selected_folder_str", {})
-        
-        folder = Path("/Users/peter/Downloads/imgs")
-        datetimes = []
-
-        for file in folder.rglob("*"):
-            if file.is_file():
-                dt = get_file_datetime(file)
-                if dt:
-                    datetimes.append(dt)
-
-        return min(datetimes) if datetimes else None
-    
-    
-    
-def datetime_selector_widget():
-    
-    
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        selected_date = st.date_input("Date", value=None, label_visibility="collapsed")
-    with col2:
-        selected_time = st.time_input("Time", step=60, value=None, label_visibility="collapsed")
-    if selected_date and selected_time:
-        selected_datetime = datetime.combine(
-            selected_date, selected_time)
-        st.write("Selected datetime:", selected_datetime)
-        return selected_datetime
-
-@st.dialog("New camera", width="large")
-def add_new_camera():
-    
-    known_cameras, _ = fetch_known_cameras()
-
-    print_widget_label("Unique camera ID",
-                       help_text="This ID will be used to identify the camera in the system.")
-    camera_id = st.text_input("Camera ID", max_chars=20, label_visibility="collapsed")
+    print_widget_label("Unique project ID",
+                       help_text="This ID will be used to identify the project in the system.")
+    project_id = st.text_input("project ID", max_chars=50, label_visibility="collapsed")
+    project_id = project_id.strip()
     
     print_widget_label("Optionally add any comments or notes",
-                       help_text="This is a free text field where you can add any comments or notes about the camera.")
+                       help_text="This is a free text field where you can add any comments or notes about the project.")
     comments = st.text_area("Comments", height=150, label_visibility="collapsed")
+    comments = comments.strip()
     
-    if camera_id:
-        if st.button(":material/save: Save camera", use_container_width=True):
-            if not camera_id.strip():
-                st.error("Camera ID cannot be empty.")
-            elif any(camera["cameraID"] == camera_id for camera in known_cameras):
-                st.error(
-                    f"Error: The ID '{camera_id}' is already taken. Please choose a unique ID.")
-            else:
-                add_camera(camera_id, comments)
-                st.rerun()
+    # if project_id:
+    if st.button(":material/save: Save project", use_container_width=True):
+        if not project_id.strip():
+            st.error("project ID cannot be empty.")
+        elif project_id in list(known_projects.keys()):
+            st.error(
+                f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
+        else:
+            add_project(project_id, comments)
+            st.rerun()
 
 @st.dialog("New location", width="large")
 def add_new_location():
@@ -527,13 +393,13 @@ def add_new_location():
             bounds.append([st.session_state.lat_selected,
                           st.session_state.lng_selected])
 
-        # add the known locations
-        for loc in known_locations:
-            coords = [loc["lat"], loc["lon"]]
+        # add the known locations        
+        for location_id, location_info in known_locations.items():
+            coords = [location_info["lat"], location_info["lon"]]
             # if show_markers:
             fl.Marker(
                 coords,
-                tooltip=loc["locationID"],
+                tooltip=location_id,
                 icon=fl.Icon(icon="camera", prefix="fa", color="darkblue")
             ).add_to(m)
             bounds.append(coords)
@@ -623,25 +489,53 @@ def add_new_location():
         "Enter new Location ID",
         label_visibility="collapsed",
     )
+    new_location_id = new_location_id.strip()
 
-    if new_location_id:
-        if st.button(":material/save: Save location", use_container_width=True):
-            if any(loc['locationID'] == new_location_id for loc in known_locations):
-                st.error(
-                    f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID.")
-            elif st.session_state.lat_selected == 0.0 and st.session_state.lng_selected == 0.0:
-                st.error(
-                    "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
-            else:
-                add_location(
-                    new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
-                new_location_id = None
-                st.session_state.lat_selected = None
-                st.session_state.lng_selected = None
-                st.session_state.metadata_checked = False # TODO: must check metadata for location GPS points, if so, put on map
-                st.rerun() 
+    # if new_location_id:
+        
+    if st.button(":material/save: Save location", use_container_width=True):
+        
+        if not new_location_id.strip():
+            st.error("Location ID cannot be empty.")
+        
+        elif new_location_id in known_locations.keys():
+        
+        # if any(loc['locationID'] == new_location_id for loc in known_locations):
+            st.error(
+                f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
+        elif st.session_state.lat_selected == 0.0 and st.session_state.lng_selected == 0.0:
+            st.error(
+                "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
+        else:
+            add_location(
+                new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
+            new_location_id = None
+            st.session_state.lat_selected = None
+            st.session_state.lng_selected = None
+            st.session_state.metadata_checked = False # TODO: must check metadata for location GPS points, if so, put on map
+            st.rerun() 
 
-# show popup with model information
+def browse_directory_widget(selected_folder):
+    col1, col2 = st.columns([1, 3], vertical_alignment="center")
+    with col1:
+        if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
+            selected_folder = select_folder()
+            save_global_vars({"selected_folder": selected_folder})
+    if not selected_folder:
+        with col2:
+            st.write('<span style="color: grey;"> None selected...</span>',
+                     unsafe_allow_html=True)
+    else:
+        with col2:
+            selected_folder_short = "..." + \
+                selected_folder[-45:] if len(
+                    selected_folder) > 45 else selected_folder
+            st.markdown(
+                f'Selected folder <code style="color:#086164; font-family:monospace;">{selected_folder_short}</code>', unsafe_allow_html=True)
+    return selected_folder
+
+
+
 
 def select_folder():
     result = subprocess.run([sys.executable, os.path.join(
@@ -653,25 +547,367 @@ def select_folder():
         return None
 
 
-def browse_directory_widget(selected_folder_str):
-    col1, col2 = st.columns([1, 3], vertical_alignment="center")
+
+
+
+
+
+
+
+
+
+#######################
+### MODEL UTILITIES ###
+#######################
+
+def select_model_widget(model_type, prev_selected_model):
+    # prepare radio button options
+    model_info = fetch_all_model_info(model_type)
+    model_options = {}
+    for key, info in model_info.items():
+        model_options[key] = {"option": info["friendly_name"],
+                              "caption": f":material/calendar_today: Released {info['release']} &nbsp;|&nbsp; "
+                              f":material/code_blocks: Developed by {info['developer']} &nbsp;|&nbsp; "
+                              f":material/description: {info['short_description']}"}
+    selected_model = radio_buttons_with_captions(
+        option_caption_dict=model_options,
+        key=f"{model_type}_model",
+        scrollable=True,
+        default_option=prev_selected_model)
+
+    # more info button
+    friendly_name = model_info[selected_model]["friendly_name"]
+    if st.button(f":material/info: More info about :grey-background[{friendly_name}]", key=f"{model_type}_model_info_button"):
+        show_model_info(model_info[selected_model])
+
+    return selected_model
+
+# check which models are known and should be listed in the dpd
+def fetch_all_model_info(type):
+
+    # fetch
+    model_info_json = os.path.join(
+        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
+    with open(model_info_json, "r") as file:
+        model_info = json.load(file)
+
+    # sort by release date
+    sorted_det_models = dict(
+        sorted(
+            model_info[type].items(),
+            # key=lambda item: datetime.strptime(item[1].get("release", "01-1900"), "%m-%Y"), # on release date
+            key=lambda item: item[1].get(
+                "friendly_name", ""),  # on frendly name
+            reverse=False
+        )
+    )
+
+    # return
+    return sorted_det_models
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#########################
+### GENERAL UTILITIES ###
+#########################
+
+def multiselect_checkboxes(classes, preselected):
+
+    # select all or none buttons
+    col1, col2 = st.columns(2)
     with col1:
-        if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
-            selected_folder_str = select_folder()
-    if not selected_folder_str:
-        with col2:
-            st.write('<span style="color: grey;"> None selected...</span>',
-                     unsafe_allow_html=True)
+        if st.button(":material/check_box: Select all", use_container_width=True):
+            for species in classes:
+                st.session_state[f"species_{species}"] = True
+    with col2:
+        if st.button(":material/check_box_outline_blank: Select none", use_container_width=True):
+            for species in classes:
+                st.session_state[f"species_{species}"] = False
+
+    # checkboxes in a scrollable container
+    selected_species = []
+    with st.container(border=True, height=300):
+        for species in classes:
+            key = f"species_{species}"
+            checked = st.session_state.get(
+                key, True if species in preselected else False)
+            if st.checkbox(species, value=checked, key=key):
+                selected_species.append(species)
+
+    # log selected species
+    st.markdown(
+        f'&nbsp; You selected the presence of <code style="color:#086164; font-family:monospace;">{len(selected_species)}</code> classes', unsafe_allow_html=True)
+
+    # return list
+    return selected_species
+
+def print_widget_label(label_text, icon=None, help_text=None):
+    if icon:
+        line = f":material/{icon}: &nbsp; "
     else:
-        with col2:
-            selected_folder_str_short = "..." + \
-                selected_folder_str[-45:] if len(
-                    selected_folder_str) > 45 else selected_folder_str
-            st.markdown(
-                f'Selected folder <code style="color:#086164; font-family:monospace;">{selected_folder_str_short}</code>', unsafe_allow_html=True)
+        line = ""
+    st.markdown(f"{line}**{label_text}**", help=help_text)
+
+def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
+    # Extract option labels and captions from the dictionary
+    options = [v["option"] for v in option_caption_dict.values()]
+    captions = [v["caption"] for v in option_caption_dict.values()]
+    key_map = {v["option"]: k for k, v in option_caption_dict.items()}
+
+    # Get default index based on default_key
+    default_index = list(option_caption_dict.keys()).index(default_option)
+
+    # Create a radio button selection with captions
+    with st.container(border=True, height=275 if scrollable else None):
+        selected_option = st.radio(
+            label=key,
+            options=options,
+            index=default_index,
+            label_visibility="collapsed",
+            captions=captions
+        )
+
+    # Return the corresponding key
+    return key_map[selected_option]
+
+
+# check if the user needs an update
+def needs_EA_update(required_version):
+    current_parts = list(map(int, current_AA_version.split('.')))
+    required_parts = list(map(int, required_version.split('.')))
+
+    # Pad the shorter version with zeros
+    while len(current_parts) < len(required_parts):
+        current_parts.append(0)
+    while len(required_parts) < len(current_parts):
+        required_parts.append(0)
+
+    # Compare each part of the version
+    for current, required in zip(current_parts, required_parts):
+        if current < required:
+            return True  # current_version is lower than required_version
+        elif current > required:
+            return False  # current_version is higher than required_version
+
+    # All parts are equal, consider versions equal
+    return False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def get_image_datetime(file_path):
+    try:
+        image = Image.open(file_path)
+        exif_data = image._getexif()
+        if not exif_data:
+            return None
+        for tag_id, value in exif_data.items():
+            tag = TAGS.get(tag_id, tag_id)
+            if tag == 'DateTimeOriginal':
+                return datetime.strptime(value, '%Y:%m:%d %H:%M:%S')
+    except Exception:
+        pass
+    return None
+
+def get_video_datetime(file_path):
+    try:
+        parser = createParser(str(file_path))
+        if not parser:
+            return None
+        metadata = extractMetadata(parser)
+        if metadata and metadata.has("creation_date"):
+            return metadata.get("creation_date")
+    except Exception:
+        pass
+    return None
+
+def get_file_datetime(file_path):
+    # Try image EXIF
+    if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+        dt = get_image_datetime(file_path)
+        if dt:
+            return dt
+
+    # Try video metadata
+    if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
+        dt = get_video_datetime(file_path)
+        if dt:
+            return dt
+
+    # Fallback: file modified time
+    return datetime.fromtimestamp(file_path.stat().st_mtime)
+
+def get_image_gps(file_path):
+    try:
+        img = Image.open(file_path)
+        exif_data = piexif.load(img.info.get("exif", b""))
+        gps_data = exif_data.get("GPS", {})
+
+        if gps_data:
+            def to_degrees(value):
+                d = value[0][0] / value[0][1]
+                m = value[1][0] / value[1][1]
+                s = value[2][0] / value[2][1]
+                return d + (m / 60.0) + (s / 3600.0)
+
+            lat = to_degrees(gps_data[piexif.GPSIFD.GPSLatitude])
+            if gps_data[piexif.GPSIFD.GPSLatitudeRef] == b'S':
+                lat = -lat
+
+            lon = to_degrees(gps_data[piexif.GPSIFD.GPSLongitude])
+            if gps_data[piexif.GPSIFD.GPSLongitudeRef] == b'W':
+                lon = -lon
+
+            return (lat, lon)
+    except Exception as e:
+        st.error(f"Error reading GPS data from {file_path}. Please check the file format and EXIF data.")
+        st.errorr(e)
+        return None
+
+def get_video_gps(file_path):
+    try:
+        parser = createParser(str(file_path))
+        if not parser:
+            return None
+
+        with parser:
+            metadata = extractMetadata(parser)
+            if not metadata:
+                return None
+
+            # hachoir stores GPS sometimes under 'location' or 'latitude/longitude'
+            location = metadata.get('location')
+            if location:
+                # Might return something like "+52.379189+004.899431/"
+                parts = location.strip("/").split("+")
+                parts = [p for p in parts if p]
+                if len(parts) >= 2:
+                    lat = float(parts[0])
+                    lon = float(parts[1])
+                    return (lat, lon)
+
+            # Try direct latitude/longitude keys
+            lat = metadata.get('latitude')
+            lon = metadata.get('longitude')
+            if lat and lon:
+                return (float(lat), float(lon))
+    except Exception:
+        return None
+
+
+def get_file_gps(file_path):
+    suffix = file_path.suffix.lower()
     
-    save_project_vars({"selected_folder_str": selected_folder_str})
-    return selected_folder_str
+    # Image formats
+    if suffix in ['.jpg', '.jpeg', '.png']:
+        return get_image_gps(file_path)
+    
+    # Video formats
+    if suffix in ['.mp4', '.avi', '.mov', '.mkv']:
+        return get_video_gps(file_path)
+    
+    return None
+
+def check_folder_metadata():
+    
+    with st.spinner("Checking data..."):
+        settings, _ = load_settings()
+        selected_folder = Path(settings["selected_folder"])
+        
+        # folder = Path("/Users/peter/Downloads/imgs")
+        datetimes = []
+        gps_coords = []
+
+        for file in selected_folder.rglob("*"):
+            if file.is_file():
+                dt = get_file_datetime(file)
+                if dt:
+                    datetimes.append(dt)
+                gps = get_file_gps(file)
+                if gps:
+                    gps_coords.append(gps)
+
+        st.write(f"Found {len(datetimes)} files with datetime information in the selected folder.")
+        st.write(f"Found {len(gps_coords)} files with GPS coordinates in the selected folder.")
+        
+        min_datetime = min(datetimes) if datetimes else None
+        ave_gps = 
+        
+        return [min_datetime, ave_gps]
+    
+HIERWASIK
+# HIER WAS IK!!!!! GPS uitlezen selectively.
+import statistics
+
+def check_folder_metadata():
+    with st.spinner("Checking data..."):
+        settings, _ = load_settings()
+        selected_folder = Path(settings["selected_folder"])
+        
+        datetimes = []
+        gps_coords = []
+
+        all_files = [f for f in selected_folder.rglob("*") if f.is_file()]
+        gps_checked = 0
+
+        for i, file in enumerate(all_files):
+            # Always check datetime
+            dt = get_file_datetime(file)
+            if dt:
+                datetimes.append(dt)
+
+            # Check GPS every 3rd file, up to 100 times
+            if i % 3 == 0 and gps_checked < 100:
+                gps = get_file_gps(file)
+                gps_checked += 1
+                if gps:
+                    gps_coords.append(gps)
+
+        st.write(f"Found {len(datetimes)} files with datetime information.")
+        st.write(f"Checked GPS in {gps_checked} files; found {len(gps_coords)} valid coordinates.")
+
+        min_datetime = min(datetimes) if datetimes else None
+        ave_gps = None
+
+        if gps_coords:
+            lats, lons = zip(*gps_coords)
+            ave_gps = (statistics.mean(lats), statistics.mean(lons))
+
+        return [min_datetime, ave_gps]
+
+
+
 
 
 
@@ -792,39 +1028,61 @@ def save_cls_classes(cls_model_key, slected_classes):
 #     except IOError as e:
 #         st.warning(f"Error writing to file: {e}")
         
-        
-def save_project_vars(new_data):
-    """
-    Update or add key-value pairs to a specific project in a settings JSON file.
-
-    Parameters:
-    - new_data (dict): Dictionary of new or updated variables.
-    - project_name (str): The name of the project to update (e.g., "VeluweProject").
-    - settings_file (str): Full path to the settings JSON file.
-    """
-    if not isinstance(new_data, dict):
-        raise ValueError("Expected new_data to be a dictionary")
-
+def save_global_vars(new_data):
+    global_settings, settings_file = load_settings()
     temp_file = settings_file + ".tmp"
+
+    # Update with new data
+    global_settings.update(new_data)
+
+    # Atomic write to prevent file corruption
+    try:
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(global_settings, f, indent=2)
+        os.replace(temp_file, settings_file)
+    except IOError as e:
+        raise RuntimeError(f"Error writing to settings file: {e}")
+
+  
+def save_project_vars(new_data):
+    # """
+    # Update or add key-value pairs to a specific project in a settings JSON file.
+
+    # Parameters:
+    # - new_data (dict): Dictionary of new or updated variables.
+    # - project_name (str): The name of the project to update (e.g., "VeluweProject").
+    # - settings_file (str): Full path to the settings JSON file.
+    # """
+    # if not isinstance(new_data, dict):
+    #     raise ValueError("Expected new_data to be a dictionary")
+
+    
     
     # Load full settings or initialize
-    try:
-        if os.path.exists(settings_file):
-            with open(settings_file, "r", encoding="utf-8") as f:
-                settings = json.load(f)
-        else:
-            settings = {}
-    except (json.JSONDecodeError, IOError):
-        settings = {}
+    # try:
+    #     if os.path.exists(settings_file):
+    #         with open(settings_file, "r", encoding="utf-8") as f:
+    #             settings = json.load(f)
+    #     else:
+    #         settings = {}
+    # except (json.JSONDecodeError, IOError):
+    #     settings = {}
+    
+    settings, settings_file = load_settings()
+    # current_project = settings["global_vars"]["current_project"]
+    temp_file = settings_file + ".tmp"
         
     # Get project section, or initialize if missing
-    project_vars = settings.get(current_project, {})
+    current_project = settings["global_vars"]["current_project"]
+    project_vars = settings["projects"][current_project]
+    # st.write(f"project_vars: {project_vars}")
 
     # Update with new data
     project_vars.update(new_data)
+    # st.write(f"project_vars: {project_vars}")
 
     # Save back into settings
-    settings[current_project] = project_vars
+    settings["projects"][current_project] = project_vars
 
     # Atomic write to prevent file corruption
     try:
@@ -833,12 +1091,10 @@ def save_project_vars(new_data):
         os.replace(temp_file, settings_file)
     except IOError as e:
         raise RuntimeError(f"Error writing to settings file: {e}")
-        
 
-
-def load_project_vars():
-    """Reads the data from the JSON file and returns it as a dictionary."""
-
+def load_global_vars():
+    """Reads the global variables from the JSON file and returns them as a dictionary."""
+    
     # Load full settings or initialize
     try:
         if os.path.exists(settings_file):
@@ -848,8 +1104,30 @@ def load_project_vars():
             settings = {}
     except (json.JSONDecodeError, IOError):
         settings = {}
+        
+    return settings.get("global_vars", {})
+
+
+def load_settings():
+    """Reads the data from the JSON file and returns it as a dictionary."""
     
-    return settings.get(current_project, {})
+    # Load full settings or initialize
+    try:
+        if os.path.exists(settings_file):
+            with open(settings_file, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+        else:
+            settings = {}
+    except (json.JSONDecodeError, IOError):
+        settings = {}
+
+    return settings, settings_file
+
+# def load_project_vars():
+#     settings, _ = load_settings()
+#     selected_project = settings["selected_project"]
+#     current_project = settings["projects"][selected_project]
+#     return current_project
 
 
 def load_txts():
