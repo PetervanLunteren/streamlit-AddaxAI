@@ -6,6 +6,7 @@ import sys
 import os
 import platform
 import json
+from pathlib import Path
 import folium
 from PIL import Image
 
@@ -39,27 +40,38 @@ st.markdown(
 )
 
 # find addaxAI files folder path
-# find folder of script
-
-
-# paths = [
-#     AddaxAI_files,
+# # find folder of script
+# cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
+# paths_to_add = [
+#     os.path.join(AddaxAI_files),
+#     os.path.join(AddaxAI_files, "cameratraps"),
+#     os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
 #     os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
+#     os.path.join(AddaxAI_files, "AddaxAI"),
 # ]
+# if cuda_toolkit_path:
+#     paths_to_add.append(os.path.join(cuda_toolkit_path, "bin"))
 
-# # Add paths to sys.path
-# for path in paths:
+# for path in paths_to_add:
 #     if path not in sys.path:
-#         sys.path.append(path)
+#         sys.path.insert(0, path)
 
-# # Ensure all paths are in PYTHONPATH while keeping existing ones
-# existing_pythonpath = os.environ.get("PYTHONPATH", "").strip(
-#     ":").split(":")  # Strip leading/trailing `:`
-# # Preserve order and remove duplicates
-# updated_pythonpath = list(dict.fromkeys(paths + existing_pythonpath))
 
-# # Set PYTHONPATH
-# os.environ["PYTHONPATH"] = ":".join(updated_pythonpath)
+# # insert dependencies to system variables
+# cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
+# paths_to_add = [
+#     os.path.join(AddaxAI_files),
+#     os.path.join(AddaxAI_files, "cameratraps"),
+#     os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
+#     os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
+#     os.path.join(AddaxAI_files, "AddaxAI")
+# ]
+# if cuda_toolkit_path:
+#     paths_to_add.append(os.path.join(cuda_toolkit_path, "bin"))
+# # for path in paths_to_add:
+# #     sys.path.insert(0, path)
+# # PYTHONPATH_separator = ":" if platform.system() != "Windows" else ";"
+# # os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH", "") + PYTHONPATH_separator + PYTHONPATH_separator.join(paths_to_add)
 
 # insert dependencies to system variables
 cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
@@ -89,7 +101,56 @@ for path in paths_to_add:
 
 os.environ["PYTHONPATH"] = PYTHONPATH_separator.join(existing_paths)
 
+# import modules from forked repositories
+from visualise_detection.bounding_box import bounding_box as bb
+from cameratraps.megadetector.detection.video_utils import frame_results_to_video_results, FrameToVideoOptions, VIDEO_EXTENSIONS
+from cameratraps.megadetector.utils.path_utils import IMG_EXTENSIONS
+
+
+
+
+
+
+# paths = [
+#     os.path.join(AddaxAI_files),
+#     os.path.join(AddaxAI_files, "cameratraps"),
+#     os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
+#     os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
+#     os.path.join(AddaxAI_files, "AddaxAI")
+# ]
+
+# # Add paths to sys.path
+# for path in paths:
+#     if path not in sys.path:
+#         sys.path.append(path)
+        
+# # Ensure all paths are in PYTHONPATH while keeping existing ones
+# existing_pythonpath = os.environ.get("PYTHONPATH", "").strip(
+#     ":").split(":") 
+# updated_pythonpath = list(dict.fromkeys(paths + existing_pythonpath))
+
+# # Set PYTHONPATH
+# os.environ["PYTHONPATH"] = ":".join(updated_pythonpath)
+
+
+# paths = [
+#     "/Applications/AddaxAI_files/cameratraps/__init__.py",
+#     "/Applications/AddaxAI_files/cameratraps/megadetector/__init__.py",
+#     "/Applications/AddaxAI_files/cameratraps/megadetector/detection/__init__.py",
+# ]
+
+# for path in paths:
+#     init_file = Path(path)
+#     init_file.parent.mkdir(parents=True, exist_ok=True)  # Ensure directories exist
+#     init_file.touch(exist_ok=True)  # Create file if it doesn't exist
+
+
+st.write(sys.path)
+
+
 from backend.utils import *
+
+
 
 # Custom CSS to style the button in the header
 st.markdown(

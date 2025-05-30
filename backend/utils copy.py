@@ -8,14 +8,15 @@ from streamlit_folium import st_folium
 import streamlit as st
 from appdirs import user_config_dir
 import pandas as pd
-import statistics
 from collections import defaultdict
 import subprocess
 import string
+import statistics
 # import time
 from datetime import datetime, time
 # from datetime import datetime
 import os
+import math
 from pathlib import Path
 from datetime import datetime
 from PIL import Image
@@ -24,8 +25,17 @@ from PIL.ExifTags import TAGS
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 import piexif
+
+
+import sys
+import pprint
+pprint.pprint(sys.path)
+
 from cameratraps.megadetector.detection.video_utils import VIDEO_EXTENSIONS
 from cameratraps.megadetector.utils.path_utils import IMG_EXTENSIONS
+
+# VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".flv", ".wmv"}
+# IMG_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"}
 
 # set global variables
 AddaxAI_files = os.path.dirname(os.path.dirname(
@@ -37,12 +47,23 @@ DET_DIR = os.path.join(AddaxAI_files, "models", "det")
 config_dir = user_config_dir("AddaxAI")
 settings_file = os.path.join(config_dir, "settings.json")
 
+# lists with adjectives and animals for random selections
+adjectives = [
+    "happy", "agile", "brave", "crisp", "grand", "nifty", "quick", "sleek", "solid", "vivid",
+    "alert", "dirty", "dense", "fresh", "proud", "quiet", "shiny", "sharp", "smart", "plain",
+    "naked", "clean", "early", "fancy", "glory", "humor", "jazzy", "lucky", "plump", "super"
+]
+animals = [
+    "otter", "eagle", "koala", "panda", "llama", "rhino", "gecko", "horse", "sheep", "tiger",
+    "shark", "sloth", "camel", "zebra", "lemur", "whale", "finch", "moose", "bison", "addax",
+    "snake", "adder", "hyena", "cobra", "puppy", "snail", "tapir", "mouse", "squid", "raven"
+]
+
 # set versions
 with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
 # print a markdown label with an icon and help text
-
 ############################
 ### DEPLOYMENT UTILITIES ###
 ############################
@@ -129,29 +150,38 @@ def location_selector_widget():
     if st.session_state.show_add_location_popup:
         add_new_location()
 
-
 def datetime_selector_widget():
-    
-    
-    
+    default_dt = st.session_state.get("min_datetime_found", None)
+
+    # Extract default values if min_datetime_found exists
+    if default_dt:
+        default_date = default_dt.date()
+        default_hour = f"{default_dt.hour:02d}"
+        default_minute = f"{default_dt.minute:02d}"
+        default_second = f"{default_dt.second:02d}"
+    else:
+        default_date = None
+        default_hour = "--"
+        default_minute = "--"
+        default_second = "--"
+
     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
 
     with col1:
-        selected_date = st.date_input("Date", value=None)
+        selected_date = st.date_input("Date", value=default_date)
 
-    # Format options as zero-padded strings
     hour_options = ["--"] + [f"{i:02d}" for i in range(24)]
     minute_options = ["--"] + [f"{i:02d}" for i in range(60)]
     second_options = ["--"] + [f"{i:02d}" for i in range(60)]
 
     with col2:
-        selected_hour = st.selectbox("Hour", options=hour_options)
+        selected_hour = st.selectbox("Hour", options=hour_options, index=hour_options.index(default_hour))
 
     with col3:
-        selected_minute = st.selectbox("Minute", options=minute_options)
+        selected_minute = st.selectbox("Minute", options=minute_options, index=minute_options.index(default_minute))
 
     with col4:
-        selected_second = st.selectbox("Second", options=second_options)
+        selected_second = st.selectbox("Second", options=second_options, index=second_options.index(default_second))
 
     # Check if all values are selected properly
     if (
@@ -166,10 +196,7 @@ def datetime_selector_widget():
             second=int(selected_second)
         )
         selected_datetime = datetime.combine(selected_date, selected_time)
-        st.write("Selected datetime:", selected_datetime)
-        
-        # deployment will only be added once the user has pressed the "ANALYSE" button
-        
+        # st.write("Selected datetime:", selected_datetime)
         return selected_datetime
 
 
@@ -201,11 +228,12 @@ def generate_deployment_id(dt: datetime) -> str:
     # Format datetime as YYYYMMDDHHMMSS
     dt_str = dt.strftime("%Y%m%d%H%M%S")
     
-    # Create a consistent 5-char hash from the datetime and some randomness
-    rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    # Pick a random adjective and animal
+    adjective = random.choice(adjectives)
+    animal = random.choice(animals)
     
     # Combine into deployment ID
-    return f"dep-{dt_str}-{rand_str}"
+    return f"dep-{dt_str}-{adjective}-{animal}"
 
 def add_deployment(datetime):
 
@@ -338,14 +366,57 @@ def add_new_project():
             add_project(project_id, comments)
             st.rerun()
 
+
+def find_closest_location():
+    
+    known_locations, _ = fetch_known_locations()
+    selected_lat = st.session_state['lat_selected']
+    selected_lon = st.session_state['lon_selected']
+    
+    st.write(f"Selected location: {selected_lat:.6f}, {selected_lon:.6f}")
+    
+    
+    
+    def haversine(lat1, lon1, lat2, lon2):
+        R = 6371.0  # Earth radius in km
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        d_phi = math.radians(lat2 - lat1)
+        d_lambda = math.radians(lon2 - lon1)
+
+        a = math.sin(d_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        return R * c
+
+    closest_location = None
+    min_distance = float('inf')
+
+    for location_id, location_info in known_locations.items():
+        st.write(location_info)
+        dist = haversine(selected_lat, selected_lon, float(location_info['lat']), float(location_info['lon']))
+        if dist < min_distance:
+            min_distance = dist
+            closest_location = location_id
+
+    if closest_location:
+        st.success(f"Closest location is '{closest_location}', "
+                   f"at {min_distance:.10f} km away.")
+        # return closest_location['id']
+    # else:
+    #     st.warning("No known locations found.")
+    #     return None
+
 @st.dialog("New location", width="large")
 def add_new_location():
 
-    # Initialize session state for lat/lng if not set
+    # Initialize session state for lat/lon if not set
     if "lat_selected" not in st.session_state:
         st.session_state.lat_selected = None
-    if "lng_selected" not in st.session_state:
-        st.session_state.lng_selected = None
+    if "lon_selected" not in st.session_state:
+        st.session_state.lon_selected = None
+        
+    st.write(f"DEBUG lat: {st.session_state.lat_selected}, lon: {st.session_state.lon_selected}")
 
     # List of locations
     known_locations, _ = fetch_known_locations()
@@ -385,15 +456,15 @@ def add_new_location():
         
 
         # add the selected location
-        if st.session_state.lat_selected and st.session_state.lng_selected:
+        if st.session_state.lat_selected and st.session_state.lon_selected:
             fl.Marker(
-                [st.session_state.lat_selected, st.session_state.lng_selected],
+                [st.session_state.lat_selected, st.session_state.lon_selected],
                 title="Selected location",
                 tooltip="Selected location",
                 icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
             ).add_to(m)
             bounds.append([st.session_state.lat_selected,
-                          st.session_state.lng_selected])
+                          st.session_state.lon_selected])
 
         # add the known locations        
         for location_id, location_info in known_locations.items():
@@ -410,9 +481,9 @@ def add_new_location():
     else:
         # bounds = []
         # add the selected location
-        if st.session_state.lat_selected and st.session_state.lng_selected:
+        if st.session_state.lat_selected and st.session_state.lon_selected:
             fl.Marker(
-                [st.session_state.lat_selected, st.session_state.lng_selected],
+                [st.session_state.lat_selected, st.session_state.lon_selected],
                 title="Selected location",
                 tooltip="Selected location",
                 icon=fl.Icon(icon="camera", prefix="fa", color="yellow")
@@ -421,8 +492,8 @@ def add_new_location():
             # only one marker, so set bounds to the selected location
             buffer = 0.0006
             bounds = [
-                [st.session_state.lat_selected - buffer, st.session_state.lng_selected - buffer],
-                [st.session_state.lat_selected + buffer, st.session_state.lng_selected + buffer]
+                [st.session_state.lat_selected - buffer, st.session_state.lon_selected - buffer],
+                [st.session_state.lat_selected + buffer, st.session_state.lon_selected + buffer]
             ]
             m.fit_bounds(bounds)
 
@@ -430,18 +501,27 @@ def add_new_location():
     if bounds:
         m.fit_bounds(bounds, padding=(75, 75))
 
-    # Add lat/lng popup on click
+    # Add lat/lon popup on click
     m.add_child(fl.LatLngPopup())
 
     # Render map
     map_data = st_folium(m, height=300, width=700)
+    
+    st.write(st.session_state.lat_selected == map_data["last_clicked"]["lat"])
+    st.write(st.session_state.lon_selected == map_data["last_clicked"]["lng"])
+    if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
+        st.write(f"Last clicked location: {map_data['last_clicked']['lat']:.6f}, {map_data['last_clicked']['lng']:.6f}")
+    else:
+        st.write("No location selected yet. Click on the map to select a location.")
+    st.write(map_data)
+    st.rerun()
 
-    # Update lat/lng when clicking on map
+    # Update lat/lon when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
         st.session_state.lat_selected = map_data["last_clicked"]["lat"]
-        st.session_state.lng_selected = map_data["last_clicked"]["lng"]
+        st.session_state.lon_selected = map_data["last_clicked"]["lng"]
         fl.Marker(
-            [st.session_state.lat_selected, st.session_state.lng_selected],
+            [st.session_state.lat_selected, st.session_state.lon_selected],
             title="Selected location",
             tooltip="Selected location",
             icon=fl.Icon(icon="camera", prefix="fa", color="yellow")
@@ -450,6 +530,8 @@ def add_new_location():
 
     # User input section
     col1, col2 = st.columns([1, 1])
+    
+    # st.write(map_data["last_clicked"] if map_data and "last_clicked" in map_data else "No location selected yet.")
 
     with col1:
         print_widget_label("Enter latitude or click on the map",
@@ -471,18 +553,18 @@ def add_new_location():
     with col2:
         print_widget_label("Enter longitude or click on the map",
                            help_text="Enter the longitude of the location.")
-        old_lng = st.session_state.get("lng_selected", 0.0)
-        new_lng = st.number_input(
+        old_lon = st.session_state.get("lon_selected", 0.0)
+        new_lon = st.number_input(
             "Enter longitude or click on the map",
-            value=st.session_state.lng_selected,
+            value=st.session_state.lon_selected,
             format="%.6f",
             step=0.000001,
             min_value=-180.0,
             max_value=180.0,
             label_visibility="collapsed",
         )
-        st.session_state.lng_selected = new_lng
-        if new_lng != old_lng:
+        st.session_state.lon_selected = new_lon
+        if new_lon != old_lon:
             st.rerun()
 
     print_widget_label("Enter unique location ID",
@@ -505,15 +587,15 @@ def add_new_location():
         # if any(loc['locationID'] == new_location_id for loc in known_locations):
             st.error(
                 f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
-        elif st.session_state.lat_selected == 0.0 and st.session_state.lng_selected == 0.0:
+        elif st.session_state.lat_selected == 0.0 and st.session_state.lon_selected == 0.0:
             st.error(
                 "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
         else:
             add_location(
-                new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
+                new_location_id, st.session_state.lat_selected, st.session_state.lon_selected)
             new_location_id = None
             st.session_state.lat_selected = None
-            st.session_state.lng_selected = None
+            st.session_state.lon_selected = None
             st.session_state.metadata_checked = False # TODO: must check metadata for location GPS points, if so, put on map
             st.rerun() 
 
@@ -756,13 +838,13 @@ def get_video_datetime(file_path):
 
 def get_file_datetime(file_path):
     # Try image EXIF
-    if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+    if file_path.suffix.lower() in IMG_EXTENSIONS:
         dt = get_image_datetime(file_path)
         if dt:
             return dt
 
     # Try video metadata
-    if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
+    if file_path.suffix.lower() in VIDEO_EXTENSIONS:
         dt = get_video_datetime(file_path)
         if dt:
             return dt
@@ -832,11 +914,11 @@ def get_file_gps(file_path):
     suffix = file_path.suffix.lower()
     
     # Image formats
-    if suffix in ['.jpg', '.jpeg', '.png']:
+    if suffix in IMG_EXTENSIONS:
         return get_image_gps(file_path)
     
     # Video formats
-    if suffix in ['.mp4', '.avi', '.mov', '.mkv']:
+    if suffix in VIDEO_EXTENSIONS:
         return get_video_gps(file_path)
     
     return None
@@ -864,11 +946,14 @@ def get_file_gps(file_path):
 #         st.write(f"Found {len(gps_coords)} files with GPS coordinates in the selected folder.")
         
 #         min_datetime = min(datetimes) if datetimes else None
-#         # ave_gps = 
+#         ave_gps = 100
         
 #         return [min_datetime, ave_gps]
     
-    
+# HIERWASIK
+# HIER WAS IK!!!!! GPS uitlezen selectively.
+
+
 def check_folder_metadata():
     with st.spinner("Checking data..."):
         settings, _ = load_settings()
@@ -948,49 +1033,6 @@ def check_folder_metadata():
         st.session_state.lon_selected = ave_lon
         st.session_state.min_datetime_found = min_datetime
         st.session_state.max_datetime_found = max_datetime
-
-
-
-    
-# HIERWASIK
-# HIER WAS IK!!!!! GPS uitlezen selectively.
-
-
-# def check_folder_metadata():
-#     with st.spinner("Checking data..."):
-#         settings, _ = load_settings()
-#         selected_folder = Path(settings["selected_folder"])
-        
-#         datetimes = []
-#         gps_coords = []
-
-#         all_files = [f for f in selected_folder.rglob("*") if f.is_file()]
-#         gps_checked = 0
-
-#         for i, file in enumerate(all_files):
-#             # Always check datetime
-#             dt = get_file_datetime(file)
-#             if dt:
-#                 datetimes.append(dt)
-
-#             # Check GPS every 3rd file, up to 100 times
-#             if i % 3 == 0 and gps_checked < 100:
-#                 gps = get_file_gps(file)
-#                 gps_checked += 1
-#                 if gps:
-#                     gps_coords.append(gps)
-
-#         st.write(f"Found {len(datetimes)} files with datetime information.")
-#         st.write(f"Checked GPS in {gps_checked} files; found {len(gps_coords)} valid coordinates.")
-
-#         min_datetime = min(datetimes) if datetimes else None
-#         ave_gps = None
-
-#         if gps_coords:
-#             lats, lons = zip(*gps_coords)
-#             ave_gps = (statistics.mean(lats), statistics.mean(lons))
-
-#         return [min_datetime, ave_gps]
 
 
 
