@@ -1,3 +1,10 @@
+# Peter van Lunteren, 30 Mei 2025
+# WAAR WAS IK?
+# Ik was bezig met de metadata read als je net een folder hebt geselecteerd, en dat ie dan autoomatisch de metadata invult.
+# Dat ging goed, totdat er een rare bug was waardoor de kaart niet meer werkte. Ik kwam er niet achter, dus ik ben marar weer opnieuw begonnen.
+# main_copy en utils_copy is verdere code, maar daar dit de bug in. Dus dan weet je dat.
+
+
 
 from appdirs import user_config_dir
 
