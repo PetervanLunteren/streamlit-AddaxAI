@@ -32,8 +32,153 @@ st.subheader(":material/sd_card: Deployment information", divider="grey")
 st.write("Fill in the information related to this deployment. A deployment refers to all the images and videos stored on a single SD card retrieved from the field.")
 
 
+from st_ant_tree import st_ant_tree
+
+# Example tree structure
+tree_data = [
+    {
+        "title": "Fruits",
+        "value": "fruits",
+        "key": "fruits",
+        "children": [
+            {"title": "Apple", "value": "apple", "key": "apple"},
+            {"title": "Banana", "value": "banana", "key": "banana"},
+        ],
+    },
+    {
+        "title": "Vegetables",
+        "value": "vegetables",
+        "key": "vegetables",
+        "children": [
+            {"title": "Carrot", "value": "carrot", "key": "carrot"},
+            {"title": "Broccoli", "value": "broccoli", "key": "broccoli"},
+        ],
+    },
+]
+
+st_ant_tree(treeData=tree_data, multiple=False, key = "y")
+
+# Show the component with arrows and checkboxes
+selected = st_ant_tree(
+    treeData=tree_data,
+    placeholder="Select your favorite foods",
+    multiple=True,
+    treeCheckable=True,
+    treeDefaultExpandAll=True,
+    showArrow=True,
+    treeLine=True,
+    bordered=True,
+    allowClear=True,
+    maxTagCount=0
+)
+
+st.write("You selected:", selected)
 
 
+from streamlit_tree_select import tree_select
+
+nodes = [
+    {
+        "label": "Class Mammalia", "value": "class_mammalia", "children": [
+            {
+                "label": "Order Rodentia", "value": "order_rodentia", "children": [
+                    {
+                        "label": "Family Sciuridae (squirrels)", "value": "family_sciuridae", "children": [
+                            {
+                                "label": "Genus Tamias (chipmunks)", "value": "genus_tamias", "children": [
+                                    {"label": "Tamias striatus (eastern chipmunk)", "value": "tamias_striatus"},
+                                    {"label": "Tamiasciurus hudsonicus (red squirrel)", "value": "tamiasciurus_hudsonicus"}  # This one is a species in genus Tamiasciurus, might move later
+                                ]
+                            },
+                            {
+                                "label": "Genus Sciurus (tree squirrels)", "value": "genus_sciurus", "children": [
+                                    {"label": "Sciurus niger (eastern fox squirrel)", "value": "sciurus_niger"},
+                                    {"label": "Sciurus carolinensis (eastern gray squirrel)", "value": "sciurus_carolinensis"},
+                                ]
+                            },
+                            {
+                                "label": "Genus Marmota (marmots)", "value": "genus_marmota", "children": [
+                                    {"label": "Marmota monax (groundhog)", "value": "marmota_monax"},
+                                    {"label": "Marmota flaviventris (yellow-bellied marmot)", "value": "marmota_flaviventris"},
+                                ]
+                            },
+                            {"label": "Otospermophilus beecheyi (california ground squirrel)", "value": "otospermophilus_beecheyi"}
+                        ]
+                    },
+                    {
+                        "label": "Family Muridae (gerbils and relatives)", "value": "family_muridae", "children": [
+                            # add species/genus here if any
+                        ]
+                    },
+                    {
+                        "label": "Family Geomyidae (pocket gophers)", "value": "family_geomyidae", "children": [
+                            # add species/genus here if any
+                        ]
+                    },
+                    {
+                        "label": "Family Erethizontidae (new world porcupines)", "value": "family_erethizontidae", "children": [
+                            {"label": "Erethizon dorsatus (north american porcupine)", "value": "erethizon_dorsatus"}
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "Class Squamata", "value": "class_squamata", "children": [
+            {
+                "label": "Order Squamata (squamates)", "value": "order_squamata"
+                # could add families/genera/species here if you have them
+            }
+        ]
+    }
+]
+
+
+
+with st.popover("Select from tree", use_container_width = True):  # This triggers the popover
+    return_select = tree_select(nodes,
+                                check_model="leaf",  # 'all' for checkboxes, 'leaf' for leaf nodes only
+                                show_expand_all=True,  # show expand all button
+                                half_check_color="#086164",  # color for half-checked nodes
+                                check_color="#086164",  # color for checked nodes
+                                key = "x"
+                                )
+
+# Initialize session state if not present
+if "selected_nodes" not in st.session_state:
+    st.session_state.selected_nodes = []
+
+
+with st.popover("Select from tree", use_container_width=True):
+    selected = tree_select(
+        nodes,
+        check_model="leaf",
+        checked = st.session_state.selected_nodes.get("checked", []),  # Use session state to pre-select nodes
+        show_expand_all=True,
+        half_check_color="#086164",
+        check_color="#086164",
+        key="tree_select",
+        # Pass the saved selection to the component if it supports a "default" or "value" param
+        # e.g., selected_nodes=st.session_state.selected_nodes
+    )
+    # Save the selection to session_state
+    if selected is not None:
+        st.session_state.selected_nodes = selected
+
+# Outside popover you can show or use the selection
+st.write("You selected:", st.session_state.selected_nodes)
+
+
+# selected = st_ant_tree(
+#     treeData=...,
+#     multiple=True,
+#     treeCheckable=True,
+#     maxTagCount=1,  # Collapse to "+N more"
+# )
+
+# if selected:
+#     st.write(f"Selected {len(selected)} species")
 
 
 # select folder
