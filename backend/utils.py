@@ -70,7 +70,7 @@ def project_selector_widget():
             "Choose a project ID",
             options=options,
             index=selected_index,
-            label_visibility="collapsed",
+            label_visibility="collapsed"
         )
         if selected_project == "+ Add new":
             st.session_state.show_add_project_popup = True
@@ -81,6 +81,16 @@ def project_selector_widget():
         if st.session_state.show_add_project_popup:
             add_new_project()
 
+        # adjust the selected project # DEBUG
+        settings, _ = load_settings()
+        if settings["selected_project"] != selected_project:
+            settings["selected_project"] = selected_project
+            with open(settings_file, "w") as file:
+                json.dump(settings, file, indent=2)
+            st.rerun()
+
+        
+        
         return selected_project
 
     # If no known projects and popup should be shown
@@ -1260,3 +1270,11 @@ def settings(txts, lang, mode):
             #     label_visibility="collapsed"
             # )
             st.text("")
+
+
+
+
+
+# import streamlit as st
+
+
