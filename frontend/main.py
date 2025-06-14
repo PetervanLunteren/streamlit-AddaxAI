@@ -71,6 +71,7 @@ st.markdown(
 # insert dependencies to system variables
 cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
 paths_to_add = [
+    # "/Users/peter/Desktop/streamlit_tree_selector/streamlit_tree_select",
     os.path.join(AddaxAI_files),
     os.path.join(AddaxAI_files, "cameratraps"),
     os.path.join(AddaxAI_files, "cameratraps", "megadetector"),

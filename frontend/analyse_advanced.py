@@ -3,6 +3,39 @@ import pandas as pd
 from datetime import datetime, timedelta
 from backend.utils import *
 
+
+# sys.path.insert(0, "/Users/peter/Desktop/streamlit_tree_selector")
+
+
+# # import streamlit_tree_select
+# # print(streamlit_tree_select.__file__)
+
+
+
+# from streamlit_tree_select import tree_select
+
+# nodes = [
+#     {"value": "mars", "label": "Mars"},
+#     {"value": "venus", "label": "Venus"},
+#     {"value": "jupiter", "label": "Jupiter"},
+# ]
+
+# checked = []
+# expanded = []
+
+# result = tree_select(nodes, checked=checked, expanded=expanded, single_select=False)
+
+# st.write("Selected nodes:", result)
+
+
+
+
+
+
+
+
+
+
 # load language settings
 txts = load_txts()
 settings, _ = load_settings()
@@ -32,47 +65,47 @@ st.subheader(":material/sd_card: Deployment information", divider="grey")
 st.write("Fill in the information related to this deployment. A deployment refers to all the images and videos stored on a single SD card retrieved from the field.")
 
 
-from st_ant_tree import st_ant_tree
+# from st_ant_tree import st_ant_tree
 
-# Example tree structure
-tree_data = [
-    {
-        "title": "Fruits",
-        "value": "fruits",
-        "key": "fruits",
-        "children": [
-            {"title": "Apple", "value": "apple", "key": "apple"},
-            {"title": "Banana", "value": "banana", "key": "banana"},
-        ],
-    },
-    {
-        "title": "Vegetables",
-        "value": "vegetables",
-        "key": "vegetables",
-        "children": [
-            {"title": "Carrot", "value": "carrot", "key": "carrot"},
-            {"title": "Broccoli", "value": "broccoli", "key": "broccoli"},
-        ],
-    },
-]
+# # Example tree structure
+# tree_data = [
+#     {
+#         "title": "Fruits",
+#         "value": "fruits",
+#         "key": "fruits",
+#         "children": [
+#             {"title": "Apple", "value": "apple", "key": "apple"},
+#             {"title": "Banana", "value": "banana", "key": "banana"},
+#         ],
+#     },
+#     {
+#         "title": "Vegetables",
+#         "value": "vegetables",
+#         "key": "vegetables",
+#         "children": [
+#             {"title": "Carrot", "value": "carrot", "key": "carrot"},
+#             {"title": "Broccoli", "value": "broccoli", "key": "broccoli"},
+#         ],
+#     },
+# ]
 
-st_ant_tree(treeData=tree_data, multiple=False, key = "y")
+# st_ant_tree(treeData=tree_data, multiple=False, key = "y")
 
-# Show the component with arrows and checkboxes
-selected = st_ant_tree(
-    treeData=tree_data,
-    placeholder="Select your favorite foods",
-    multiple=True,
-    treeCheckable=True,
-    treeDefaultExpandAll=True,
-    showArrow=True,
-    treeLine=True,
-    bordered=True,
-    allowClear=True,
-    maxTagCount=0
-)
+# # Show the component with arrows and checkboxes
+# selected = st_ant_tree(
+#     treeData=tree_data,
+#     placeholder="Select your favorite foods",
+#     multiple=True,
+#     treeCheckable=True,
+#     treeDefaultExpandAll=True,
+#     showArrow=True,
+#     treeLine=True,
+#     bordered=True,
+#     allowClear=True,
+#     maxTagCount=0
+# )
 
-st.write("You selected:", selected)
+# st.write("You selected:", selected)
 
 
 from streamlit_tree_select import tree_select
@@ -136,39 +169,57 @@ nodes = [
 
 
 
-with st.popover("Select from tree", use_container_width = True):  # This triggers the popover
-    return_select = tree_select(nodes,
-                                check_model="leaf",  # 'all' for checkboxes, 'leaf' for leaf nodes only
-                                show_expand_all=True,  # show expand all button
-                                half_check_color="#086164",  # color for half-checked nodes
-                                check_color="#086164",  # color for checked nodes
-                                key = "x"
-                                )
-
-# Initialize session state if not present
+# Initialize state
 if "selected_nodes" not in st.session_state:
     st.session_state.selected_nodes = []
+if "expanded_nodes" not in st.session_state:
+    st.session_state.expanded_nodes = []
+if "last_selected" not in st.session_state:
+    st.session_state.last_selected = {}
 
-
+# UI
 with st.popover("Select from tree", use_container_width=True):
     selected = tree_select(
         nodes,
         check_model="leaf",
-        checked = st.session_state.selected_nodes.get("checked", []),  # Use session state to pre-select nodes
+        checked=st.session_state.selected_nodes,
+        expanded=st.session_state.expanded_nodes,
         show_expand_all=True,
         half_check_color="#086164",
         check_color="#086164",
-        key="tree_select",
-        # Pass the saved selection to the component if it supports a "default" or "value" param
-        # e.g., selected_nodes=st.session_state.selected_nodes
+        key="tree_select2"
     )
-    # Save the selection to session_state
-    if selected is not None:
-        st.session_state.selected_nodes = selected
 
-# Outside popover you can show or use the selection
-st.write("You selected:", st.session_state.selected_nodes)
+# If the selection is new, update and rerun
+if selected is not None:
+    new_checked = selected.get("checked", [])
+    new_expanded = selected.get("expanded", [])
+    last_checked = st.session_state.last_selected.get("checked", [])
+    last_expanded = st.session_state.last_selected.get("expanded", [])
 
+    if new_checked != last_checked or new_expanded != last_expanded:
+        st.session_state.selected_nodes = new_checked
+        st.session_state.expanded_nodes = new_expanded
+        st.session_state.last_selected = selected
+        st.rerun()  # 🔁 Force a rerun so the component picks up the change
+
+# Feedback
+
+
+def count_leaf_nodes(nodes):
+    count = 0
+    for node in nodes:
+        if "children" in node and node["children"]:
+            count += count_leaf_nodes(node["children"])
+        else:
+            count += 1
+    return count
+
+# Example usage
+leaf_count = count_leaf_nodes(nodes)
+# st.write(f"Number of leaf nodes: {leaf_count}")
+
+st.write("You selected:", len(st.session_state.selected_nodes), " of ", leaf_count, "classes")
 
 # selected = st_ant_tree(
 #     treeData=...,
