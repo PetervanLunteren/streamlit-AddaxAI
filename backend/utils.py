@@ -99,6 +99,8 @@ def project_selector_widget():
 
 
 def location_selector_widget():
+    
+
     # Initialize the popup state in session_state if it doesn't exist yet
     if "show_add_location_popup" not in st.session_state:
         st.session_state.show_add_location_popup = False
@@ -112,6 +114,10 @@ def location_selector_widget():
         if st.button(":material/add_circle: Add first location", key="add_new_location_button", use_container_width=False):
             # Set the flag to show the popup
             st.session_state.show_add_location_popup = True
+
+        if st.session_state.coords_found:
+            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lon_selected:.3f}).", icon=":material/info:")
+
 
     else:
         location_ids = list(locations.keys())
@@ -133,7 +139,12 @@ def location_selector_widget():
         if st.session_state.show_add_location_popup:
             add_new_location()
 
+        if st.session_state.coords_found:
+            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lon_selected:.3f}).", icon=":material/info:")
+
+
         return selected_location
+
 
     # If no known locations and popup should be shown
     if st.session_state.show_add_location_popup:
@@ -938,12 +949,9 @@ def check_folder_metadata():
         min_datetime = min(datetimes) if datetimes else None
         max_datetime = max(datetimes) if datetimes else None
 
-        if gps_coords:
-            lats, lons = zip(*gps_coords)
-            ave_lat = statistics.mean(lats)
-            ave_lon = statistics.mean(lons)
-
         # Initialize session state for lat/lon if not set
+        if "coords_found" not in st.session_state:
+            st.session_state.coords_found = False
         if "lat_selected" not in st.session_state:
             st.session_state.lat_selected = None
         if "lon_selected" not in st.session_state:
@@ -953,14 +961,23 @@ def check_folder_metadata():
         if "max_datetime_found" not in st.session_state:
             st.session_state.max_datetime_found = None
         
+        if gps_coords:
+            lats, lons = zip(*gps_coords)
+            ave_lat = statistics.mean(lats)
+            ave_lon = statistics.mean(lons)
+            st.session_state.lat_selected = ave_lat
+            st.session_state.lon_selected = ave_lon
+            st.session_state.coords_found = True
+        
         # set session state values
-        st.session_state.lat_selected = ave_lat
-        st.session_state.lon_selected = ave_lon
         st.session_state.min_datetime_found = min_datetime
         st.session_state.max_datetime_found = max_datetime
+        
+        # write results to the app
+        info_txt = f"Found {len(image_files)} images and {len(video_files)} videos in the selected folder."
+        st.info(info_txt, icon=":material/info:")
 
-
-
+        st.write(st.session_state)
     
 # HIERWASIK
 # HIER WAS IK!!!!! GPS uitlezen selectively.
@@ -1278,3 +1295,124 @@ def settings(txts, lang, mode):
 # import streamlit as st
 
 
+
+
+
+
+
+
+#### SPECIES SELECTOR
+from streamlit_tree_select import tree_select
+
+def species_selector():
+
+    nodes = [
+        {
+            "label": "Class Mammalia", "value": "class_mammalia", "children": [
+                {
+                    "label": "Order Rodentia", "value": "order_rodentia", "children": [
+                        {
+                            "label": "Family Sciuridae (squirrels)", "value": "family_sciuridae", "children": [
+                                {
+                                    "label": "Genus Tamias (chipmunks)", "value": "genus_tamias", "children": [
+                                        {"label": "Tamias striatus (eastern chipmunk)", "value": "tamias_striatus"},
+                                        {"label": "Tamiasciurus hudsonicus (red squirrel)", "value": "tamiasciurus_hudsonicus"}  # This one is a species in genus Tamiasciurus, might move later
+                                    ]
+                                },
+                                {
+                                    "label": "Genus Sciurus (tree squirrels)", "value": "genus_sciurus", "children": [
+                                        {"label": "Sciurus niger (eastern fox squirrel)", "value": "sciurus_niger"},
+                                        {"label": "Sciurus carolinensis (eastern gray squirrel)", "value": "sciurus_carolinensis"},
+                                    ]
+                                },
+                                {
+                                    "label": "Genus Marmota (marmots)", "value": "genus_marmota", "children": [
+                                        {"label": "Marmota monax (groundhog)", "value": "marmota_monax"},
+                                        {"label": "Marmota flaviventris (yellow-bellied marmot)", "value": "marmota_flaviventris"},
+                                    ]
+                                },
+                                {"label": "Otospermophilus beecheyi (california ground squirrel)", "value": "otospermophilus_beecheyi"}
+                            ]
+                        },
+                        {
+                            "label": "Family Muridae (gerbils and relatives)", "value": "family_muridae", "children": [
+                                # add species/genus here if any
+                            ]
+                        },
+                        {
+                            "label": "Family Geomyidae (pocket gophers)", "value": "family_geomyidae", "children": [
+                                # add species/genus here if any
+                            ]
+                        },
+                        {
+                            "label": "Family Erethizontidae (new world porcupines)", "value": "family_erethizontidae", "children": [
+                                {"label": "Erethizon dorsatus (north american porcupine)", "value": "erethizon_dorsatus"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "label": "Class Squamata", "value": "class_squamata", "children": [
+                {
+                    "label": "Order Squamata (squamates)", "value": "order_squamata"
+                    # could add families/genera/species here if you have them
+                }
+            ]
+        }
+    ]
+
+
+
+    # Initialize state
+    if "selected_nodes" not in st.session_state:
+        st.session_state.selected_nodes = []
+    if "expanded_nodes" not in st.session_state:
+        st.session_state.expanded_nodes = []
+    if "last_selected" not in st.session_state:
+        st.session_state.last_selected = {}
+
+    # UI
+    with st.popover("Select from tree", use_container_width=True):
+        selected = tree_select(
+            nodes,
+            check_model="leaf",
+            checked=st.session_state.selected_nodes,
+            expanded=st.session_state.expanded_nodes,
+            show_expand_all=True,
+            half_check_color="#086164",
+            check_color="#086164",
+            key="tree_select2"
+        )
+
+    # If the selection is new, update and rerun
+    if selected is not None:
+        new_checked = selected.get("checked", [])
+        new_expanded = selected.get("expanded", [])
+        last_checked = st.session_state.last_selected.get("checked", [])
+        last_expanded = st.session_state.last_selected.get("expanded", [])
+
+        if new_checked != last_checked or new_expanded != last_expanded:
+            st.session_state.selected_nodes = new_checked
+            st.session_state.expanded_nodes = new_expanded
+            st.session_state.last_selected = selected
+            st.rerun()  # 🔁 Force a rerun so the component picks up the change
+
+    # Feedback
+
+
+    def count_leaf_nodes(nodes):
+        count = 0
+        for node in nodes:
+            if "children" in node and node["children"]:
+                count += count_leaf_nodes(node["children"])
+            else:
+                count += 1
+        return count
+
+    # Example usage
+    leaf_count = count_leaf_nodes(nodes)
+    # st.write(f"Number of leaf nodes: {leaf_count}")
+
+    st.write("You selected:", len(st.session_state.selected_nodes), " of ", leaf_count, "classes")

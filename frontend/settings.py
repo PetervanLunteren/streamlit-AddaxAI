@@ -29,7 +29,7 @@ settings_, settings_file = load_settings()
 st.write("settings_file:", settings_file)
 st.write("settings:", settings_)
 
-
+ç
 # st.write("settings_file: /Users/peter/Library/Application Support/AddaxAI/settings.json")
 
 
