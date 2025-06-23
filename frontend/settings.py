@@ -1,6 +1,7 @@
 
 import streamlit as st
 import sys
+import platform
 
 from backend.utils import *
 
@@ -27,12 +28,15 @@ lang_selected = st.selectbox(
 settings_, settings_file = load_settings()
 
 st.write("settings_file:", settings_file)
-st.write("settings:", settings_)
-
-ç
-# st.write("settings_file: /Users/peter/Library/Application Support/AddaxAI/settings.json")
-
-
+if st.button("Open settings.json"):
+    if platform.system() == "Darwin":  # macOS
+        os.system(f'open "{settings_file}"')
+    else:
+        st.warning("This action is only supported on macOS.")
+with st.expander("Current settings", expanded=False):
+    st.write("settings:", settings_)
+with st.expander("st.session_state", expanded=False):
+    st.write(st.session_state)
 
 save_btn = st.button(":material/save: Save settings", use_container_width=True,
                         type = "primary", key = "language_btn")

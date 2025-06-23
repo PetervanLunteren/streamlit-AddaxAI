@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from backend.utils import *
+from st_flexible_callout_elements import flexible_callout
+
 
 # cd /Applications/AddaxAI_files/AddaxAI && conda activate env-streamlit-addaxai && cd streamlit-AddaxAI/frontend && streamlit run main.py >> streamlit_log.txt 2>&1 &
 
@@ -17,8 +19,9 @@ settings, _ = load_settings()
 lang = settings["lang"]
 mode = settings["mode"]
 
-
 st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
+
+flexible_callout("This is the standard flexible callout.", icon=":material/info:", background_color="#d9e3e7", font_color="#086164", icon_size=25)
 
 # header
 st.header(":material/rocket_launch: Add deployment to database", divider="grey")
@@ -108,8 +111,8 @@ if selected_folder and os.path.isdir(selected_folder):
                 print_widget_label(
                     "Start", help_text="help text")
                 selected_datetime = datetime_selector_widget()
-                st.write("")
-                st.write("Selected datetime:", selected_datetime)
+                # st.write("")
+                # st.write("Selected datetime:", selected_datetime)
                 # st.write("")
                 
             if selected_datetime:

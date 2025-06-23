@@ -116,7 +116,7 @@ def location_selector_widget():
             st.session_state.show_add_location_popup = True
 
         if st.session_state.coords_found:
-            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lon_selected:.3f}).", icon=":material/info:")
+            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lng_selected:.3f}).", icon=":material/info:")
 
 
     else:
@@ -140,7 +140,7 @@ def location_selector_widget():
             add_new_location()
 
         if st.session_state.coords_found:
-            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lon_selected:.3f}).", icon=":material/info:")
+            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lng_selected:.3f}).", icon=":material/info:")
 
 
         return selected_location
@@ -153,12 +153,32 @@ def location_selector_widget():
 
 def datetime_selector_widget():
     
+    # Initialize the session state for min_datetime_found if not set
+    if "min_datetime_found" not in st.session_state:
+        st.session_state.min_datetime_found = None
+        # if present, it will be of format "datetime.datetime(2013, 1, 17, 13, 5, 21)"
     
+    # Pre-fill defaults
+    default_date = None
+    default_hour = "--"
+    default_minute = "--"
+    default_second = "--"
+    
+    if st.session_state.min_datetime_found:
+        # # In case it's stored as a string like "datetime.datetime(2013, 1, 17, 13, 5, 21)"
+        # if isinstance(st.session_state.min_datetime_found, str):
+        #     st.session_state.min_datetime_found = eval(st.session_state.min_datetime_found)
+        
+        dt = st.session_state.min_datetime_found
+        default_date = dt.date()
+        default_hour = f"{dt.hour:02d}"
+        default_minute = f"{dt.minute:02d}"
+        default_second = f"{dt.second:02d}"
     
     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
 
     with col1:
-        selected_date = st.date_input("Date", value=None)
+        selected_date = st.date_input("Date", value=default_date)
 
     # Format options as zero-padded strings
     hour_options = ["--"] + [f"{i:02d}" for i in range(24)]
@@ -166,14 +186,19 @@ def datetime_selector_widget():
     second_options = ["--"] + [f"{i:02d}" for i in range(60)]
 
     with col2:
-        selected_hour = st.selectbox("Hour", options=hour_options)
+        selected_hour = st.selectbox("Hour", options=hour_options, index=hour_options.index(default_hour))
 
     with col3:
-        selected_minute = st.selectbox("Minute", options=minute_options)
+        selected_minute = st.selectbox("Minute", options=minute_options, index=minute_options.index(default_minute))
 
     with col4:
-        selected_second = st.selectbox("Second", options=second_options)
+        selected_second = st.selectbox("Second", options=second_options, index=second_options.index(default_second))
 
+    if st.session_state.min_datetime_found:
+        st.info(
+            f"Prefilled with the earliest datetime found in the metadata. If adjusted, the other datetimes will update automatically.",
+            icon=":material/info:")
+        
     # Check if all values are selected properly
     if (
         selected_date
@@ -187,7 +212,7 @@ def datetime_selector_widget():
             second=int(selected_second)
         )
         selected_datetime = datetime.combine(selected_date, selected_time)
-        st.write("Selected datetime:", selected_datetime)
+        # st.write("Selected datetime:", selected_datetime)
         
         # deployment will only be added once the user has pressed the "ANALYSE" button
         
@@ -218,19 +243,19 @@ def fetch_known_deployments():
     selected_deployment = location["selected_deployment"]
     return deployments, selected_deployment
 
-def generate_deployment_id(dt: datetime) -> str:
-    # Format datetime as YYYYMMDDHHMMSS
-    dt_str = dt.strftime("%Y%m%d%H%M%S")
+def generate_deployment_id():
     
     # Create a consistent 5-char hash from the datetime and some randomness
-    rand_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    rand_str_1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    rand_str_2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
     
     # Combine into deployment ID
-    return f"dep-{dt_str}-{rand_str}"
+    return f"dep-{rand_str_1}-{rand_str_2}"
 
 def add_deployment(datetime):
 
     settings, _ = load_settings()
+    selected_folder = settings["selected_folder"]
     selected_project = settings["selected_project"]
     project = settings["projects"][selected_project]
     selected_location = project["selected_location"]
@@ -238,26 +263,27 @@ def add_deployment(datetime):
     deployments = location["deployments"]
 
     # generate a unique deployment ID
-    deployment_id = generate_deployment_id(datetime)
+    deployment_id = generate_deployment_id()
 
     # Add new deployment
     deployments[deployment_id] = {
         "deploymentStart": datetime.isoformat(),
         "deploymentEnd": None,  # initially set to None
+        "path": selected_folder,
     }
 
-    # Sort deployments (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
-    sorted_deployments = dict(sorted(deployments.items(), key=lambda item: item[0].lower()))
-    settings["projects"][selected_project]["locations"][selected_location]["deployments"] = sorted_deployments
-    settings["projects"][selected_project]["locations"][selected_location]["selected_deployment"] = deployment_id
+    # # Sort deployments (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
+    # sorted_deployments = dict(sorted(deployments.items(), key=lambda item: item[0].lower()))
+    # settings["projects"][selected_project]["locations"][selected_location]["deployments"] = sorted_deployments
+    # settings["projects"][selected_project]["locations"][selected_location]["selected_deployment"] = deployment_id
 
     # Save updated settings
     with open(settings_file, "w") as file:
         json.dump(settings, file, indent=2)
 
     # Return list of deployments and index of the new one
-    deployment_list = list(sorted_deployments.values())
-    selected_index = deployment_list.index(sorted_deployments[deployment_id])
+    deployment_list = list(deployments.values())
+    selected_index = deployment_list.index(deployments[deployment_id])
 
     return selected_index, deployment_list
 
@@ -451,11 +477,20 @@ def add_new_location():
     if bounds:
         m.fit_bounds(bounds, padding=(75, 75))
 
+    
+
     # Add lat/lng popup on click
     m.add_child(fl.LatLngPopup())
 
     # Render map
     map_data = st_folium(m, height=300, width=700)
+    
+    st.write(st.session_state)
+    st.write("Map data:", map_data)
+    
+    if "last_clicked" in map_data:
+        st.write("Last clicked location:", map_data["last_clicked"])
+    
 
     # Update lat/lng when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
@@ -954,8 +989,8 @@ def check_folder_metadata():
             st.session_state.coords_found = False
         if "lat_selected" not in st.session_state:
             st.session_state.lat_selected = None
-        if "lon_selected" not in st.session_state:
-            st.session_state.lon_selected = None
+        if "lng_selected" not in st.session_state:
+            st.session_state.lng_selected = None
         if "min_datetime_found" not in st.session_state:
             st.session_state.min_datetime_found = None
         if "max_datetime_found" not in st.session_state:
@@ -966,7 +1001,7 @@ def check_folder_metadata():
             ave_lat = statistics.mean(lats)
             ave_lon = statistics.mean(lons)
             st.session_state.lat_selected = ave_lat
-            st.session_state.lon_selected = ave_lon
+            st.session_state.lng_selected = ave_lon
             st.session_state.coords_found = True
         
         # set session state values
@@ -976,6 +1011,8 @@ def check_folder_metadata():
         # write results to the app
         info_txt = f"Found {len(image_files)} images and {len(video_files)} videos in the selected folder."
         st.info(info_txt, icon=":material/info:")
+        
+        
 
         st.write(st.session_state)
     
