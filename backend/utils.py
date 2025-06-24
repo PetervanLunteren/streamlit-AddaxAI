@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from PIL import Image
+from st_flexible_callout_elements import flexible_callout
 import random
 from PIL.ExifTags import TAGS
 from hachoir.metadata import extractMetadata
@@ -47,108 +48,148 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 ### DEPLOYMENT UTILITIES ###
 ############################
 
+def open_active_dialog():
+    """Call the currently active dialog based on session state."""
+    dialog = st.session_state.get("active_dialog", None)
+
+    if dialog == "project":
+        add_new_project()
+    elif dialog == "location":
+        add_new_location()
+    elif dialog is not None:
+        # If dialog was closed outside (e.g. clicking outside or pressing ESC)
+        st.session_state.active_dialog = None
+
+
+
 def project_selector_widget():
-    # Initialize the popup state in session_state if it doesn't exist yet
-    if "show_add_project_popup" not in st.session_state:
-        st.session_state.show_add_project_popup = False
+    if "active_dialog" not in st.session_state:
+        st.session_state.active_dialog = None  # values: None, 'project', 'location'
+    # if "show_add_project_popup" not in st.session_state:
+    #     st.session_state.show_add_project_popup = False
 
     projects, selected_project = fetch_known_projects()
     
-    # st.write(f"projects: {projects}")
-
     if projects == {}:
+    # if False: # DEBUG
         if st.button(":material/add_circle: Add your first project", key="add_new_project_button", use_container_width=False):
-            # Set the flag to show the popup
-            st.session_state.show_add_project_popup = True
+            # st.session_state.show_add_project_popup = True
+            st.session_state.active_dialog = "project"
 
     else:
-        # project_ids = [project["projectID"] for project in projects]
-        project_ids = list(projects.keys())
-        options = project_ids + ["+ Add new"]
-        selected_index = options.index(selected_project) if selected_project in options else 0
-        selected_project = st.selectbox(
-            "Choose a project ID",
-            options=options,
-            index=selected_index,
-            label_visibility="collapsed"
-        )
-        if selected_project == "+ Add new":
-            st.session_state.show_add_project_popup = True
-        else:
-            # If user selects anything else, close popup
-            st.session_state.show_add_project_popup = False
+        col1, col2 = st.columns([13, 1])
+        with col1:
+            options = list(projects.keys())
+            selected_index = options.index(selected_project) if selected_project in options else 0
+            selected_project = st.selectbox(
+                "Existing projects",
+                options=options,
+                index=selected_index,
+                label_visibility="collapsed",
+                # on_change=lambda: st.session_state.update(show_add_project_popup=False),
+                on_change=lambda: st.session_state.update(active_dialog=None)  # reset dialog state
+            )
+        with col2:
+            if st.button(":material/add_circle:", use_container_width=True, help="Add a new project", type="secondary"):
+                # st.session_state.show_add_project_popup = True
+                st.session_state.active_dialog = "project"
 
-        if st.session_state.show_add_project_popup:
-            add_new_project()
+        # if st.session_state.show_add_project_popup:
+        #     add_new_project()
+            
+        open_active_dialog()
 
-        # adjust the selected project # DEBUG
+        # adjust the selected project
         settings, _ = load_settings()
         if settings["selected_project"] != selected_project:
             settings["selected_project"] = selected_project
             with open(settings_file, "w") as file:
                 json.dump(settings, file, indent=2)
             st.rerun()
-
-        
         
         return selected_project
 
-    # If no known projects and popup should be shown
-    if st.session_state.show_add_project_popup:
-        add_new_project()
+    # # If no known projects and popup should be shown
+    # if st.session_state.show_add_project_popup:
+    #     add_new_project()
 
+    # # --- Call the dialog based on current state ---
+    # if st.session_state.active_dialog == "project":
+    #     add_new_project()
+    # elif st.session_state.active_dialog == "location":
+    #     add_new_location()
+    # else:
+    #     # This detects that the dialog was closed via ESC or outside-click
+    #     # and resets the state if needed
+    #     if "active_dialog" in st.session_state and st.session_state.active_dialog is not None:
+    #         st.session_state.active_dialog = None
 
 def location_selector_widget():
-    
-
-    # Initialize the popup state in session_state if it doesn't exist yet
-    if "show_add_location_popup" not in st.session_state:
-        st.session_state.show_add_location_popup = False
+    if "active_dialog" not in st.session_state:
+        st.session_state.active_dialog = None  # values: None, 'project', 'location'
+    # if "show_add_location_popup" not in st.session_state:
+    #     st.session_state.show_add_location_popup = False
 
     locations, selected_location = fetch_known_locations()
 
-    # st.write(f"locations: {locations}")
-    # st.write(f"selected_location: {selected_location}")
-
     if locations == {}:
+    # if False: # DEBUG
         if st.button(":material/add_circle: Add first location", key="add_new_location_button", use_container_width=False):
-            # Set the flag to show the popup
-            st.session_state.show_add_location_popup = True
+            # st.session_state.show_add_location_popup = True
+            st.session_state.active_dialog = "location"
 
         if st.session_state.coords_found:
-            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lng_selected:.3f}).", icon=":material/info:")
-
+            info_box(f"Coordinates found in metadata ({st.session_state.exif_lat:.3f}, {st.session_state.exif_lng:.3f}).", icon=":material/info:")
 
     else:
-        location_ids = list(locations.keys())
-        options = location_ids + ["+ Add new"]
-        selected_index = options.index(selected_location) if selected_location in options else 0
-        
-        selected_location = st.selectbox(
-            "Choose a location ID",
-            options=options,
-            index=selected_index,
-            label_visibility="collapsed",
-        )
-        if selected_location == "+ Add new":
-            st.session_state.show_add_location_popup = True
-        else:
-            # If user selects anything else, close popup
-            st.session_state.show_add_location_popup = False
+        col1, col2 = st.columns([13, 1])
+        with col1:
+            options = list(locations.keys())
+            selected_index = options.index(selected_location) if selected_location in options else 0
+            selected_location = st.selectbox(
+                "Choose a location ID",
+                options=options,
+                index=selected_index,
+                label_visibility="collapsed",
+                # on_change=lambda: st.session_state.update(show_add_location_popup=False)
+                on_change=lambda: st.session_state.update(active_dialog=None)  # reset dialog state
+            )
+        with col2:
+            if st.button(":material/add_circle:", use_container_width=True, help="Add a new location", type="secondary"):
+                # st.session_state.show_add_location_popup = True
+                st.session_state.active_dialog = "location"
 
-        if st.session_state.show_add_location_popup:
-            add_new_location()
+        # if st.session_state.show_add_location_popup:
+        #     add_new_location()
+
+        open_active_dialog()
 
         if st.session_state.coords_found:
-            st.info(f"Coordinates found in metadata ({st.session_state.lat_selected:.3f}, {st.session_state.lng_selected:.3f}).", icon=":material/info:")
-
+            info_box(f"Coordinates found in metadata ({st.session_state.exif_lat:.3f}, {st.session_state.exif_lng:.3f}).", icon=":material/info:")
 
         return selected_location
 
 
-    # If no known locations and popup should be shown
-    if st.session_state.show_add_location_popup:
-        add_new_location()
+    # # If no known locations and popup should be shown
+    # if st.session_state.show_add_location_popup:
+    #     add_new_location()
+    
+    # # --- Call the dialog based on current state ---
+    # if st.session_state.active_dialog == "project":
+    #     add_new_project()
+    # elif st.session_state.active_dialog == "location":
+    #     add_new_location()
+    # else:
+    #     # This detects that the dialog was closed via ESC or outside-click
+    #     # and resets the state if needed
+    #     if "active_dialog" in st.session_state and st.session_state.active_dialog is not None:
+    #         st.session_state.active_dialog = None
+
+
+
+
+
+
 
 
 def datetime_selector_widget():
@@ -195,7 +236,7 @@ def datetime_selector_widget():
         selected_second = st.selectbox("Second", options=second_options, index=second_options.index(default_second))
 
     if st.session_state.min_datetime_found:
-        st.info(
+        info_box(
             f"Prefilled with the earliest datetime found in the metadata. If adjusted, the other datetimes will update automatically.",
             icon=":material/info:")
         
@@ -383,16 +424,41 @@ def add_new_project():
                 f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
         else:
             add_project(project_id, comments)
+            
+            # reset session state variables
+            st.session_state.clear()
             st.rerun()
+
+# # Before the dialog definition
+# if "should_rerun_dialog" not in st.session_state:
+#     st.session_state.should_rerun_dialog = False
 
 @st.dialog("New location", width="large")
 def add_new_location():
+
+    # # If flagged to rerun from EXIF, do it now
+    # if "should_rerun_dialog" not in st.session_state:
+    #     st.session_state.should_rerun_dialog = False
+    # if st.session_state.should_rerun_dialog:
+    #     st.session_state.should_rerun_dialog = False
+    #     st.rerun()
 
     # Initialize session state for lat/lng if not set
     if "lat_selected" not in st.session_state:
         st.session_state.lat_selected = None
     if "lng_selected" not in st.session_state:
         st.session_state.lng_selected = None
+    if "exif_set" not in st.session_state:
+        st.session_state.exif_set = False
+
+    if st.session_state.coords_found:
+        info_box(f"The location found in metadata is already selected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).", icon=":material/info:")
+        if not st.session_state.exif_set:
+            st.session_state.lat_selected = st.session_state.exif_lat
+            st.session_state.lng_selected = st.session_state.exif_lng
+            st.session_state.exif_set = True
+            st.rerun() # DEBUG
+            # st.session_state.should_rerun_dialog = True
 
     # List of locations
     known_locations, _ = fetch_known_locations()
@@ -485,13 +551,6 @@ def add_new_location():
     # Render map
     map_data = st_folium(m, height=300, width=700)
     
-    st.write(st.session_state)
-    st.write("Map data:", map_data)
-    
-    if "last_clicked" in map_data:
-        st.write("Last clicked location:", map_data["last_clicked"])
-    
-
     # Update lat/lng when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
         st.session_state.lat_selected = map_data["last_clicked"]["lat"]
@@ -500,9 +559,10 @@ def add_new_location():
             [st.session_state.lat_selected, st.session_state.lng_selected],
             title="Selected location",
             tooltip="Selected location",
-            icon=fl.Icon(icon="camera", prefix="fa", color="yellow")
+            icon=fl.Icon(icon="camera", prefix="fa", color="green")
         ).add_to(m)
-        st.rerun()
+        st.rerun() # DEBUG
+        # st.session_state.should_rerun_dialog = True
 
     # User input section
     col1, col2 = st.columns([1, 1])
@@ -522,7 +582,8 @@ def add_new_location():
         )
         st.session_state.lat_selected = new_lat
         if new_lat != old_lat:
-            st.rerun()
+            st.rerun() # DEBUG
+            # st.session_state.should_rerun_dialog = True
 
     with col2:
         print_widget_label("Enter longitude or click on the map",
@@ -539,10 +600,12 @@ def add_new_location():
         )
         st.session_state.lng_selected = new_lng
         if new_lng != old_lng:
-            st.rerun()
+            st.rerun() # DEBUG
+            # st.session_state.should_rerun_dialog = True
 
     print_widget_label("Enter unique location ID",
                        help_text="This ID will be used to identify the location in the system.")
+    # st.write("DEBUG 7")
     new_location_id = st.text_input(
         "Enter new Location ID",
         label_visibility="collapsed",
@@ -553,12 +616,10 @@ def add_new_location():
         
     if st.button(":material/save: Save location", use_container_width=True):
         
-        if not new_location_id.strip():
+        if new_location_id == "":
             st.error("Location ID cannot be empty.")
         
         elif new_location_id in known_locations.keys():
-        
-        # if any(loc['locationID'] == new_location_id for loc in known_locations):
             st.error(
                 f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
         elif st.session_state.lat_selected == 0.0 and st.session_state.lng_selected == 0.0:
@@ -568,10 +629,10 @@ def add_new_location():
             add_location(
                 new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
             new_location_id = None
-            st.session_state.lat_selected = None
-            st.session_state.lng_selected = None
-            st.session_state.metadata_checked = False # TODO: must check metadata for location GPS points, if so, put on map
-            st.rerun() 
+            
+            # reset session state variables
+            st.session_state.clear()
+            st.rerun()
 
 def browse_directory_widget(selected_folder):
     col1, col2 = st.columns([1, 3], vertical_alignment="center")
@@ -579,6 +640,11 @@ def browse_directory_widget(selected_folder):
         if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
             selected_folder = select_folder()
             save_global_vars({"selected_folder": selected_folder})
+            
+            # reset session state variables
+            st.session_state.clear()
+            
+            
     if not selected_folder:
         with col2:
             st.write('<span style="color: grey;"> None selected...</span>',
@@ -849,8 +915,8 @@ def get_image_gps(file_path):
 
             return (lat, lon)
     except Exception as e:
-        st.error(f"Error reading GPS data from {file_path}. Please check the file format and EXIF data.")
-        st.errorr(e)
+        # st.error(f"Error reading GPS data from {file_path}. Please check the file format and EXIF data.")
+        # st.error(e)
         return None
 
 def get_video_gps(file_path):
@@ -987,10 +1053,10 @@ def check_folder_metadata():
         # Initialize session state for lat/lon if not set
         if "coords_found" not in st.session_state:
             st.session_state.coords_found = False
-        if "lat_selected" not in st.session_state:
-            st.session_state.lat_selected = None
-        if "lng_selected" not in st.session_state:
-            st.session_state.lng_selected = None
+        if "exif_lat" not in st.session_state:
+            st.session_state.exif_lat = None
+        if "exif_lng" not in st.session_state:
+            st.session_state.exif_lng = None
         if "min_datetime_found" not in st.session_state:
             st.session_state.min_datetime_found = None
         if "max_datetime_found" not in st.session_state:
@@ -1000,8 +1066,8 @@ def check_folder_metadata():
             lats, lons = zip(*gps_coords)
             ave_lat = statistics.mean(lats)
             ave_lon = statistics.mean(lons)
-            st.session_state.lat_selected = ave_lat
-            st.session_state.lng_selected = ave_lon
+            st.session_state.exif_lat = ave_lat
+            st.session_state.exif_lng = ave_lon
             st.session_state.coords_found = True
         
         # set session state values
@@ -1010,12 +1076,21 @@ def check_folder_metadata():
         
         # write results to the app
         info_txt = f"Found {len(image_files)} images and {len(video_files)} videos in the selected folder."
-        st.info(info_txt, icon=":material/info:")
+        info_box(info_txt, icon=":material/info:")
         
         
 
-        st.write(st.session_state)
+        # st.write(st.session_state)
     
+
+def info_box(msg, icon=":material/info:"):
+    flexible_callout(msg,
+                     icon=icon,
+                     background_color="#d9e3e7af",
+                     font_color="#086164",
+                     icon_size=23)
+
+
 # HIERWASIK
 # HIER WAS IK!!!!! GPS uitlezen selectively.
 

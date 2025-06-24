@@ -1,5 +1,5 @@
 import streamlit as st
-from backend.analyse_utils import class_selector
+# from backend.analyse_utils import class_selector
 
 # st.set_page_config(layout="wide")
 
@@ -7,9 +7,9 @@ from backend.utils import *
         
 # load language settings
 txts = load_txts()
-vars = load_vars()
-lang = vars.get("lang", "en")
-mode = vars.get("mode", 1)
+# vars = load_vars()
+# lang = vars.get("lang", "en")
+# mode = vars.get("mode", 1)
 
 # place settings
 # settings(txts, lang, mode)
@@ -27,7 +27,7 @@ st.selectbox("Select model", ["Model 1", "Model 2", "Model 3"])
 # select species
 st.subheader(":material/pets: Animal presence", divider="gray")
 st.write("Which animals are present in your project area?")
-selected = class_selector(["dog", "cat", "bird", "fish", "lizard", "hamster", "turtle", "rabbit", "ferret", "snake", "frog", "tortoise", "gerbil", "chinchilla", "parrot", "canary", "goldfish", "guinea pig", "mouse", "rat"])
+# selected = class_selector(["dog", "cat", "bird", "fish", "lizard", "hamster", "turtle", "rabbit", "ferret", "snake", "frog", "tortoise", "gerbil", "chinchilla", "parrot", "canary", "goldfish", "guinea pig", "mouse", "rat"])
 
 
 
