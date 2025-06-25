@@ -48,36 +48,34 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 ### DEPLOYMENT UTILITIES ###
 ############################
 
-def open_active_dialog():
-    """Call the currently active dialog based on session state."""
-    dialog = st.session_state.get("active_dialog", None)
-
-    if dialog == "project":
-        add_new_project()
-    elif dialog == "location":
-        add_new_location()
-    elif dialog is not None:
-        # If dialog was closed outside (e.g. clicking outside or pressing ESC)
-        st.session_state.active_dialog = None
+# def open_active_dialog():
+#     dialog = st.session_state.get("active_dialog", None)
+#     # try:
+#     if True:  # DEBUG
+#         if dialog == "project":
+#             add_new_project()
+#         elif dialog == "location":
+#             add_new_location()
+#         elif dialog is not None:
+#             st.session_state.active_dialog = None
+#     # except Exception:
+#     #     st.session_state.active_dialog = None
+#     #     pass
 
 
 
 def project_selector_widget():
-    if "active_dialog" not in st.session_state:
-        st.session_state.active_dialog = None  # values: None, 'project', 'location'
-    # if "show_add_project_popup" not in st.session_state:
-    #     st.session_state.show_add_project_popup = False
+    # if "active_dialog" not in st.session_state:
+    #     st.session_state.active_dialog = None
 
     projects, selected_project = fetch_known_projects()
     
     if projects == {}:
-    # if False: # DEBUG
         if st.button(":material/add_circle: Add your first project", key="add_new_project_button", use_container_width=False):
-            # st.session_state.show_add_project_popup = True
-            st.session_state.active_dialog = "project"
+            add_new_project_popover("Add your first project")
 
     else:
-        col1, col2 = st.columns([13, 1])
+        col1, col2 = st.columns([3, 1])
         with col1:
             options = list(projects.keys())
             selected_index = options.index(selected_project) if selected_project in options else 0
@@ -85,19 +83,10 @@ def project_selector_widget():
                 "Existing projects",
                 options=options,
                 index=selected_index,
-                label_visibility="collapsed",
-                # on_change=lambda: st.session_state.update(show_add_project_popup=False),
-                on_change=lambda: st.session_state.update(active_dialog=None)  # reset dialog state
+                label_visibility="collapsed"
             )
         with col2:
-            if st.button(":material/add_circle:", use_container_width=True, help="Add a new project", type="secondary"):
-                # st.session_state.show_add_project_popup = True
-                st.session_state.active_dialog = "project"
-
-        # if st.session_state.show_add_project_popup:
-        #     add_new_project()
-            
-        open_active_dialog()
+            add_new_project_popover("Add")
 
         # adjust the selected project
         settings, _ = load_settings()
@@ -109,40 +98,20 @@ def project_selector_widget():
         
         return selected_project
 
-    # # If no known projects and popup should be shown
-    # if st.session_state.show_add_project_popup:
-    #     add_new_project()
-
-    # # --- Call the dialog based on current state ---
-    # if st.session_state.active_dialog == "project":
-    #     add_new_project()
-    # elif st.session_state.active_dialog == "location":
-    #     add_new_location()
-    # else:
-    #     # This detects that the dialog was closed via ESC or outside-click
-    #     # and resets the state if needed
-    #     if "active_dialog" in st.session_state and st.session_state.active_dialog is not None:
-    #         st.session_state.active_dialog = None
-
 def location_selector_widget():
-    if "active_dialog" not in st.session_state:
-        st.session_state.active_dialog = None  # values: None, 'project', 'location'
-    # if "show_add_location_popup" not in st.session_state:
-    #     st.session_state.show_add_location_popup = False
+    # if "active_dialog" not in st.session_state:
+    #     st.session_state.active_dialog = None 
 
     locations, selected_location = fetch_known_locations()
 
     if locations == {}:
-    # if False: # DEBUG
-        if st.button(":material/add_circle: Add first location", key="add_new_location_button", use_container_width=False):
-            # st.session_state.show_add_location_popup = True
-            st.session_state.active_dialog = "location"
+        add_new_location_popover("Add your first location")
 
         if st.session_state.coords_found:
             info_box(f"Coordinates found in metadata ({st.session_state.exif_lat:.3f}, {st.session_state.exif_lng:.3f}).", icon=":material/info:")
 
     else:
-        col1, col2 = st.columns([13, 1])
+        col1, col2 = st.columns([3, 1])
         with col1:
             options = list(locations.keys())
             selected_index = options.index(selected_location) if selected_location in options else 0
@@ -150,47 +119,16 @@ def location_selector_widget():
                 "Choose a location ID",
                 options=options,
                 index=selected_index,
-                label_visibility="collapsed",
-                # on_change=lambda: st.session_state.update(show_add_location_popup=False)
-                on_change=lambda: st.session_state.update(active_dialog=None)  # reset dialog state
+                label_visibility="collapsed"
+                # on_change=lambda: st.session_state.update(active_dialog=None)  # reset dialog state
             )
         with col2:
-            if st.button(":material/add_circle:", use_container_width=True, help="Add a new location", type="secondary"):
-                # st.session_state.show_add_location_popup = True
-                st.session_state.active_dialog = "location"
-
-        # if st.session_state.show_add_location_popup:
-        #     add_new_location()
-
-        open_active_dialog()
+            add_new_location_popover("Add")
 
         if st.session_state.coords_found:
             info_box(f"Coordinates found in metadata ({st.session_state.exif_lat:.3f}, {st.session_state.exif_lng:.3f}).", icon=":material/info:")
 
         return selected_location
-
-
-    # # If no known locations and popup should be shown
-    # if st.session_state.show_add_location_popup:
-    #     add_new_location()
-    
-    # # --- Call the dialog based on current state ---
-    # if st.session_state.active_dialog == "project":
-    #     add_new_project()
-    # elif st.session_state.active_dialog == "location":
-    #     add_new_location()
-    # else:
-    #     # This detects that the dialog was closed via ESC or outside-click
-    #     # and resets the state if needed
-    #     if "active_dialog" in st.session_state and st.session_state.active_dialog is not None:
-    #         st.session_state.active_dialog = None
-
-
-
-
-
-
-
 
 def datetime_selector_widget():
     
@@ -401,7 +339,7 @@ def add_project(projectID, comments):
 
 
 @st.dialog("New project", width="large")
-def add_new_project():
+def add_new_project_dialog():
     
     known_projects, _ = fetch_known_projects()
 
@@ -429,12 +367,56 @@ def add_new_project():
             st.session_state.clear()
             st.rerun()
 
+def add_new_project_popover(txt):
+    # use st.empty to create a popover container
+    # so that it can be closed on button click
+    # and the popover can be reused
+    popover_container = st.empty()
+    with popover_container.container():
+        with st.popover(f":material/add_circle: {txt}",
+                        help="Add a new project",
+                        use_container_width=True):
+            
+            # fetch known projects IDs
+            known_projects, _ = fetch_known_projects()
+
+            # input for project ID
+            print_widget_label("Unique project ID",
+                            help_text="This ID will be used to identify the project in the system.")
+            project_id = st.text_input("project ID", max_chars=50, label_visibility="collapsed")
+            project_id = project_id.strip()
+            
+            # input for optional comments
+            print_widget_label("Optionally add any comments or notes",
+                            help_text="This is a free text field where you can add any comments or notes about the project.")
+            comments = st.text_area("Comments", height=150, label_visibility="collapsed")
+            comments = comments.strip()
+            
+            # button to save project 
+            if st.button(":material/save: Save project", use_container_width=True):
+                
+                # check validity
+                if not project_id.strip():
+                    st.error("project ID cannot be empty.")
+                elif project_id in list(known_projects.keys()):
+                    st.error(
+                        f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
+                else:
+                    
+                    # if all good, add project
+                    add_project(project_id, comments)
+                    
+                    # reset session state variables before reloading
+                    st.session_state.clear()
+                    popover_container.empty()
+                    st.rerun()
+
 # # Before the dialog definition
 # if "should_rerun_dialog" not in st.session_state:
 #     st.session_state.should_rerun_dialog = False
 
 @st.dialog("New location", width="large")
-def add_new_location():
+def add_new_location_dialog():
 
     # # If flagged to rerun from EXIF, do it now
     # if "should_rerun_dialog" not in st.session_state:
@@ -528,11 +510,11 @@ def add_new_location():
                 [st.session_state.lat_selected, st.session_state.lng_selected],
                 title="Selected location",
                 tooltip="Selected location",
-                icon=fl.Icon(icon="camera", prefix="fa", color="yellow")
+                icon=fl.Icon(icon="camera", prefix="fa", color="red")
             ).add_to(m)
 
             # only one marker, so set bounds to the selected location
-            buffer = 0.0006
+            buffer = 0.001
             bounds = [
                 [st.session_state.lat_selected - buffer, st.session_state.lng_selected - buffer],
                 [st.session_state.lat_selected + buffer, st.session_state.lng_selected + buffer]
@@ -633,6 +615,209 @@ def add_new_location():
             # reset session state variables
             st.session_state.clear()
             st.rerun()
+
+def add_new_location_popover(txt):
+
+    # use st.empty to create a popover container
+    # so that it can be closed on button click
+    # and the popover can be reused
+    popover_container = st.empty()
+    with popover_container.container():
+        with st.popover(f":material/add_circle: {txt}",
+                        help="Add a new location",
+                        use_container_width=True):
+            
+            # init session state vars
+            if "lat_selected" not in st.session_state:
+                st.session_state.lat_selected = None
+            if "lng_selected" not in st.session_state:
+                st.session_state.lng_selected = None
+            if "exif_set" not in st.session_state:
+                st.session_state.exif_set = False
+            if "coords_found" not in st.session_state:
+                st.session_state.coords_found = False
+
+            # update values if coordinates found in metadata
+            if st.session_state.coords_found:
+                info_box(f"The location found in metadata is already selected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).", icon=":material/info:")
+                if not st.session_state.exif_set:
+                    st.session_state.lat_selected = st.session_state.exif_lat
+                    st.session_state.lng_selected = st.session_state.exif_lng
+                    st.session_state.exif_set = True
+                    st.rerun()
+
+            # fetch known locations
+            known_locations, _ = fetch_known_locations()
+
+            # base map
+            m = fl.Map(
+                location=[0, 0],
+                zoom_start=1,
+                control_scale=True
+            )
+
+            # terrain layer
+            fl.TileLayer(
+                tiles='https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.jpg',
+                attr='© Stamen, © OpenStreetMap',
+                name='Stamen Terrain',
+                overlay=False,
+                control=True
+            ).add_to(m)
+
+            # satellite layer
+            fl.TileLayer(
+                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attr='© Esri',
+                name='Esri Satellite',
+                overlay=False,
+                control=True
+            ).add_to(m)
+
+            # layer control
+            fl.LayerControl().add_to(m)
+
+            # add markers
+            bounds = []
+            if known_locations:
+                
+                # add the selected location
+                if st.session_state.lat_selected and st.session_state.lng_selected:
+                    fl.Marker(
+                        [st.session_state.lat_selected, st.session_state.lng_selected],
+                        title="Selected location",
+                        tooltip="Selected location",
+                        icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
+                    ).add_to(m)
+                    bounds.append([st.session_state.lat_selected,
+                                st.session_state.lng_selected])
+
+                # add the other known locations        
+                for location_id, location_info in known_locations.items():
+                    coords = [location_info["lat"], location_info["lon"]]
+                    fl.Marker(
+                        coords,
+                        tooltip=location_id,
+                        icon=fl.Icon(icon="camera", prefix="fa", color="darkblue")
+                    ).add_to(m)
+                    bounds.append(coords)
+                    m.fit_bounds(bounds, padding=(75, 75))
+            
+            else:
+                
+                # add the selected location
+                if st.session_state.lat_selected and st.session_state.lng_selected:
+                    fl.Marker(
+                        [st.session_state.lat_selected, st.session_state.lng_selected],
+                        title="Selected location",
+                        tooltip="Selected location",
+                        icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
+                    ).add_to(m)
+
+                    # only one marker so set bounds to the selected location
+                    buffer = 0.001
+                    bounds = [
+                        [st.session_state.lat_selected - buffer, st.session_state.lng_selected - buffer],
+                        [st.session_state.lat_selected + buffer, st.session_state.lng_selected + buffer]
+                    ]
+                    m.fit_bounds(bounds)
+
+            # fit map to markers with some extra padding
+            if bounds:
+                m.fit_bounds(bounds, padding=(75, 75))
+
+            # add brief lat lng popup on mouse click
+            m.add_child(fl.LatLngPopup())
+
+            # render map in center
+            _, map_col, _ = st.columns([0.025, 0.95, 0.025])
+            with map_col:
+                map_data = st_folium(m, height=300, width=700)
+            # map_data = st_folium(m, height=300, width=700)
+            
+            # update lat lng widgets when clicking on map
+            if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
+                st.session_state.lat_selected = map_data["last_clicked"]["lat"]
+                st.session_state.lng_selected = map_data["last_clicked"]["lng"]
+                fl.Marker(
+                    [st.session_state.lat_selected, st.session_state.lng_selected],
+                    title="Selected location",
+                    tooltip="Selected location",
+                    icon=fl.Icon(icon="camera", prefix="fa", color="green")
+                ).add_to(m)
+                st.rerun()
+
+            # user input
+            col1, col2 = st.columns([1, 1])
+            
+            # lat
+            with col1:
+                print_widget_label("Enter latitude or click on the map",
+                                help_text="Enter the latitude of the location.")
+                old_lat = st.session_state.get("lat_selected", 0.0)
+                new_lat = st.number_input(
+                    "Enter latitude or click on the map",
+                    value=st.session_state.lat_selected,
+                    format="%.6f",
+                    step=0.000001,
+                    min_value=-90.0,
+                    max_value=90.0,
+                    label_visibility="collapsed",
+                )
+                st.session_state.lat_selected = new_lat
+                if new_lat != old_lat:
+                    st.rerun()
+            
+            # lng
+            with col2:
+                print_widget_label("Enter longitude or click on the map",
+                                help_text="Enter the longitude of the location.")
+                old_lng = st.session_state.get("lng_selected", 0.0)
+                new_lng = st.number_input(
+                    "Enter longitude or click on the map",
+                    value=st.session_state.lng_selected,
+                    format="%.6f",
+                    step=0.000001,
+                    min_value=-180.0,
+                    max_value=180.0,
+                    label_visibility="collapsed",
+                )
+                st.session_state.lng_selected = new_lng
+                if new_lng != old_lng:
+                    st.rerun()
+            
+            # location ID
+            print_widget_label("Enter unique location ID",
+                            help_text="This ID will be used to identify the location in the system.")
+            new_location_id = st.text_input(
+                "Enter new Location ID",
+                label_visibility="collapsed",
+            )
+            new_location_id = new_location_id.strip()
+
+            # button to save location                      
+            if st.button(":material/save: Save location", use_container_width=True):
+                
+                # check validity
+                if new_location_id == "":
+                    st.error("Location ID cannot be empty.")
+                elif new_location_id in known_locations.keys():
+                    st.error(
+                        f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
+                elif st.session_state.lat_selected == 0.0 and st.session_state.lng_selected == 0.0:
+                    st.error(
+                        "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
+                else:
+                    
+                    # if all good, add location
+                    add_location(
+                        new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
+                    new_location_id = None
+                    
+                    # reset session state variables before reloading
+                    st.session_state.clear()
+                    popover_container.empty()
+                    st.rerun()
 
 def browse_directory_widget(selected_folder):
     col1, col2 = st.columns([1, 3], vertical_alignment="center")

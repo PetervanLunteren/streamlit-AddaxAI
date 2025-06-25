@@ -45,6 +45,18 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+
+# Inject custom CSS
+st.markdown("""
+    <style>
+        /* Target the popover container */
+        [data-testid="stPopoverBody"] {
+            width: 800px !important;  /* Adjust the width as needed */
+            max-width: 90vw;          /* Optional: prevent overflow on small screens */
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # find addaxAI files folder path
 # find folder of script
 
