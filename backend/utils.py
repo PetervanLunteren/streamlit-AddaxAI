@@ -12,6 +12,7 @@ import statistics
 from collections import defaultdict
 import subprocess
 import string
+import math
 # import time
 from datetime import datetime, time
 # from datetime import datetime
@@ -48,34 +49,22 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 ### DEPLOYMENT UTILITIES ###
 ############################
 
-# def open_active_dialog():
-#     dialog = st.session_state.get("active_dialog", None)
-#     # try:
-#     if True:  # DEBUG
-#         if dialog == "project":
-#             add_new_project()
-#         elif dialog == "location":
-#             add_new_location()
-#         elif dialog is not None:
-#             st.session_state.active_dialog = None
-#     # except Exception:
-#     #     st.session_state.active_dialog = None
-#     #     pass
-
-
-
+# this widget lets the user select a project from a dropdown menu
+# or add a new pojrect via popover
 def project_selector_widget():
-    # if "active_dialog" not in st.session_state:
-    #     st.session_state.active_dialog = None
 
+    # check what is already known and selected
     projects, selected_project = fetch_known_projects()
     
+    # if first project, show only button and no dropdown
     if projects == {}:
-        if st.button(":material/add_circle: Add your first project", key="add_new_project_button", use_container_width=False):
-            add_new_project_popover("Add your first project")
+        add_new_project_popover("Add your first project")
 
+    # if there are projects, show dropdown and button
     else:
         col1, col2 = st.columns([3, 1])
+        
+        # dropdown for existing projects
         with col1:
             options = list(projects.keys())
             selected_index = options.index(selected_project) if selected_project in options else 0
@@ -85,6 +74,8 @@ def project_selector_widget():
                 index=selected_index,
                 label_visibility="collapsed"
             )
+            
+        # popover to add a new project
         with col2:
             add_new_project_popover("Add")
 
@@ -96,39 +87,113 @@ def project_selector_widget():
                 json.dump(settings, file, indent=2)
             st.rerun()
         
+        # return
         return selected_project
 
+# this widget lets the user select a location from a dropdown menu
+# or add a new location via popover
 def location_selector_widget():
-    # if "active_dialog" not in st.session_state:
-    #     st.session_state.active_dialog = None 
 
+    # check what is already known and selected
     locations, selected_location = fetch_known_locations()
 
+    # calculate distance to closest known locations if coordinates are found in metadata
+    if "closest_location" not in st.session_state:
+        st.session_state.closest_location = None
+    if st.session_state.coords_found_in_exif:
+        st.session_state.closest_location = get_closest_location_within_radius((st.session_state.exif_lat, st.session_state.exif_lng), locations)            
+    
+    # if first location, show only button and no dropdown
     if locations == {}:
         add_new_location_popover("Add your first location")
 
-        if st.session_state.coords_found:
-            info_box(f"Coordinates found in metadata ({st.session_state.exif_lat:.3f}, {st.session_state.exif_lng:.3f}).", icon=":material/info:")
+        # show info box if coordinates are found in metadata
+        if st.session_state.coords_found_in_exif:
+            info_box(f"Coordinates ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}) were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
 
+    # if there are locations, show dropdown and button
     else:
         col1, col2 = st.columns([3, 1])
+        
+        # dropdown for existing locations
         with col1:
             options = list(locations.keys())
+            
+            # set to last selected location if it exists
             selected_index = options.index(selected_location) if selected_location in options else 0
+            
+            # if coordinates are found in metadata, pre-select the closest location
+            if st.session_state.coords_found_in_exif and st.session_state.closest_location is not None:
+                closes_location_name, _ = st.session_state.closest_location
+                selected_index = options.index(closes_location_name) if closes_location_name in options else 0
+            
+            # create the selectbox
             selected_location = st.selectbox(
                 "Choose a location ID",
                 options=options,
                 index=selected_index,
                 label_visibility="collapsed"
-                # on_change=lambda: st.session_state.update(active_dialog=None)  # reset dialog state
             )
+        
+        # popover to add a new location
         with col2:
             add_new_location_popover("Add")
 
-        if st.session_state.coords_found:
-            info_box(f"Coordinates found in metadata ({st.session_state.exif_lat:.3f}, {st.session_state.exif_lng:.3f}).", icon=":material/info:")
+        # info box if coordinates are found in metadata
+        if st.session_state.coords_found_in_exif:
 
+            # define message based on whether a closest location was found
+            message = f"Coordinates extracted from image metadata: ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}). "
+            if st.session_state.closest_location is not None:
+                name, dist = st.session_state.closest_location
+                message += f"Matches known location <i>{name}</i>, about {dist} meters away."
+            else:
+                message += f"No known location found within 50 meters."
+            info_box(message)
+            
+        # return
         return selected_location
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculate the distance in meters between two lat/lng points."""
+    R = 6371000  # Earth radius in meters
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+
+    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+def get_closest_location_within_radius(known_point, locations, max_distance_meters=50):
+    """
+    Find the closest known location within a max distance (default 50 meters).
+    
+    Parameters:
+    - known_point: tuple (lat, lon)
+    - locations: dict of known locations with lat/lon
+    - max_distance_meters: float, max distance to consider a match
+    
+    Returns:
+    - Tuple (location_name, distance_in_meters_rounded) or None if no match
+    """
+    lat_known, lon_known = known_point
+    candidates = []
+
+    for name, data in locations.items():
+        lat = data["lat"]
+        lon = data["lon"]
+        dist = haversine_distance(lat_known, lon_known, lat, lon)
+        if dist <= max_distance_meters:
+            candidates.append((name, dist))
+
+    if not candidates:
+        return None
+
+    # Get closest match
+    closest = min(candidates, key=lambda x: x[1])
+    return (closest[0], round(closest[1]))
 
 def datetime_selector_widget():
     
@@ -337,36 +402,6 @@ def add_project(projectID, comments):
 
     return selected_index, project_list
 
-
-@st.dialog("New project", width="large")
-def add_new_project_dialog():
-    
-    known_projects, _ = fetch_known_projects()
-
-    print_widget_label("Unique project ID",
-                       help_text="This ID will be used to identify the project in the system.")
-    project_id = st.text_input("project ID", max_chars=50, label_visibility="collapsed")
-    project_id = project_id.strip()
-    
-    print_widget_label("Optionally add any comments or notes",
-                       help_text="This is a free text field where you can add any comments or notes about the project.")
-    comments = st.text_area("Comments", height=150, label_visibility="collapsed")
-    comments = comments.strip()
-    
-    # if project_id:
-    if st.button(":material/save: Save project", use_container_width=True):
-        if not project_id.strip():
-            st.error("project ID cannot be empty.")
-        elif project_id in list(known_projects.keys()):
-            st.error(
-                f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
-        else:
-            add_project(project_id, comments)
-            
-            # reset session state variables
-            st.session_state.clear()
-            st.rerun()
-
 def add_new_project_popover(txt):
     # use st.empty to create a popover container
     # so that it can be closed on button click
@@ -411,210 +446,6 @@ def add_new_project_popover(txt):
                     popover_container.empty()
                     st.rerun()
 
-# # Before the dialog definition
-# if "should_rerun_dialog" not in st.session_state:
-#     st.session_state.should_rerun_dialog = False
-
-@st.dialog("New location", width="large")
-def add_new_location_dialog():
-
-    # # If flagged to rerun from EXIF, do it now
-    # if "should_rerun_dialog" not in st.session_state:
-    #     st.session_state.should_rerun_dialog = False
-    # if st.session_state.should_rerun_dialog:
-    #     st.session_state.should_rerun_dialog = False
-    #     st.rerun()
-
-    # Initialize session state for lat/lng if not set
-    if "lat_selected" not in st.session_state:
-        st.session_state.lat_selected = None
-    if "lng_selected" not in st.session_state:
-        st.session_state.lng_selected = None
-    if "exif_set" not in st.session_state:
-        st.session_state.exif_set = False
-
-    if st.session_state.coords_found:
-        info_box(f"The location found in metadata is already selected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).", icon=":material/info:")
-        if not st.session_state.exif_set:
-            st.session_state.lat_selected = st.session_state.exif_lat
-            st.session_state.lng_selected = st.session_state.exif_lng
-            st.session_state.exif_set = True
-            st.rerun() # DEBUG
-            # st.session_state.should_rerun_dialog = True
-
-    # List of locations
-    known_locations, _ = fetch_known_locations()
-
-    # Create the base map with the default terrain layer
-    m = fl.Map(
-        location=[0, 0],
-        zoom_start=1,
-        control_scale=True
-    )
-
-    # Add the terrain layer
-    fl.TileLayer(
-        tiles='https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.jpg',
-        attr='© Stamen, © OpenStreetMap',
-        name='Stamen Terrain',
-        overlay=False,
-        control=True
-    ).add_to(m)
-
-    # Add the satellite layer
-    fl.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attr='© Esri',
-        name='Esri Satellite',
-        overlay=False,
-        control=True
-    ).add_to(m)
-
-    # Add layer control to switch between them
-    fl.LayerControl().add_to(m)
-
-    # Add markers
-    bounds = []
-    if known_locations:
-        # show_markers = st.checkbox("Show other locations", value=True)
-        
-
-        # add the selected location
-        if st.session_state.lat_selected and st.session_state.lng_selected:
-            fl.Marker(
-                [st.session_state.lat_selected, st.session_state.lng_selected],
-                title="Selected location",
-                tooltip="Selected location",
-                icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
-            ).add_to(m)
-            bounds.append([st.session_state.lat_selected,
-                          st.session_state.lng_selected])
-
-        # add the known locations        
-        for location_id, location_info in known_locations.items():
-            coords = [location_info["lat"], location_info["lon"]]
-            # if show_markers:
-            fl.Marker(
-                coords,
-                tooltip=location_id,
-                icon=fl.Icon(icon="camera", prefix="fa", color="darkblue")
-            ).add_to(m)
-            bounds.append(coords)
-            m.fit_bounds(bounds, padding=(75, 75))
-    
-    else:
-        # bounds = []
-        # add the selected location
-        if st.session_state.lat_selected and st.session_state.lng_selected:
-            fl.Marker(
-                [st.session_state.lat_selected, st.session_state.lng_selected],
-                title="Selected location",
-                tooltip="Selected location",
-                icon=fl.Icon(icon="camera", prefix="fa", color="red")
-            ).add_to(m)
-
-            # only one marker, so set bounds to the selected location
-            buffer = 0.001
-            bounds = [
-                [st.session_state.lat_selected - buffer, st.session_state.lng_selected - buffer],
-                [st.session_state.lat_selected + buffer, st.session_state.lng_selected + buffer]
-            ]
-            m.fit_bounds(bounds)
-
-    # Fit map to markers with extra padding
-    if bounds:
-        m.fit_bounds(bounds, padding=(75, 75))
-
-    
-
-    # Add lat/lng popup on click
-    m.add_child(fl.LatLngPopup())
-
-    # Render map
-    map_data = st_folium(m, height=300, width=700)
-    
-    # Update lat/lng when clicking on map
-    if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
-        st.session_state.lat_selected = map_data["last_clicked"]["lat"]
-        st.session_state.lng_selected = map_data["last_clicked"]["lng"]
-        fl.Marker(
-            [st.session_state.lat_selected, st.session_state.lng_selected],
-            title="Selected location",
-            tooltip="Selected location",
-            icon=fl.Icon(icon="camera", prefix="fa", color="green")
-        ).add_to(m)
-        st.rerun() # DEBUG
-        # st.session_state.should_rerun_dialog = True
-
-    # User input section
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        print_widget_label("Enter latitude or click on the map",
-                           help_text="Enter the latitude of the location.")
-        old_lat = st.session_state.get("lat_selected", 0.0)
-        new_lat = st.number_input(
-            "Enter latitude or click on the map",
-            value=st.session_state.lat_selected,
-            format="%.6f",
-            step=0.000001,
-            min_value=-90.0,
-            max_value=90.0,
-            label_visibility="collapsed",
-        )
-        st.session_state.lat_selected = new_lat
-        if new_lat != old_lat:
-            st.rerun() # DEBUG
-            # st.session_state.should_rerun_dialog = True
-
-    with col2:
-        print_widget_label("Enter longitude or click on the map",
-                           help_text="Enter the longitude of the location.")
-        old_lng = st.session_state.get("lng_selected", 0.0)
-        new_lng = st.number_input(
-            "Enter longitude or click on the map",
-            value=st.session_state.lng_selected,
-            format="%.6f",
-            step=0.000001,
-            min_value=-180.0,
-            max_value=180.0,
-            label_visibility="collapsed",
-        )
-        st.session_state.lng_selected = new_lng
-        if new_lng != old_lng:
-            st.rerun() # DEBUG
-            # st.session_state.should_rerun_dialog = True
-
-    print_widget_label("Enter unique location ID",
-                       help_text="This ID will be used to identify the location in the system.")
-    # st.write("DEBUG 7")
-    new_location_id = st.text_input(
-        "Enter new Location ID",
-        label_visibility="collapsed",
-    )
-    new_location_id = new_location_id.strip()
-
-    # if new_location_id:
-        
-    if st.button(":material/save: Save location", use_container_width=True):
-        
-        if new_location_id == "":
-            st.error("Location ID cannot be empty.")
-        
-        elif new_location_id in known_locations.keys():
-            st.error(
-                f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
-        elif st.session_state.lat_selected == 0.0 and st.session_state.lng_selected == 0.0:
-            st.error(
-                "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
-        else:
-            add_location(
-                new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
-            new_location_id = None
-            
-            # reset session state variables
-            st.session_state.clear()
-            st.rerun()
 
 def add_new_location_popover(txt):
 
@@ -634,12 +465,12 @@ def add_new_location_popover(txt):
                 st.session_state.lng_selected = None
             if "exif_set" not in st.session_state:
                 st.session_state.exif_set = False
-            if "coords_found" not in st.session_state:
-                st.session_state.coords_found = False
+            if "coords_found_in_exif" not in st.session_state:
+                st.session_state.coords_found_in_exif = False
 
             # update values if coordinates found in metadata
-            if st.session_state.coords_found:
-                info_box(f"The location found in metadata is already selected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).", icon=":material/info:")
+            if st.session_state.coords_found_in_exif:
+                info_box(f"Coordinates from metadata have been preselected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).")
                 if not st.session_state.exif_set:
                     st.session_state.lat_selected = st.session_state.exif_lat
                     st.session_state.lng_selected = st.session_state.exif_lng
@@ -816,6 +647,7 @@ def add_new_location_popover(txt):
                     
                     # reset session state variables before reloading
                     st.session_state.clear()
+                    st.session_state.coords_found_in_exif = False
                     popover_container.empty()
                     st.rerun()
 
@@ -1148,32 +980,6 @@ def get_file_gps(file_path):
     
     return None
 
-# def check_folder_metadata():
-    
-#     with st.spinner("Checking data..."):
-#         settings, _ = load_settings()
-#         selected_folder = Path(settings["selected_folder"])
-        
-#         # folder = Path("/Users/peter/Downloads/imgs")
-#         datetimes = []
-#         gps_coords = []
-
-#         for file in selected_folder.rglob("*"):
-#             if file.is_file():
-#                 dt = get_file_datetime(file)
-#                 if dt:
-#                     datetimes.append(dt)
-#                 gps = get_file_gps(file)
-#                 if gps:
-#                     gps_coords.append(gps)
-
-#         st.write(f"Found {len(datetimes)} files with datetime information in the selected folder.")
-#         st.write(f"Found {len(gps_coords)} files with GPS coordinates in the selected folder.")
-        
-#         min_datetime = min(datetimes) if datetimes else None
-#         # ave_gps = 
-        
-#         return [min_datetime, ave_gps]
     
     
 def check_folder_metadata():
@@ -1236,8 +1042,8 @@ def check_folder_metadata():
         max_datetime = max(datetimes) if datetimes else None
 
         # Initialize session state for lat/lon if not set
-        if "coords_found" not in st.session_state:
-            st.session_state.coords_found = False
+        if "coords_found_in_exif" not in st.session_state:
+            st.session_state.coords_found_in_exif = False
         if "exif_lat" not in st.session_state:
             st.session_state.exif_lat = None
         if "exif_lng" not in st.session_state:
@@ -1253,7 +1059,7 @@ def check_folder_metadata():
             ave_lon = statistics.mean(lons)
             st.session_state.exif_lat = ave_lat
             st.session_state.exif_lng = ave_lon
-            st.session_state.coords_found = True
+            st.session_state.coords_found_in_exif = True
         
         # set session state values
         st.session_state.min_datetime_found = min_datetime
@@ -1274,52 +1080,6 @@ def info_box(msg, icon=":material/info:"):
                      background_color="#d9e3e7af",
                      font_color="#086164",
                      icon_size=23)
-
-
-# HIERWASIK
-# HIER WAS IK!!!!! GPS uitlezen selectively.
-
-
-# def check_folder_metadata():
-#     with st.spinner("Checking data..."):
-#         settings, _ = load_settings()
-#         selected_folder = Path(settings["selected_folder"])
-        
-#         datetimes = []
-#         gps_coords = []
-
-#         all_files = [f for f in selected_folder.rglob("*") if f.is_file()]
-#         gps_checked = 0
-
-#         for i, file in enumerate(all_files):
-#             # Always check datetime
-#             dt = get_file_datetime(file)
-#             if dt:
-#                 datetimes.append(dt)
-
-#             # Check GPS every 3rd file, up to 100 times
-#             if i % 3 == 0 and gps_checked < 100:
-#                 gps = get_file_gps(file)
-#                 gps_checked += 1
-#                 if gps:
-#                     gps_coords.append(gps)
-
-#         st.write(f"Found {len(datetimes)} files with datetime information.")
-#         st.write(f"Checked GPS in {gps_checked} files; found {len(gps_coords)} valid coordinates.")
-
-#         min_datetime = min(datetimes) if datetimes else None
-#         ave_gps = None
-
-#         if gps_coords:
-#             lats, lons = zip(*gps_coords)
-#             ave_gps = (statistics.mean(lats), statistics.mean(lons))
-
-#         return [min_datetime, ave_gps]
-
-
-
-
-
 
 
 @st.dialog("Model information", width="large")
