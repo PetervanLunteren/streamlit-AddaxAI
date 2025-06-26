@@ -101,7 +101,7 @@ def location_selector_widget():
     if "closest_location" not in st.session_state:
         st.session_state.closest_location = None
     if st.session_state.coords_found_in_exif:
-        st.session_state.closest_location = get_closest_location_within_radius((st.session_state.exif_lat, st.session_state.exif_lng), locations)            
+        st.session_state.closest_location = match_locations((st.session_state.exif_lat, st.session_state.exif_lng), locations)            
     
     # if first location, show only button and no dropdown
     if locations == {}:
@@ -166,7 +166,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-def get_closest_location_within_radius(known_point, locations, max_distance_meters=50):
+def match_locations(known_point, locations, max_distance_meters=50):
     """
     Find the closest known location within a max distance (default 50 meters).
     

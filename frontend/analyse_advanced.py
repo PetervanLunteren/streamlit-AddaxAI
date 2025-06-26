@@ -21,6 +21,115 @@ mode = settings["mode"]
 
 st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
 
+
+
+###### WORKING STEPPER BAR ######
+class StepperBar:
+    def __init__(self, steps, orientation='horizontal', active_color='blue', completed_color='green', inactive_color='gray'):
+        self.steps = steps
+        self.current_step = 0
+        self.orientation = orientation
+        self.active_color = active_color
+        self.completed_color = completed_color
+        self.inactive_color = inactive_color
+
+    def set_current_step(self, step):
+        if 0 <= step < len(self.steps):
+            self.current_step = step
+        else:
+            raise ValueError("Step index out of range")
+
+    def display(self):
+        if self.orientation == 'horizontal':
+            return self._display_horizontal()
+        elif self.orientation == 'vertical':
+            return self._display_vertical()
+        else:
+            raise ValueError("Orientation must be either 'horizontal' or 'vertical'")
+
+    def _display_horizontal(self):
+        stepper_html = "<div style='display:flex; justify-content:space-between; align-items:center;'>"
+        for i, step in enumerate(self.steps):
+            color = self.completed_color if i < self.current_step else self.inactive_color
+            current_color = self.active_color if i == self.current_step else color
+            stepper_html += f"""
+            <div style='text-align:center;'>
+                <div style='width:30px; height:30px; border-radius:50%; background-color:{current_color}; display:inline-block;'></div>
+                <div>{step}</div>
+            </div>"""
+            if i < len(self.steps) - 1:
+                stepper_html += f"<div style='flex-grow:1; height:2px; background-color:{self.inactive_color};'></div>"
+        stepper_html += "</div>"
+        return stepper_html
+
+    def _display_vertical(self):
+        stepper_html = "<div style='display:flex; flex-direction:column; align-items:flex-start;'>"
+        for i, step in enumerate(self.steps):
+            color = self.completed_color if i < self.current_step else self.inactive_color
+            current_color = self.active_color if i == self.current_step else color
+            stepper_html += f"""
+            <div style='display:flex; align-items:center; margin-bottom:10px;'>
+                <div style='width:30px; height:30px; border-radius:50%; background-color:{current_color}; margin-right:10px;'></div>
+                <div>{step}</div>
+            </div>"""
+            if i < len(self.steps) - 1:
+                stepper_html += f"<div style='width:2px; height:20px; background-color:{self.inactive_color}; margin-left:14px;'></div>"
+        stepper_html += "</div>"
+        return stepper_html
+
+# --- Initialize state
+if "current_step" not in st.session_state:
+    st.session_state.current_step = 0
+
+# --- Handle button clicks (top of script!)
+prev_clicked = st.sidebar.button("⬅ Previous", key="prev")
+next_clicked = st.sidebar.button("Next ➡", key="next")
+
+if prev_clicked and st.session_state.current_step > 0:
+    st.session_state.current_step -= 1
+elif next_clicked and st.session_state.current_step < 4:
+    st.session_state.current_step += 1
+
+# --- Create stepper
+stepper = StepperBar(
+    steps=["Step 1", "Step 2", "Step 3", "Step 4", "Step 5"],
+    orientation="horizontal",
+    active_color="#086164",
+    completed_color="#0861647D",
+    inactive_color="#f0f2f6"
+)
+stepper.set_current_step(st.session_state.current_step)
+
+# --- Display in correct order
+st.markdown(stepper.display(), unsafe_allow_html=True)
+
+# --- Show step text
+messages = [
+    "This is the first step. You can start by selecting a folder for your deployment.",
+    "In this step, you can select the project to which this deployment belongs.",
+    "Here you can specify the location where the deployment was made.",
+    "In this step, you can select the camera used for the deployment.",
+    "Finally, you can set the start date and time for the deployment. This is important for tracking when the data was collected."
+]
+st.write(messages[st.session_state.current_step])
+
+# --- Buttons at bottom
+col1, col2 = st.columns([1, 1])
+with col1:
+    st.button("⬅ Previous", key="prev2", on_click=lambda: st.session_state.update(current_step=max(0, st.session_state.current_step - 1)))
+with col2:
+    st.button("Next ➡", key="next2", on_click=lambda: st.session_state.update(current_step=min(4, st.session_state.current_step + 1)))
+
+###### END WORKING STEPPER BAR ######
+
+
+
+
+
+
+
+
+
 # header
 st.header(":material/rocket_launch: Add deployment to database", divider="grey")
 st.write(
