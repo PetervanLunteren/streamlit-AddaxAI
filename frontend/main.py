@@ -5,7 +5,7 @@
 # main_copy en utils_copy is verdere code, maar daar dit de bug in. Dus dan weet je dat.
 
 
-
+from backend.utils import *
 from appdirs import user_config_dir
 
 import streamlit as st
@@ -47,6 +47,7 @@ st.markdown(
 
 
 # Inject custom CSS
+# to adjust the width of the popover container
 st.markdown("""
     <style>
         /* Target the popover container */
@@ -55,6 +56,11 @@ st.markdown("""
             max-width: 90vw;          /* Optional: prevent overflow on small screens */
         }
     </style>
+""", unsafe_allow_html=True)
+
+# Inject Material Icons for the header stepper bar
+st.markdown("""
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 """, unsafe_allow_html=True)
 
 # find addaxAI files folder path
@@ -95,13 +101,14 @@ if cuda_toolkit_path:
 for path in paths_to_add:
     if path not in sys.path:
         sys.path.insert(0, path)
-        
+
 # Update PYTHONPATH env var without duplicates
 PYTHONPATH_separator = ":" if platform.system() != "Windows" else ";"
 existing_paths = os.environ.get("PYTHONPATH", "").split(PYTHONPATH_separator)
 
 # Remove empty strings, duplicates, and keep order
-existing_paths = [p for i, p in enumerate(existing_paths) if p and p not in existing_paths[:i]]
+existing_paths = [p for i, p in enumerate(
+    existing_paths) if p and p not in existing_paths[:i]]
 
 for path in paths_to_add:
     if path not in existing_paths:
@@ -109,7 +116,6 @@ for path in paths_to_add:
 
 os.environ["PYTHONPATH"] = PYTHONPATH_separator.join(existing_paths)
 
-from backend.utils import *
 
 # Custom CSS to style the button in the header
 st.markdown(
@@ -155,7 +161,22 @@ if not os.path.exists(settings_file):
         "lang": "en",  # default language
         "mode": 1,  # default mode (0: simple, 1: advanced)
         "selected_folder": None,
-        "selected_project": None, 
+        "selected_project": None,
+        "projects": {}
+    }
+
+    # start with a clean slate
+    settings = {
+        "vars": {
+            "global": {
+                "lang": "en",
+                "mode": 1,
+            },
+            "analyse_advanced": {
+                "selected_folder": None,
+                "project": None,
+            }
+        },
         "projects": {}
     }
 
@@ -171,8 +192,8 @@ if not os.path.exists(settings_file):
 txts = load_txts()
 # vars = load_project_vars()
 settings, _ = load_settings()
-lang = settings["lang"]
-mode = settings["mode"]
+lang = settings["vars"]["global"]["lang"]
+mode = settings["vars"]["global"]["mode"]
 
 # render a dummy map with a marker so that the rest of the markers this session will be rendered
 m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)

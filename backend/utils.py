@@ -54,11 +54,11 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 def project_selector_widget():
 
     # check what is already known and selected
-    projects, selected_project = fetch_known_projects()
+    projects, project = fetch_known_projects()
     
     # if first project, show only button and no dropdown
     if projects == {}:
-        add_new_project_popover("Add your first project")
+        add_new_project_popover("Define your first project")
 
     # if there are projects, show dropdown and button
     else:
@@ -67,8 +67,8 @@ def project_selector_widget():
         # dropdown for existing projects
         with col1:
             options = list(projects.keys())
-            selected_index = options.index(selected_project) if selected_project in options else 0
-            selected_project = st.selectbox(
+            selected_index = options.index(project) if project in options else 0
+            project = st.selectbox(
                 "Existing projects",
                 options=options,
                 index=selected_index,
@@ -77,18 +77,18 @@ def project_selector_widget():
             
         # popover to add a new project
         with col2:
-            add_new_project_popover("Add")
+            add_new_project_popover("New")
 
         # adjust the selected project
         settings, _ = load_settings()
-        if settings["selected_project"] != selected_project:
-            settings["selected_project"] = selected_project
+        if settings["vars"]["analyse_advanced"]["project"] != project:
+            settings["vars"]["analyse_advanced"]["project"] = project
             with open(settings_file, "w") as file:
                 json.dump(settings, file, indent=2)
             st.rerun()
         
         # return
-        return selected_project
+        return project
 
 # this widget lets the user select a location from a dropdown menu
 # or add a new location via popover
@@ -105,7 +105,7 @@ def location_selector_widget():
     
     # if first location, show only button and no dropdown
     if locations == {}:
-        add_new_location_popover("Add your first location")
+        add_new_location_popover("Define your first location")
 
         # show info box if coordinates are found in metadata
         if st.session_state.coords_found_in_exif:
@@ -137,7 +137,7 @@ def location_selector_widget():
         
         # popover to add a new location
         with col2:
-            add_new_location_popover("Add")
+            add_new_location_popover("New")
 
         # info box if coordinates are found in metadata
         if st.session_state.coords_found_in_exif:
@@ -266,21 +266,21 @@ def datetime_selector_widget():
 def fetch_known_projects():
     settings, _ = load_settings()
     projects = settings["projects"]
-    selected_project = settings["selected_project"]
-    return projects, selected_project
+    project = settings["vars"]["analyse_advanced"]["project"]
+    return projects, project
 
 def fetch_known_locations():
     settings, _ = load_settings()
-    selected_project = settings["selected_project"]
-    project = settings["projects"][selected_project]
+    project = settings["vars"]["analyse_advanced"]["project"]
+    project = settings["projects"][project]
     selected_location = project["selected_location"]
     locations = project["locations"]
     return locations, selected_location
 
 def fetch_known_deployments():
     settings, _ = load_settings()
-    selected_project = settings["selected_project"]
-    project = settings["projects"][selected_project]
+    project = settings["vars"]["analyse_advanced"]["project"]
+    project = settings["projects"][project]
     selected_location = project["selected_location"]
     location = project["locations"][selected_location]
     deployments = location["deployments"]
@@ -296,12 +296,134 @@ def generate_deployment_id():
     # Combine into deployment ID
     return f"dep-{rand_str_1}-{rand_str_2}"
 
+###### WORKING STEPPER BAR ######
+
+
+class StepperBar:
+    def __init__(self, steps, orientation='horizontal', active_color='blue', completed_color='green', inactive_color='gray'):
+        self.steps = steps
+        self.current_step = 0
+        self.orientation = orientation
+        self.active_color = active_color
+        self.completed_color = completed_color
+        self.inactive_color = inactive_color
+
+    def set_current_step(self, step):
+        if 0 <= step < len(self.steps):
+            self.current_step = step
+        else:
+            raise ValueError("Step index out of range")
+
+    def display(self):
+        if self.orientation == 'horizontal':
+            return self._display_horizontal()
+        elif self.orientation == 'vertical':
+            return self._display_vertical()
+        else:
+            raise ValueError("Orientation must be either 'horizontal' or 'vertical'")
+
+    def _display_horizontal(self):
+        stepper_html = "<div style='display:flex; justify-content:space-between; align-items:center;'>"
+        for i, step in enumerate(self.steps):
+            if i < self.current_step:
+                icon = "check_circle"
+                color = self.completed_color
+            elif i == self.current_step:
+                icon = "radio_button_checked"
+                color = self.active_color
+            else:
+                icon = "radio_button_unchecked"
+                color = self.inactive_color
+
+            stepper_html += f"""
+            <div style='text-align:center;'>
+                <span class="material-icons" style="color:{color}; font-size:30px;">{icon}</span>
+                <div>{step}</div>
+            </div>"""
+            if i < len(self.steps) - 1:
+                stepper_html += f"<div style='flex-grow:1; height:2px; background-color:{self.inactive_color};'></div>"
+        stepper_html += "</div>"
+        return stepper_html
+
+    def _display_horizontal(self):
+        stepper_html = "<div style='display:flex; justify-content:space-between; align-items:center;'>"
+        for i, step in enumerate(self.steps):
+            if i < self.current_step:
+                icon = "check_circle"
+                color = self.completed_color
+            elif i == self.current_step:
+                icon = "radio_button_checked"
+                color = self.active_color
+            else:
+                icon = "radio_button_unchecked"
+                color = self.inactive_color
+
+            stepper_html += f"""
+            <div style='text-align:center;'>
+                <span class="material-icons" style="color:{color}; font-size:30px;">{icon}</span>
+                <div style="color:{color};">{step}</div>
+            </div>"""
+            if i < len(self.steps) - 1:
+                stepper_html += f"<div style='flex-grow:1; height:2px; background-color:{self.inactive_color};'></div>"
+        stepper_html += "</div>"
+        return stepper_html
+
+    def _display_vertical(self):
+        stepper_html = "<div style='display:flex; flex-direction:column; align-items:flex-start;'>"
+        for i, step in enumerate(self.steps):
+            color = self.completed_color if i < self.current_step else self.inactive_color
+            current_color = self.active_color if i == self.current_step else color
+            stepper_html += f"""
+            <div style='display:flex; align-items:center; margin-bottom:10px;'>
+                <div style='width:30px; height:30px; border-radius:50%; background-color:{current_color}; margin-right:10px;'></div>
+                <div>{step}</div>
+            </div>"""
+            if i < len(self.steps) - 1:
+                stepper_html += f"<div style='width:2px; height:20px; background-color:{self.inactive_color}; margin-left:14px;'></div>"
+        stepper_html += "</div>"
+        return stepper_html
+
+def fetch_current_step():
+    # load
+    # settings, _ = load_settings()
+    # project = settings["vars"]["analyse_advanced"]["project"]
+    # project_vars = settings["projects"][project]["vars"]
+    # current_step = project_vars.get("current_step", 0)
+    # return current_step
+
+    settings, _ = load_settings()
+    project = settings.get("project")
+    project_data = settings.get("projects", {}).get(project, {})
+    project_vars = project_data.get("vars", {})
+    return project_vars.get("current_step", 0)
+    
+HIERWASIK
+# dit moet niet zijn update project vars, maar update "analyse_advanced" vars
+# ook selected folder moet zijn "folder"....
+def update_project_vars(updates):
+    
+    # load
+    settings, _ = load_settings()
+    project = settings["vars"]["analyse_advanced"]["project"]
+    project_vars = settings["projects"][project]["vars"]
+    
+    # st.write("DEBUG - Project Variables")
+    # st.write(project_vars)
+    
+    project_vars.update(updates)
+    
+    # Save updated settings
+    with open(settings_file, "w") as file:
+        json.dump(settings, file, indent=2)
+
+
+
 def add_deployment(datetime):
 
     settings, _ = load_settings()
     selected_folder = settings["selected_folder"]
-    selected_project = settings["selected_project"]
-    project = settings["projects"][selected_project]
+    project = settings["vars"]["analyse_advanced"]["project"]
+    project = settings["projects"][project]
     selected_location = project["selected_location"]
     location = project["locations"][selected_location]
     deployments = location["deployments"]
@@ -318,8 +440,8 @@ def add_deployment(datetime):
 
     # # Sort deployments (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
     # sorted_deployments = dict(sorted(deployments.items(), key=lambda item: item[0].lower()))
-    # settings["projects"][selected_project]["locations"][selected_location]["deployments"] = sorted_deployments
-    # settings["projects"][selected_project]["locations"][selected_location]["selected_deployment"] = deployment_id
+    # settings["projects"][project]["locations"][selected_location]["deployments"] = sorted_deployments
+    # settings["projects"][project]["locations"][selected_location]["selected_deployment"] = deployment_id
 
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -334,8 +456,8 @@ def add_deployment(datetime):
 def add_location(location_id, lat, lon):
 
     settings, _ = load_settings()
-    selected_project = settings["selected_project"]
-    project = settings["projects"][selected_project]
+    project = settings["vars"]["analyse_advanced"]["project"]
+    project = settings["projects"][project]
     locations = project["locations"]
 
     # Check if location_id is unique
@@ -352,8 +474,8 @@ def add_location(location_id, lat, lon):
 
     # Sort locations (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
     sorted_locations = dict(sorted(locations.items(), key=lambda item: item[0].lower()))
-    settings["projects"][selected_project]["locations"] = sorted_locations
-    settings["projects"][selected_project]["selected_location"] = location_id
+    settings["projects"][project]["locations"] = sorted_locations
+    settings["projects"][project]["selected_location"] = location_id
 
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -382,15 +504,17 @@ def add_project(projectID, comments):
     # Add new project
     projects[projectID] = {
         "comments": comments,
-        "selected_location": None,
+        # "selected_location": None,
+        # "vars": {},
         "locations": {},
     }
 
     # Sort projects (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
     sorted_projects = dict(sorted(projects.items(), key=lambda item: item[0].lower()))
     settings["projects"] = sorted_projects
-    # settings["selected_project"] = list(sorted_projects.keys()).index(projectID) # update selected index
-    settings["selected_project"] = projectID
+    # settings["vars"]["analyse_advanced"]["project"] = list(sorted_projects.keys()).index(projectID) # update selected index
+    # settings["vars"]["analyse_advanced"]["project"] = projectID
+    settings["vars"]["analyse_advanced"]["project"] = projectID
 
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -409,7 +533,7 @@ def add_new_project_popover(txt):
     popover_container = st.empty()
     with popover_container.container():
         with st.popover(f":material/add_circle: {txt}",
-                        help="Add a new project",
+                        help="Define a new project",
                         use_container_width=True):
             
             # fetch known projects IDs
@@ -455,7 +579,7 @@ def add_new_location_popover(txt):
     popover_container = st.empty()
     with popover_container.container():
         with st.popover(f":material/add_circle: {txt}",
-                        help="Add a new location",
+                        help="Define a new location",
                         use_container_width=True):
             
             # init session state vars
@@ -1295,8 +1419,8 @@ def load_settings():
 
 # def load_project_vars():
 #     settings, _ = load_settings()
-#     selected_project = settings["selected_project"]
-#     current_project = settings["projects"][selected_project]
+#     project = settings["vars"]["analyse_advanced"]["project"]
+#     current_project = settings["projects"][project]
 #     return current_project
 
 
