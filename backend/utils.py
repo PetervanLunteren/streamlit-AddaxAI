@@ -54,7 +54,7 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 def project_selector_widget():
 
     # check what is already known and selected
-    projects, project = fetch_known_projects()
+    projects, selected_projectID = fetch_known_projects()
     
     # if first project, show only button and no dropdown
     if projects == {}:
@@ -67,8 +67,10 @@ def project_selector_widget():
         # dropdown for existing projects
         with col1:
             options = list(projects.keys())
-            selected_index = options.index(project) if project in options else 0
-            project = st.selectbox(
+            selected_index = options.index(selected_projectID) if selected_projectID in options else 0
+            
+            # overwrite selected_projectID if user has selected a different project
+            selected_projectID = st.selectbox(
                 "Existing projects",
                 options=options,
                 index=selected_index,
@@ -81,21 +83,21 @@ def project_selector_widget():
 
         # adjust the selected project
         settings, _ = load_settings()
-        if settings["vars"]["analyse_advanced"]["project"] != project:
-            settings["vars"]["analyse_advanced"]["project"] = project
+        if settings["vars"]["analyse_advanced"]["selected_projectID"] != selected_projectID:
+            settings["vars"]["analyse_advanced"]["selected_projectID"] = selected_projectID
             with open(settings_file, "w") as file:
                 json.dump(settings, file, indent=2)
             st.rerun()
         
         # return
-        return project
+        return selected_projectID
 
 # this widget lets the user select a location from a dropdown menu
 # or add a new location via popover
 def location_selector_widget():
 
     # check what is already known and selected
-    locations, selected_location = fetch_known_locations()
+    locations, location = fetch_known_locations()
 
     # calculate distance to closest known locations if coordinates are found in metadata
     if "closest_location" not in st.session_state:
@@ -120,7 +122,7 @@ def location_selector_widget():
             options = list(locations.keys())
             
             # set to last selected location if it exists
-            selected_index = options.index(selected_location) if selected_location in options else 0
+            selected_index = options.index(location) if location in options else 0
             
             # if coordinates are found in metadata, pre-select the closest location
             if st.session_state.coords_found_in_exif and st.session_state.closest_location is not None:
@@ -128,7 +130,7 @@ def location_selector_widget():
                 selected_index = options.index(closes_location_name) if closes_location_name in options else 0
             
             # create the selectbox
-            selected_location = st.selectbox(
+            location = st.selectbox(
                 "Choose a location ID",
                 options=options,
                 index=selected_index,
@@ -152,7 +154,7 @@ def location_selector_widget():
             info_box(message)
             
         # return
-        return selected_location
+        return location
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     """Calculate the distance in meters between two lat/lng points."""
@@ -266,23 +268,23 @@ def datetime_selector_widget():
 def fetch_known_projects():
     settings, _ = load_settings()
     projects = settings["projects"]
-    project = settings["vars"]["analyse_advanced"]["project"]
-    return projects, project
+    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
+    return projects, selected_projectID
 
 def fetch_known_locations():
     settings, _ = load_settings()
-    project = settings["vars"]["analyse_advanced"]["project"]
+    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
     project = settings["projects"][project]
-    selected_location = project["selected_location"]
+    location = project["location"]
     locations = project["locations"]
-    return locations, selected_location
+    return locations, location
 
 def fetch_known_deployments():
     settings, _ = load_settings()
-    project = settings["vars"]["analyse_advanced"]["project"]
+    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
     project = settings["projects"][project]
-    selected_location = project["selected_location"]
-    location = project["locations"][selected_location]
+    location = project["location"]
+    location = project["locations"][location]
     deployments = location["deployments"]
     selected_deployment = location["selected_deployment"]
     return deployments, selected_deployment
@@ -302,15 +304,15 @@ def generate_deployment_id():
 class StepperBar:
     def __init__(self, steps, orientation='horizontal', active_color='blue', completed_color='green', inactive_color='gray'):
         self.steps = steps
-        self.current_step = 0
+        self.step = 0
         self.orientation = orientation
         self.active_color = active_color
         self.completed_color = completed_color
         self.inactive_color = inactive_color
 
-    def set_current_step(self, step):
+    def set_step(self, step):
         if 0 <= step < len(self.steps):
-            self.current_step = step
+            self.step = step
         else:
             raise ValueError("Step index out of range")
 
@@ -325,10 +327,10 @@ class StepperBar:
     def _display_horizontal(self):
         stepper_html = "<div style='display:flex; justify-content:space-between; align-items:center;'>"
         for i, step in enumerate(self.steps):
-            if i < self.current_step:
+            if i < self.step:
                 icon = "check_circle"
                 color = self.completed_color
-            elif i == self.current_step:
+            elif i == self.step:
                 icon = "radio_button_checked"
                 color = self.active_color
             else:
@@ -348,10 +350,10 @@ class StepperBar:
     def _display_horizontal(self):
         stepper_html = "<div style='display:flex; justify-content:space-between; align-items:center;'>"
         for i, step in enumerate(self.steps):
-            if i < self.current_step:
+            if i < self.step:
                 icon = "check_circle"
                 color = self.completed_color
-            elif i == self.current_step:
+            elif i == self.step:
                 icon = "radio_button_checked"
                 color = self.active_color
             else:
@@ -371,8 +373,8 @@ class StepperBar:
     def _display_vertical(self):
         stepper_html = "<div style='display:flex; flex-direction:column; align-items:flex-start;'>"
         for i, step in enumerate(self.steps):
-            color = self.completed_color if i < self.current_step else self.inactive_color
-            current_color = self.active_color if i == self.current_step else color
+            color = self.completed_color if i < self.step else self.inactive_color
+            current_color = self.active_color if i == self.step else color
             stepper_html += f"""
             <div style='display:flex; align-items:center; margin-bottom:10px;'>
                 <div style='width:30px; height:30px; border-radius:50%; background-color:{current_color}; margin-right:10px;'></div>
@@ -383,34 +385,30 @@ class StepperBar:
         stepper_html += "</div>"
         return stepper_html
 
-def fetch_current_step():
+def fetch_step(section):
     # load
     # settings, _ = load_settings()
-    # project = settings["vars"]["analyse_advanced"]["project"]
+    # selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
     # project_vars = settings["projects"][project]["vars"]
-    # current_step = project_vars.get("current_step", 0)
-    # return current_step
+    # step = project_vars.get("step", 0)
+    # return step
 
     settings, _ = load_settings()
-    project = settings.get("project")
-    project_data = settings.get("projects", {}).get(project, {})
-    project_vars = project_data.get("vars", {})
-    return project_vars.get("current_step", 0)
-    
-HIERWASIK
-# dit moet niet zijn update project vars, maar update "analyse_advanced" vars
-# ook selected folder moet zijn "folder"....
-def update_project_vars(updates):
+    vars = settings["vars"].get(section)
+    step = vars.get("step", 0)
+    return step
+
+
+def update_vars(section, updates):
     
     # load
     settings, _ = load_settings()
-    project = settings["vars"]["analyse_advanced"]["project"]
-    project_vars = settings["projects"][project]["vars"]
+    vars = settings["vars"][section]
     
     # st.write("DEBUG - Project Variables")
     # st.write(project_vars)
     
-    project_vars.update(updates)
+    vars.update(updates)
     
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -422,10 +420,10 @@ def add_deployment(datetime):
 
     settings, _ = load_settings()
     selected_folder = settings["selected_folder"]
-    project = settings["vars"]["analyse_advanced"]["project"]
+    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
     project = settings["projects"][project]
-    selected_location = project["selected_location"]
-    location = project["locations"][selected_location]
+    location = project["location"]
+    location = project["locations"][location]
     deployments = location["deployments"]
 
     # generate a unique deployment ID
@@ -440,8 +438,8 @@ def add_deployment(datetime):
 
     # # Sort deployments (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
     # sorted_deployments = dict(sorted(deployments.items(), key=lambda item: item[0].lower()))
-    # settings["projects"][project]["locations"][selected_location]["deployments"] = sorted_deployments
-    # settings["projects"][project]["locations"][selected_location]["selected_deployment"] = deployment_id
+    # settings["projects"][project]["locations"][location]["deployments"] = sorted_deployments
+    # settings["projects"][project]["locations"][location]["selected_deployment"] = deployment_id
 
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -456,7 +454,7 @@ def add_deployment(datetime):
 def add_location(location_id, lat, lon):
 
     settings, _ = load_settings()
-    project = settings["vars"]["analyse_advanced"]["project"]
+    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
     project = settings["projects"][project]
     locations = project["locations"]
 
@@ -475,7 +473,7 @@ def add_location(location_id, lat, lon):
     # Sort locations (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
     sorted_locations = dict(sorted(locations.items(), key=lambda item: item[0].lower()))
     settings["projects"][project]["locations"] = sorted_locations
-    settings["projects"][project]["selected_location"] = location_id
+    settings["projects"][project]["location"] = location_id
 
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -504,25 +502,21 @@ def add_project(projectID, comments):
     # Add new project
     projects[projectID] = {
         "comments": comments,
-        # "selected_location": None,
+        # "location": None,
         # "vars": {},
         "locations": {},
     }
 
-    # Sort projects (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
-    sorted_projects = dict(sorted(projects.items(), key=lambda item: item[0].lower()))
-    settings["projects"] = sorted_projects
-    # settings["vars"]["analyse_advanced"]["project"] = list(sorted_projects.keys()).index(projectID) # update selected index
-    # settings["vars"]["analyse_advanced"]["project"] = projectID
-    settings["vars"]["analyse_advanced"]["project"] = projectID
+    settings["projects"] = projects # add project
+    settings["vars"]["analyse_advanced"]["selected_projectID"] = projectID # update selected project
 
     # Save updated settings
     with open(settings_file, "w") as file:
         json.dump(settings, file, indent=2)
 
     # Return list of projects and index of the new one
-    project_list = list(sorted_projects.values())
-    selected_index = project_list.index(sorted_projects[projectID])
+    project_list = list(projects.values())
+    selected_index = project_list.index(projects[projectID])
 
     return selected_index, project_list
 
@@ -780,7 +774,10 @@ def browse_directory_widget(selected_folder):
     with col1:
         if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
             selected_folder = select_folder()
-            save_global_vars({"selected_folder": selected_folder})
+            # update_vars("selected_folder", selected_folder)
+            # save_global_vars({"selected_folder": selected_folder})
+            update_vars(section="analyse_advanced",
+                        updates={"selected_folder": selected_folder})
             
             # reset session state variables
             st.session_state.clear()
@@ -792,11 +789,11 @@ def browse_directory_widget(selected_folder):
                      unsafe_allow_html=True)
     else:
         with col2:
-            selected_folder_short = "..." + \
+            folder_short = "..." + \
                 selected_folder[-45:] if len(
                     selected_folder) > 45 else selected_folder
             st.markdown(
-                f'Selected folder <code style="color:#086164; font-family:monospace;">{selected_folder_short}</code>', unsafe_allow_html=True)
+                f'Selected folder <code style="color:#086164; font-family:monospace;">{folder_short}</code>', unsafe_allow_html=True)
     return selected_folder
 
 
@@ -1109,7 +1106,8 @@ def get_file_gps(file_path):
 def check_folder_metadata():
     with st.spinner("Checking data..."):
         settings, _ = load_settings()
-        selected_folder = Path(settings["selected_folder"])
+        # selected_folder = Path(settings["selected_folder"])
+        selected_folder = Path(settings["vars"]["analyse_advanced"]["selected_folder"])
         
         datetimes = []
         gps_coords = []
@@ -1419,7 +1417,7 @@ def load_settings():
 
 # def load_project_vars():
 #     settings, _ = load_settings()
-#     project = settings["vars"]["analyse_advanced"]["project"]
+#     project = settings["vars"]["analyse_advanced"].get("project")
 #     current_project = settings["projects"][project]
 #     return current_project
 
