@@ -170,8 +170,6 @@ if not os.path.exists(settings_file):
                 "mode": 1,
             },
             "analyse_advanced": {
-                # "folder": None,
-                # "project": None,
             }
         },
         "projects": {}

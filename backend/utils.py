@@ -1,4 +1,5 @@
 
+from streamlit_tree_select import tree_select
 import os
 import json
 import streamlit as st
@@ -51,11 +52,13 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 
 # this widget lets the user select a project from a dropdown menu
 # or add a new pojrect via popover
+
+
 def project_selector_widget():
 
     # check what is already known and selected
     projects, selected_projectID = fetch_known_projects()
-    
+
     # if first project, show only button and no dropdown
     if projects == {}:
         add_new_project_popover("Define your first project")
@@ -63,12 +66,13 @@ def project_selector_widget():
     # if there are projects, show dropdown and button
     else:
         col1, col2 = st.columns([3, 1])
-        
+
         # dropdown for existing projects
         with col1:
             options = list(projects.keys())
-            selected_index = options.index(selected_projectID) if selected_projectID in options else 0
-            
+            selected_index = options.index(
+                selected_projectID) if selected_projectID in options else 0
+
             # overwrite selected_projectID if user has selected a different project
             selected_projectID = st.selectbox(
                 "Existing projects",
@@ -76,7 +80,7 @@ def project_selector_widget():
                 index=selected_index,
                 label_visibility="collapsed"
             )
-            
+
         # popover to add a new project
         with col2:
             add_new_project_popover("New")
@@ -88,47 +92,65 @@ def project_selector_widget():
             with open(settings_file, "w") as file:
                 json.dump(settings, file, indent=2)
             st.rerun()
-        
+
         # return
         return selected_projectID
 
 # this widget lets the user select a location from a dropdown menu
 # or add a new location via popover
+
+
 def location_selector_widget():
+
+    # load settings
+    coords_found_in_exif, exif_lat, exif_lng = fetch_vars(section="analyse_advanced",  # SESSION
+                                                          requested_vars=["coords_found_in_exif", "exif_lat", "exif_lng"])
 
     # check what is already known and selected
     locations, location = fetch_known_locations()
 
-    # calculate distance to closest known locations if coordinates are found in metadata
-    if "closest_location" not in st.session_state:
-        st.session_state.closest_location = None
-    if st.session_state.coords_found_in_exif:
-        st.session_state.closest_location = match_locations((st.session_state.exif_lat, st.session_state.exif_lng), locations)            
-    
+    # # calculate distance to closest known locations if coordinates are found in metadata
+    # if "closest_location" not in st.session_state:
+    #     st.session_state.closest_location = None
+    # if st.session_state.coords_found_in_exif:
+    #     st.session_state.closest_location = match_locations((st.session_state.exif_lat, st.session_state.exif_lng), locations)
+    if coords_found_in_exif:  # SESSION
+        closest_location = match_locations((exif_lat, exif_lng), locations)
+
     # if first location, show only button and no dropdown
     if locations == {}:
         add_new_location_popover("Define your first location")
 
-        # show info box if coordinates are found in metadata
-        if st.session_state.coords_found_in_exif:
-            info_box(f"Coordinates ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}) were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
+        # # show info box if coordinates are found in metadata
+        # if st.session_state.coords_found_in_exif:
+        #     info_box(f"Coordinates ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}) were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
+        if coords_found_in_exif:  # SESSION
+            info_box(
+                f"Coordinates ({exif_lat:.5f}, {exif_lng:.5f}) were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
 
     # if there are locations, show dropdown and button
     else:
         col1, col2 = st.columns([3, 1])
-        
+
         # dropdown for existing locations
         with col1:
             options = list(locations.keys())
-            
+
             # set to last selected location if it exists
-            selected_index = options.index(location) if location in options else 0
-            
-            # if coordinates are found in metadata, pre-select the closest location
-            if st.session_state.coords_found_in_exif and st.session_state.closest_location is not None:
-                closes_location_name, _ = st.session_state.closest_location
-                selected_index = options.index(closes_location_name) if closes_location_name in options else 0
-            
+            selected_index = options.index(
+                location) if location in options else 0
+
+            # # if coordinates are found in metadata, pre-select the closest location
+            # if st.session_state.coords_found_in_exif and st.session_state.closest_location is not None:
+            #     closes_location_name, _ = st.session_state.closest_location
+            #     selected_index = options.index(closes_location_name) if closes_location_name in options else 0
+
+            if coords_found_in_exif and closest_location is not None:
+                # if coordinates are found in metadata, pre-select the closest location
+                closest_location_name, _ = closest_location
+                selected_index = options.index(
+                    closest_location_name) if closest_location_name in options else 0
+
             # create the selectbox
             location = st.selectbox(
                 "Choose a location ID",
@@ -136,25 +158,38 @@ def location_selector_widget():
                 index=selected_index,
                 label_visibility="collapsed"
             )
-        
+
         # popover to add a new location
         with col2:
             add_new_location_popover("New")
 
+        # # info box if coordinates are found in metadata
+        # if st.session_state.coords_found_in_exif:
+
+        #     # define message based on whether a closest location was found
+        #     message = f"Coordinates extracted from image metadata: ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}). "
+        #     if st.session_state.closest_location is not None:
+        #         name, dist = st.session_state.closest_location
+        #         message += f"Matches known location <i>{name}</i>, about {dist} meters away."
+        #     else:
+        #         message += f"No known location found within 50 meters."
+        #     info_box(message)
+
         # info box if coordinates are found in metadata
-        if st.session_state.coords_found_in_exif:
+        if coords_found_in_exif:
 
             # define message based on whether a closest location was found
-            message = f"Coordinates extracted from image metadata: ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}). "
-            if st.session_state.closest_location is not None:
-                name, dist = st.session_state.closest_location
+            message = f"Coordinates extracted from image metadata: ({exif_lat:.5f}, {exif_lng:.5f}). "
+            if closest_location is not None:
+                name, dist = closest_location
                 message += f"Matches known location <i>{name}</i>, about {dist} meters away."
             else:
                 message += f"No known location found within 50 meters."
             info_box(message)
-            
+
         # return
         return location
+
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     """Calculate the distance in meters between two lat/lng points."""
@@ -164,19 +199,21 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
 
-    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * \
+        math.cos(phi2) * math.sin(delta_lambda / 2)**2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
+
 
 def match_locations(known_point, locations, max_distance_meters=50):
     """
     Find the closest known location within a max distance (default 50 meters).
-    
+
     Parameters:
     - known_point: tuple (lat, lon)
     - locations: dict of known locations with lat/lon
     - max_distance_meters: float, max distance to consider a match
-    
+
     Returns:
     - Tuple (location_name, distance_in_meters_rounded) or None if no match
     """
@@ -197,30 +234,31 @@ def match_locations(known_point, locations, max_distance_meters=50):
     closest = min(candidates, key=lambda x: x[1])
     return (closest[0], round(closest[1]))
 
+
 def datetime_selector_widget():
-    
+
     # Initialize the session state for min_datetime_found if not set
     if "min_datetime_found" not in st.session_state:
         st.session_state.min_datetime_found = None
         # if present, it will be of format "datetime.datetime(2013, 1, 17, 13, 5, 21)"
-    
+
     # Pre-fill defaults
     default_date = None
     default_hour = "--"
     default_minute = "--"
     default_second = "--"
-    
+
     if st.session_state.min_datetime_found:
         # # In case it's stored as a string like "datetime.datetime(2013, 1, 17, 13, 5, 21)"
         # if isinstance(st.session_state.min_datetime_found, str):
         #     st.session_state.min_datetime_found = eval(st.session_state.min_datetime_found)
-        
+
         dt = st.session_state.min_datetime_found
         default_date = dt.date()
         default_hour = f"{dt.hour:02d}"
         default_minute = f"{dt.minute:02d}"
         default_second = f"{dt.second:02d}"
-    
+
     col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
 
     with col1:
@@ -232,19 +270,22 @@ def datetime_selector_widget():
     second_options = ["--"] + [f"{i:02d}" for i in range(60)]
 
     with col2:
-        selected_hour = st.selectbox("Hour", options=hour_options, index=hour_options.index(default_hour))
+        selected_hour = st.selectbox(
+            "Hour", options=hour_options, index=hour_options.index(default_hour))
 
     with col3:
-        selected_minute = st.selectbox("Minute", options=minute_options, index=minute_options.index(default_minute))
+        selected_minute = st.selectbox(
+            "Minute", options=minute_options, index=minute_options.index(default_minute))
 
     with col4:
-        selected_second = st.selectbox("Second", options=second_options, index=second_options.index(default_second))
+        selected_second = st.selectbox(
+            "Second", options=second_options, index=second_options.index(default_second))
 
     if st.session_state.min_datetime_found:
         info_box(
             f"Prefilled with the earliest datetime found in the metadata. If adjusted, the other datetimes will update automatically.",
             icon=":material/info:")
-        
+
     # Check if all values are selected properly
     if (
         selected_date
@@ -259,42 +300,51 @@ def datetime_selector_widget():
         )
         selected_datetime = datetime.combine(selected_date, selected_time)
         # st.write("Selected datetime:", selected_datetime)
-        
+
         # deployment will only be added once the user has pressed the "ANALYSE" button
-        
+
         return selected_datetime
 
 
 def fetch_known_projects():
     settings, _ = load_settings()
     projects = settings["projects"]
-    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
+    selected_projectID = settings["vars"]["analyse_advanced"].get(
+        "selected_projectID")
     return projects, selected_projectID
+
 
 def fetch_known_locations():
     settings, _ = load_settings()
-    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
-    project = settings["projects"][project]
-    location = project["location"]
+    selected_projectID = settings["vars"]["analyse_advanced"].get(
+        "selected_projectID")
+    project = settings["projects"][selected_projectID]
+    selected_location = settings["vars"]["analyse_advanced"].get(
+        "selected_location")
     locations = project["locations"]
-    return locations, location
+    return locations, selected_location
+
 
 def fetch_known_deployments():
     settings, _ = load_settings()
-    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
-    project = settings["projects"][project]
+    selected_projectID = settings["vars"]["analyse_advanced"].get(
+        "selected_projectID")
+    project = settings["projects"][selected_projectID]
     location = project["location"]
     location = project["locations"][location]
     deployments = location["deployments"]
     selected_deployment = location["selected_deployment"]
     return deployments, selected_deployment
 
+
 def generate_deployment_id():
-    
+
     # Create a consistent 5-char hash from the datetime and some randomness
-    rand_str_1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-    rand_str_2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-    
+    rand_str_1 = ''.join(random.choices(
+        string.ascii_uppercase + string.digits, k=5))
+    rand_str_2 = ''.join(random.choices(
+        string.ascii_uppercase + string.digits, k=5))
+
     # Combine into deployment ID
     return f"dep-{rand_str_1}-{rand_str_2}"
 
@@ -322,7 +372,8 @@ class StepperBar:
         elif self.orientation == 'vertical':
             return self._display_vertical()
         else:
-            raise ValueError("Orientation must be either 'horizontal' or 'vertical'")
+            raise ValueError(
+                "Orientation must be either 'horizontal' or 'vertical'")
 
     def _display_horizontal(self):
         stepper_html = "<div style='display:flex; justify-content:space-between; align-items:center;'>"
@@ -385,6 +436,7 @@ class StepperBar:
         stepper_html += "</div>"
         return stepper_html
 
+
 def fetch_step(section):
     # load
     # settings, _ = load_settings()
@@ -399,29 +451,57 @@ def fetch_step(section):
     return step
 
 
-def update_vars(section, updates):
-    
-    # load
-    settings, _ = load_settings()
-    vars = settings["vars"][section]
-    
-    # st.write("DEBUG - Project Variables")
-    # st.write(project_vars)
-    
-    vars.update(updates)
-    
-    # Save updated settings
-    with open(settings_file, "w") as file:
-        json.dump(settings, file, indent=2)
+# def update_vars(section, updates):
 
+#     # load
+#     settings, _ = load_settings()
+#     vars = settings["vars"][section]
+
+#     # st.write("DEBUG - Project Variables")
+#     # st.write(project_vars)
+
+#     for key, value in updates.items():
+#         if isinstance(value, datetime):
+#             # If the value is a datetime, convert it to ISO format
+#             value = value.isoformat()
+#         vars[key] = value
+
+#     vars.update(updates)
+
+#     # Save updated settings
+#     with open(settings_file, "w") as file:
+#         json.dump(settings, file, indent=2)
+
+def default_converter(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    raise TypeError(
+        f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
+
+def update_vars(section, updates):
+    settings, settings_file = load_settings()
+
+    if "vars" not in settings:
+        settings["vars"] = {}
+    if section not in settings["vars"]:
+        settings["vars"][section] = {}
+
+    # Update only the section with any type of values
+    settings["vars"][section].update(updates)
+
+    # Use `default=default_converter` to catch any lingering datetime objects
+    with open(settings_file, "w") as file:
+        json.dump(settings, file, indent=2, default=default_converter)
 
 
 def add_deployment(datetime):
 
     settings, _ = load_settings()
     selected_folder = settings["selected_folder"]
-    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
-    project = settings["projects"][project]
+    selected_projectID = settings["vars"]["analyse_advanced"].get(
+        "selected_projectID")
+    project = settings["projects"][selected_projectID]
     location = project["location"]
     location = project["locations"][location]
     deployments = location["deployments"]
@@ -451,16 +531,19 @@ def add_deployment(datetime):
 
     return selected_index, deployment_list
 
+
 def add_location(location_id, lat, lon):
 
     settings, _ = load_settings()
-    selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
-    project = settings["projects"][project]
+    selected_projectID = settings["vars"]["analyse_advanced"].get(
+        "selected_projectID")
+    project = settings["projects"][selected_projectID]
     locations = project["locations"]
 
     # Check if location_id is unique
     if location_id in locations.keys():
-        raise ValueError(f"Location ID '{location_id}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
+        raise ValueError(
+            f"Location ID '{location_id}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
 
     # Add new location
     locations[location_id] = {
@@ -471,7 +554,8 @@ def add_location(location_id, lat, lon):
     }
 
     # Sort locations (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
-    sorted_locations = dict(sorted(locations.items(), key=lambda item: item[0].lower()))
+    sorted_locations = dict(
+        sorted(locations.items(), key=lambda item: item[0].lower()))
     settings["projects"][project]["locations"] = sorted_locations
     settings["projects"][project]["location"] = location_id
 
@@ -492,12 +576,13 @@ def add_project(projectID, comments):
     settings, settings_file = load_settings()
     projects = settings["projects"]
     projectIDs = projects.keys()
-    
+
     # st.write(projectIDs)
 
     # Check if project_id is unique
     if projectID in projectIDs:
-        raise ValueError(f"project ID '{projectID}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
+        raise ValueError(
+            f"project ID '{projectID}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
 
     # Add new project
     projects[projectID] = {
@@ -507,8 +592,9 @@ def add_project(projectID, comments):
         "locations": {},
     }
 
-    settings["projects"] = projects # add project
-    settings["vars"]["analyse_advanced"]["selected_projectID"] = projectID # update selected project
+    settings["projects"] = projects  # add project
+    # update selected project
+    settings["vars"]["analyse_advanced"]["selected_projectID"] = projectID
 
     # Save updated settings
     with open(settings_file, "w") as file:
@@ -520,6 +606,7 @@ def add_project(projectID, comments):
 
     return selected_index, project_list
 
+
 def add_new_project_popover(txt):
     # use st.empty to create a popover container
     # so that it can be closed on button click
@@ -529,25 +616,27 @@ def add_new_project_popover(txt):
         with st.popover(f":material/add_circle: {txt}",
                         help="Define a new project",
                         use_container_width=True):
-            
+
             # fetch known projects IDs
             known_projects, _ = fetch_known_projects()
 
             # input for project ID
             print_widget_label("Unique project ID",
-                            help_text="This ID will be used to identify the project in the system.")
-            project_id = st.text_input("project ID", max_chars=50, label_visibility="collapsed")
+                               help_text="This ID will be used to identify the project in the system.")
+            project_id = st.text_input(
+                "project ID", max_chars=50, label_visibility="collapsed")
             project_id = project_id.strip()
-            
+
             # input for optional comments
             print_widget_label("Optionally add any comments or notes",
-                            help_text="This is a free text field where you can add any comments or notes about the project.")
-            comments = st.text_area("Comments", height=150, label_visibility="collapsed")
+                               help_text="This is a free text field where you can add any comments or notes about the project.")
+            comments = st.text_area(
+                "Comments", height=150, label_visibility="collapsed")
             comments = comments.strip()
-            
-            # button to save project 
+
+            # button to save project
             if st.button(":material/save: Save project", use_container_width=True):
-                
+
                 # check validity
                 if not project_id.strip():
                     st.error("project ID cannot be empty.")
@@ -555,10 +644,10 @@ def add_new_project_popover(txt):
                     st.error(
                         f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
                 else:
-                    
+
                     # if all good, add project
                     add_project(project_id, comments)
-                    
+
                     # reset session state variables before reloading
                     st.session_state.clear()
                     popover_container.empty()
@@ -575,20 +664,25 @@ def add_new_location_popover(txt):
         with st.popover(f":material/add_circle: {txt}",
                         help="Define a new location",
                         use_container_width=True):
-            
-            # init session state vars
-            if "lat_selected" not in st.session_state:
-                st.session_state.lat_selected = None
-            if "lng_selected" not in st.session_state:
-                st.session_state.lng_selected = None
-            if "exif_set" not in st.session_state:
-                st.session_state.exif_set = False
-            if "coords_found_in_exif" not in st.session_state:
-                st.session_state.coords_found_in_exif = False
+
+            # init vars
+            lat_selected, lng_selected, exif_set, coords_found_in_exif = fetch_vars(section="analyse_advanced",  # SESSION`
+                                                                                    requested_vars=["lat_selected", "lng_selected", "exif_set", "coords_found_in_exif"])
+
+            # # init session state vars
+            # if "lat_selected" not in st.session_state:
+            #     st.session_state.lat_selected = None
+            # if "lng_selected" not in st.session_state:
+            #     st.session_state.lng_selected = None
+            # if "exif_set" not in st.session_state:
+            #     st.session_state.exif_set = False
+            # if "coords_found_in_exif" not in st.session_state:
+            #     st.session_state.coords_found_in_exif = False
 
             # update values if coordinates found in metadata
             if st.session_state.coords_found_in_exif:
-                info_box(f"Coordinates from metadata have been preselected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).")
+                info_box(
+                    f"Coordinates from metadata have been preselected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).")
                 if not st.session_state.exif_set:
                     st.session_state.lat_selected = st.session_state.exif_lat
                     st.session_state.lng_selected = st.session_state.exif_lng
@@ -629,45 +723,52 @@ def add_new_location_popover(txt):
             # add markers
             bounds = []
             if known_locations:
-                
+
                 # add the selected location
                 if st.session_state.lat_selected and st.session_state.lng_selected:
                     fl.Marker(
-                        [st.session_state.lat_selected, st.session_state.lng_selected],
+                        [st.session_state.lat_selected,
+                            st.session_state.lng_selected],
                         title="Selected location",
                         tooltip="Selected location",
-                        icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
+                        icon=fl.Icon(icon="camera", prefix="fa",
+                                     color="darkred")
                     ).add_to(m)
                     bounds.append([st.session_state.lat_selected,
-                                st.session_state.lng_selected])
+                                   st.session_state.lng_selected])
 
-                # add the other known locations        
+                # add the other known locations
                 for location_id, location_info in known_locations.items():
                     coords = [location_info["lat"], location_info["lon"]]
                     fl.Marker(
                         coords,
                         tooltip=location_id,
-                        icon=fl.Icon(icon="camera", prefix="fa", color="darkblue")
+                        icon=fl.Icon(icon="camera", prefix="fa",
+                                     color="darkblue")
                     ).add_to(m)
                     bounds.append(coords)
                     m.fit_bounds(bounds, padding=(75, 75))
-            
+
             else:
-                
+
                 # add the selected location
                 if st.session_state.lat_selected and st.session_state.lng_selected:
                     fl.Marker(
-                        [st.session_state.lat_selected, st.session_state.lng_selected],
+                        [st.session_state.lat_selected,
+                            st.session_state.lng_selected],
                         title="Selected location",
                         tooltip="Selected location",
-                        icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
+                        icon=fl.Icon(icon="camera", prefix="fa",
+                                     color="darkred")
                     ).add_to(m)
 
                     # only one marker so set bounds to the selected location
                     buffer = 0.001
                     bounds = [
-                        [st.session_state.lat_selected - buffer, st.session_state.lng_selected - buffer],
-                        [st.session_state.lat_selected + buffer, st.session_state.lng_selected + buffer]
+                        [st.session_state.lat_selected - buffer,
+                            st.session_state.lng_selected - buffer],
+                        [st.session_state.lat_selected + buffer,
+                            st.session_state.lng_selected + buffer]
                     ]
                     m.fit_bounds(bounds)
 
@@ -683,7 +784,7 @@ def add_new_location_popover(txt):
             with map_col:
                 map_data = st_folium(m, height=300, width=700)
             # map_data = st_folium(m, height=300, width=700)
-            
+
             # update lat lng widgets when clicking on map
             if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
                 st.session_state.lat_selected = map_data["last_clicked"]["lat"]
@@ -698,11 +799,11 @@ def add_new_location_popover(txt):
 
             # user input
             col1, col2 = st.columns([1, 1])
-            
+
             # lat
             with col1:
                 print_widget_label("Enter latitude or click on the map",
-                                help_text="Enter the latitude of the location.")
+                                   help_text="Enter the latitude of the location.")
                 old_lat = st.session_state.get("lat_selected", 0.0)
                 new_lat = st.number_input(
                     "Enter latitude or click on the map",
@@ -716,11 +817,11 @@ def add_new_location_popover(txt):
                 st.session_state.lat_selected = new_lat
                 if new_lat != old_lat:
                     st.rerun()
-            
+
             # lng
             with col2:
                 print_widget_label("Enter longitude or click on the map",
-                                help_text="Enter the longitude of the location.")
+                                   help_text="Enter the longitude of the location.")
                 old_lng = st.session_state.get("lng_selected", 0.0)
                 new_lng = st.number_input(
                     "Enter longitude or click on the map",
@@ -734,19 +835,19 @@ def add_new_location_popover(txt):
                 st.session_state.lng_selected = new_lng
                 if new_lng != old_lng:
                     st.rerun()
-            
+
             # location ID
             print_widget_label("Enter unique location ID",
-                            help_text="This ID will be used to identify the location in the system.")
+                               help_text="This ID will be used to identify the location in the system.")
             new_location_id = st.text_input(
                 "Enter new Location ID",
                 label_visibility="collapsed",
             )
             new_location_id = new_location_id.strip()
 
-            # button to save location                      
+            # button to save location
             if st.button(":material/save: Save location", use_container_width=True):
-                
+
                 # check validity
                 if new_location_id == "":
                     st.error("Location ID cannot be empty.")
@@ -757,17 +858,18 @@ def add_new_location_popover(txt):
                     st.error(
                         "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
                 else:
-                    
+
                     # if all good, add location
                     add_location(
                         new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
                     new_location_id = None
-                    
+
                     # reset session state variables before reloading
                     st.session_state.clear()
                     st.session_state.coords_found_in_exif = False
                     popover_container.empty()
                     st.rerun()
+
 
 def browse_directory_widget(selected_folder):
     col1, col2 = st.columns([1, 3], vertical_alignment="center")
@@ -778,11 +880,10 @@ def browse_directory_widget(selected_folder):
             # save_global_vars({"selected_folder": selected_folder})
             update_vars(section="analyse_advanced",
                         updates={"selected_folder": selected_folder})
-            
+
             # reset session state variables
             st.session_state.clear()
-            
-            
+
     if not selected_folder:
         with col2:
             st.write('<span style="color: grey;"> None selected...</span>',
@@ -797,8 +898,6 @@ def browse_directory_widget(selected_folder):
     return selected_folder
 
 
-
-
 def select_folder():
     result = subprocess.run([sys.executable, os.path.join(
         AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "folder_selector.py")], capture_output=True, text=True)
@@ -807,15 +906,6 @@ def select_folder():
         return folder_path
     else:
         return None
-
-
-
-
-
-
-
-
-
 
 
 #######################
@@ -845,6 +935,8 @@ def select_model_widget(model_type, prev_selected_model):
     return selected_model
 
 # check which models are known and should be listed in the dpd
+
+
 def fetch_all_model_info(type):
 
     # fetch
@@ -866,24 +958,6 @@ def fetch_all_model_info(type):
 
     # return
     return sorted_det_models
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 #########################
@@ -920,12 +994,14 @@ def multiselect_checkboxes(classes, preselected):
     # return list
     return selected_species
 
+
 def print_widget_label(label_text, icon=None, help_text=None):
     if icon:
         line = f":material/{icon}: &nbsp; "
     else:
         line = ""
     st.markdown(f"{line}**{label_text}**", help=help_text)
+
 
 def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
     # Extract option labels and captions from the dictionary
@@ -972,22 +1048,6 @@ def needs_EA_update(required_version):
     return False
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def get_image_datetime(file_path):
     try:
         image = Image.open(file_path)
@@ -1002,6 +1062,7 @@ def get_image_datetime(file_path):
         pass
     return None
 
+
 def get_video_datetime(file_path):
     try:
         parser = createParser(str(file_path))
@@ -1013,6 +1074,7 @@ def get_video_datetime(file_path):
     except Exception:
         pass
     return None
+
 
 def get_file_datetime(file_path):
     # Try image EXIF
@@ -1029,6 +1091,7 @@ def get_file_datetime(file_path):
 
     # Fallback: file modified time
     return datetime.fromtimestamp(file_path.stat().st_mtime)
+
 
 def get_image_gps(file_path):
     try:
@@ -1056,6 +1119,7 @@ def get_image_gps(file_path):
         # st.error(f"Error reading GPS data from {file_path}. Please check the file format and EXIF data.")
         # st.error(e)
         return None
+
 
 def get_video_gps(file_path):
     try:
@@ -1090,25 +1154,25 @@ def get_video_gps(file_path):
 
 def get_file_gps(file_path):
     suffix = file_path.suffix.lower()
-    
+
     # Image formats
     if suffix in ['.jpg', '.jpeg', '.png']:
         return get_image_gps(file_path)
-    
+
     # Video formats
     if suffix in ['.mp4', '.avi', '.mov', '.mkv']:
         return get_video_gps(file_path)
-    
+
     return None
 
-    
-    
+
 def check_folder_metadata():
     with st.spinner("Checking data..."):
         settings, _ = load_settings()
         # selected_folder = Path(settings["selected_folder"])
-        selected_folder = Path(settings["vars"]["analyse_advanced"]["selected_folder"])
-        
+        selected_folder = Path(
+            settings["vars"]["analyse_advanced"]["selected_folder"])
+
         datetimes = []
         gps_coords = []
 
@@ -1130,8 +1194,8 @@ def check_folder_metadata():
         # Most cameras lack GPS, so early exit saves time when no coordinates found
         # Initial GPS readings can be noisy; averaging multiple points improves accuracy
         gps_checked = 0
-        max_gps_checks = 100 
-        check_every_nth = 10 
+        max_gps_checks = 100
+        check_every_nth = 10
         sufficient_gps_coords = 5
 
         # images
@@ -1152,7 +1216,7 @@ def check_folder_metadata():
             dt = get_video_datetime(file)
             if dt:
                 datetimes.append(dt)
-                
+
             # spread GPS checks across files and early exit
             if i % check_every_nth == 0 and gps_checked < max_gps_checks and len(gps_coords) < sufficient_gps_coords:
                 gps = get_video_gps(file)
@@ -1160,41 +1224,63 @@ def check_folder_metadata():
                     gps_coords.append(gps)
                 gps_checked += 1
 
-        min_datetime = min(datetimes) if datetimes else None
-        max_datetime = max(datetimes) if datetimes else None
+        # min_datetime = min(datetimes) if datetimes else None
+        # max_datetime = max(datetimes) if datetimes else None
+        exif_min_datetime = min(datetimes) if datetimes else None
+        exif_max_datetime = max(datetimes) if datetimes else None
 
         # Initialize session state for lat/lon if not set
-        if "coords_found_in_exif" not in st.session_state:
-            st.session_state.coords_found_in_exif = False
-        if "exif_lat" not in st.session_state:
-            st.session_state.exif_lat = None
-        if "exif_lng" not in st.session_state:
-            st.session_state.exif_lng = None
-        if "min_datetime_found" not in st.session_state:
-            st.session_state.min_datetime_found = None
-        if "max_datetime_found" not in st.session_state:
-            st.session_state.max_datetime_found = None
-        
+        # if "coords_found_in_exif" not in st.session_state:
+        #     st.session_state.coords_found_in_exif = False
+        # if "exif_lat" not in st.session_state:
+        #     st.session_state.exif_lat = None
+        # if "exif_lng" not in st.session_state:
+        #     st.session_state.exif_lng = None
+        # if "min_datetime_found" not in st.session_state:
+        #     st.session_state.min_datetime_found = None
+        # if "max_datetime_found" not in st.session_state:
+        #     st.session_state.max_datetime_found = None
+
+        # Initialize variables
+        coords_found_in_exif = False
+        exif_lat = None
+        exif_lng = None
+        # exif_min_datetime = None
+        # exif_max_datetime = None
+
         if gps_coords:
             lats, lons = zip(*gps_coords)
             ave_lat = statistics.mean(lats)
             ave_lon = statistics.mean(lons)
-            st.session_state.exif_lat = ave_lat
-            st.session_state.exif_lng = ave_lon
-            st.session_state.coords_found_in_exif = True
-        
+            # st.session_state.exif_lat = ave_lat
+            # st.session_state.exif_lng = ave_lon
+            # st.session_state.coords_found_in_exif = True
+            exif_lat = ave_lat
+            exif_lng = ave_lon
+            coords_found_in_exif = True
+
         # set session state values
-        st.session_state.min_datetime_found = min_datetime
-        st.session_state.max_datetime_found = max_datetime
-        
+        # st.session_state.min_datetime_found = min_datetime
+        # st.session_state.max_datetime_found = max_datetime
+        # min_datetime_found = min_datetime
+        # max_datetime_found = max_datetime
+
+        # SESSION
+        update_vars(section="analyse_advanced",
+                    updates={
+                        "coords_found_in_exif": coords_found_in_exif,
+                        "exif_lat": exif_lat,
+                        "exif_lng": exif_lng,
+                        "exif_min_datetime": exif_min_datetime,
+                        "exif_max_datetime": exif_max_datetime,
+                    })
+
         # write results to the app
         info_txt = f"Found {len(image_files)} images and {len(video_files)} videos in the selected folder."
         info_box(info_txt, icon=":material/info:")
-        
-        
 
         # st.write(st.session_state)
-    
+
 
 def info_box(msg, icon=":material/info:"):
     flexible_callout(msg,
@@ -1272,6 +1358,7 @@ def show_model_info(model_info):
             st.write(
                 f"Current version of AddaxAI (v{current_AA_version}) is able to use this model. No update required.")
 
+
 def fetch_model_info(model_name):
     return json.load(open(os.path.join(CLS_DIR, model_name, "variables.json"), "r"))
 
@@ -1319,7 +1406,7 @@ def save_cls_classes(cls_model_key, slected_classes):
 #         os.replace(temp_fpath, fpath)
 #     except IOError as e:
 #         st.warning(f"Error writing to file: {e}")
-        
+
 def save_global_vars(new_data):
     global_settings, settings_file = load_settings()
     temp_file = settings_file + ".tmp"
@@ -1335,7 +1422,7 @@ def save_global_vars(new_data):
     except IOError as e:
         raise RuntimeError(f"Error writing to settings file: {e}")
 
-  
+
 def save_project_vars(new_data):
     # """
     # Update or add key-value pairs to a specific project in a settings JSON file.
@@ -1348,8 +1435,6 @@ def save_project_vars(new_data):
     # if not isinstance(new_data, dict):
     #     raise ValueError("Expected new_data to be a dictionary")
 
-    
-    
     # Load full settings or initialize
     # try:
     #     if os.path.exists(settings_file):
@@ -1359,11 +1444,11 @@ def save_project_vars(new_data):
     #         settings = {}
     # except (json.JSONDecodeError, IOError):
     #     settings = {}
-    
+
     settings, settings_file = load_settings()
     # current_project = settings["global_vars"]["current_project"]
     temp_file = settings_file + ".tmp"
-        
+
     # Get project section, or initialize if missing
     current_project = settings["global_vars"]["current_project"]
     project_vars = settings["projects"][current_project]
@@ -1384,9 +1469,10 @@ def save_project_vars(new_data):
     except IOError as e:
         raise RuntimeError(f"Error writing to settings file: {e}")
 
+
 def load_global_vars():
     """Reads the global variables from the JSON file and returns them as a dictionary."""
-    
+
     # Load full settings or initialize
     try:
         if os.path.exists(settings_file):
@@ -1396,13 +1482,19 @@ def load_global_vars():
             settings = {}
     except (json.JSONDecodeError, IOError):
         settings = {}
-        
+
     return settings.get("global_vars", {})
+
+
+def fetch_vars(section, requested_vars):
+    settings, _ = load_settings()
+    section_vars = settings["vars"][section]
+    return {var: section_vars.get(var, None) for var in requested_vars}.values()
 
 
 def load_settings():
     """Reads the data from the JSON file and returns it as a dictionary."""
-    
+
     # Load full settings or initialize
     try:
         if os.path.exists(settings_file):
@@ -1418,7 +1510,7 @@ def load_settings():
 # def load_project_vars():
 #     settings, _ = load_settings()
 #     project = settings["vars"]["analyse_advanced"].get("project")
-#     current_project = settings["projects"][project]
+#     current_project = settings["projects"][selected_projectID]
 #     return current_project
 
 
@@ -1429,6 +1521,7 @@ def load_txts():
     with open(txts_fpath, "r", encoding="utf-8") as file:
         txts = json.load(file)
     return txts
+
 
 def settings(txts, lang, mode):
     _, col2 = st.columns([5, 1])
@@ -1468,20 +1561,11 @@ def settings(txts, lang, mode):
             st.text("")
 
 
-
-
-
 # import streamlit as st
 
 
+# SPECIES SELECTOR
 
-
-
-
-
-
-#### SPECIES SELECTOR
-from streamlit_tree_select import tree_select
 
 def species_selector():
 
@@ -1494,23 +1578,30 @@ def species_selector():
                             "label": "Family Sciuridae (squirrels)", "value": "family_sciuridae", "children": [
                                 {
                                     "label": "Genus Tamias (chipmunks)", "value": "genus_tamias", "children": [
-                                        {"label": "Tamias striatus (eastern chipmunk)", "value": "tamias_striatus"},
-                                        {"label": "Tamiasciurus hudsonicus (red squirrel)", "value": "tamiasciurus_hudsonicus"}  # This one is a species in genus Tamiasciurus, might move later
+                                        {"label": "Tamias striatus (eastern chipmunk)",
+                                         "value": "tamias_striatus"},
+                                        # This one is a species in genus Tamiasciurus, might move later
+                                        {"label": "Tamiasciurus hudsonicus (red squirrel)", "value": "tamiasciurus_hudsonicus"}
                                     ]
                                 },
                                 {
                                     "label": "Genus Sciurus (tree squirrels)", "value": "genus_sciurus", "children": [
-                                        {"label": "Sciurus niger (eastern fox squirrel)", "value": "sciurus_niger"},
-                                        {"label": "Sciurus carolinensis (eastern gray squirrel)", "value": "sciurus_carolinensis"},
+                                        {"label": "Sciurus niger (eastern fox squirrel)",
+                                         "value": "sciurus_niger"},
+                                        {"label": "Sciurus carolinensis (eastern gray squirrel)",
+                                         "value": "sciurus_carolinensis"},
                                     ]
                                 },
                                 {
                                     "label": "Genus Marmota (marmots)", "value": "genus_marmota", "children": [
-                                        {"label": "Marmota monax (groundhog)", "value": "marmota_monax"},
-                                        {"label": "Marmota flaviventris (yellow-bellied marmot)", "value": "marmota_flaviventris"},
+                                        {"label": "Marmota monax (groundhog)",
+                                         "value": "marmota_monax"},
+                                        {"label": "Marmota flaviventris (yellow-bellied marmot)",
+                                         "value": "marmota_flaviventris"},
                                     ]
                                 },
-                                {"label": "Otospermophilus beecheyi (california ground squirrel)", "value": "otospermophilus_beecheyi"}
+                                {"label": "Otospermophilus beecheyi (california ground squirrel)",
+                                 "value": "otospermophilus_beecheyi"}
                             ]
                         },
                         {
@@ -1525,7 +1616,8 @@ def species_selector():
                         },
                         {
                             "label": "Family Erethizontidae (new world porcupines)", "value": "family_erethizontidae", "children": [
-                                {"label": "Erethizon dorsatus (north american porcupine)", "value": "erethizon_dorsatus"}
+                                {"label": "Erethizon dorsatus (north american porcupine)",
+                                 "value": "erethizon_dorsatus"}
                             ]
                         }
                     ]
@@ -1541,8 +1633,6 @@ def species_selector():
             ]
         }
     ]
-
-
 
     # Initialize state
     if "selected_nodes" not in st.session_state:
@@ -1580,7 +1670,6 @@ def species_selector():
 
     # Feedback
 
-
     def count_leaf_nodes(nodes):
         count = 0
         for node in nodes:
@@ -1594,4 +1683,5 @@ def species_selector():
     leaf_count = count_leaf_nodes(nodes)
     # st.write(f"Number of leaf nodes: {leaf_count}")
 
-    st.write("You selected:", len(st.session_state.selected_nodes), " of ", leaf_count, "classes")
+    st.write("You selected:", len(st.session_state.selected_nodes),
+             " of ", leaf_count, "classes")
