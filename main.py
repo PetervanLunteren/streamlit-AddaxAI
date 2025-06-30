@@ -1,8 +1,6 @@
 
 
-# cd /Applications/AddaxAI_files/AddaxAI
-# conda activate env-streamlit-addaxai
-# cd streamlit-AddaxAI
+# cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
 
 
 
@@ -21,8 +19,8 @@ from PIL import Image
 AddaxAI_files = os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.realpath(__file__))))
 
-# st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
-#     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "logo_square.png"), page_title="AddaxAI")
+st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
+    AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), page_title="AddaxAI")
 
 # st.write(f"AddaxAI files: {AddaxAI_files}")
 
@@ -216,7 +214,15 @@ folium.Marker([39.949610, -75.150282]).add_to(m)
 # save only the last 1000 lines of the log file
 # log_fpath = "/Users/peter/Desktop/streamlit_app/frontend/streamlit_log.txt"
 log_fpath = os.path.join(AddaxAI_files, "AddaxAI",
-                         "streamlit-AddaxAI", "frontend", "streamlit_log.txt")
+                         "streamlit-AddaxAI", "assets", "logs", "log.txt")
+if not os.path.exists(log_fpath):
+    # create an empty log file
+    with open(log_fpath, "w", encoding="utf-8") as file:
+        file.write("AddaxAI Streamlit App Log\n")
+        file.write("========================================\n")
+        file.write("This is the log file for the AddaxAI Streamlit app.\n")
+        file.write("It will contain the last 1000 lines of the log.\n")
+        file.write("========================================\n\n")  
 # with open(log_fpath, "r", encoding="utf-8") as file:
 #     log = file.readlines()
 #     if len(log) > 1000:
