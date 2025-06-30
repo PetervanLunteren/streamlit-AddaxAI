@@ -121,12 +121,12 @@ with st.container(border=True):
     #             with st.container(border=True):
     #                 print_widget_label(
     #                     "Start", help_text="help text")
-    #                 selected_datetime = datetime_selector_widget()
+    #                 selected_min_datetime = datetime_selector_widget()
 
-    #             if selected_datetime:
+    #             if selected_min_datetime:
 
     #                 if st.button("DEBUG"):
-    #                     add_deployment(selected_datetime)
+    #                     add_deployment(selected_min_datetime)
 
     #     # place the buttons
     #     col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -182,18 +182,18 @@ with st.container(border=True):
                 with st.container(border=True):
                     print_widget_label(
                         "Start", help_text="help text")
-                    selected_datetime = datetime_selector_widget()
+                    selected_min_datetime = datetime_selector_widget()
                     
 
 
-                st.write("Selected datetime:", selected_datetime)
+                st.write("Selected datetime:", selected_min_datetime)
                 st.write("Selected location ID:", selected_locationID)
 
 
 
 
                     # if st.button("DEBUG"):
-                    #     add_deployment(selected_datetime)
+                    #     add_deployment(selected_min_datetime)
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -204,13 +204,19 @@ with st.container(border=True):
                 clear_vars(section="analyse_advanced")
                 st.rerun()
 
-        if selected_projectID and selected_locationID and selected_datetime:
+        if selected_projectID and selected_locationID and selected_min_datetime:
                 with col_btn_next:
-                    if selected_datetime:
+                    if selected_min_datetime:
                         if st.button(":material/arrow_forward: Next", use_container_width=True):
-                            add_deployment(selected_datetime)
+                            
                             update_vars(section="analyse_advanced",
-                                        updates={"step": 2}) # 0 indexed
+                                        updates={
+                                            # "step": 2,  # 0 indexed # DEBUG
+                                                 "step" : 1,
+                                                 "selected_projectID": selected_projectID,
+                                                 "selected_locationID": selected_locationID,
+                                                 "selected_min_datetime": selected_min_datetime})
+                            add_deployment(selected_min_datetime = selected_min_datetime)
                             st.rerun()
                     else:
                         st.button(":material/arrow_forward: Next",
@@ -317,15 +323,15 @@ st.write("")
 #             with st.container(border=True):
 #                 print_widget_label(
 #                     "Start", help_text="help text")
-#                 selected_datetime = datetime_selector_widget()
+#                 selected_min_datetime = datetime_selector_widget()
 #                 # st.write("")
-#                 # st.write("Selected datetime:", selected_datetime)
+#                 # st.write("Selected datetime:", selected_min_datetime)
 #                 # st.write("")
 
-#             if selected_datetime:
+#             if selected_min_datetime:
 
 #                 if st.button("DEBUG"):
-#                     add_deployment(selected_datetime)
+#                     add_deployment(selected_min_datetime)
 
 
 # #     # model section

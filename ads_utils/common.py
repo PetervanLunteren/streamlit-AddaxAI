@@ -14,8 +14,8 @@ from collections import defaultdict
 import subprocess
 import string
 import math
-# import time
-from datetime import datetime, time
+import time as sleep_time
+from datetime import datetime, time, timedelta
 # from datetime import datetime
 import os
 from pathlib import Path
@@ -43,8 +43,6 @@ map_file = os.path.join(config_dir, "map.json")
 # set versions
 with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
-
-# print a markdown label with an icon and help text
 
 ############################
 ### DEPLOYMENT UTILITIES ###
@@ -192,7 +190,10 @@ def location_selector_widget():
             message = f"Coordinates extracted from image metadata: ({exif_lat:.5f}, {exif_lng:.5f}). "
             if closest_location is not None:
                 name, dist = closest_location
-                message += f"Matches known location <i>{name}</i>, about {dist} meters away."
+                if dist > 0:
+                    message += f"Matches known location <i>{name}</i>, about {dist} meters away."
+                else:
+                    message += f"Matches known location <i>{name}</i>."
             else:
                 message += f"No known location found within 50 meters."
             info_box(message)
@@ -331,8 +332,6 @@ def load_known_projects():
     projects = map["projects"]
     selected_projectID = analyse_advanced_vars.get(
         "selected_projectID")
-    # st.write("DEBUG - Selected Project ID:", selected_projectID)
-    # st.write("DEBUG - Projects:", projects)
     return projects, selected_projectID
 
 
@@ -476,28 +475,6 @@ def load_step(section):
     step = analyse_advanced_vars.get("step", 0)
     return step
 
-
-# def update_vars(section, updates):
-
-#     # load
-#     settings, _ = load_settings()
-#     vars = settings["vars"][section]
-
-#     # st.write("DEBUG - Project Variables")
-#     # st.write(project_vars)
-
-#     for key, value in updates.items():
-#         if isinstance(value, datetime):
-#             # If the value is a datetime, convert it to ISO format
-#             value = value.isoformat()
-#         vars[key] = value
-
-#     vars.update(updates)
-
-#     # Save updated settings
-#     with open(settings_file, "w") as file:
-#         json.dump(settings, file, indent=2)
-
 def default_converter(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
@@ -574,7 +551,7 @@ def update_vars(section, updates):
 
 
 
-def add_deployment(datetime):
+def add_deployment(selected_min_datetime):
 
 
     # settings, _ = load_settings()
@@ -598,6 +575,26 @@ def add_deployment(datetime):
         "selected_locationID")
     location = project["locations"][selected_locationID]
     deployments = location["deployments"]
+    
+    # check what the exif datetime is
+    exif_min_datetime_str = analyse_advanced_vars.get("exif_min_datetime", None)
+    exif_min_datetime = (
+        datetime.fromisoformat(exif_min_datetime_str)
+        if exif_min_datetime_str is not None
+        else None
+    )
+    exif_max_datetime_str = analyse_advanced_vars.get("exif_max_datetime", None)
+    exif_max_datetime = (
+        datetime.fromisoformat(exif_max_datetime_str)
+        if exif_max_datetime_str is not None
+        else None
+    )
+    
+    # then calculate the difference between the selected datetime and the exif datetime
+    diff_min_datetime = selected_min_datetime - exif_min_datetime
+    
+    # Adjust exif_max_datetime if selected_min_datetime is later than exif_min_datetime
+    selected_max_datetime = exif_max_datetime + diff_min_datetime
 
     # generate a unique deployment ID
     deployment_id = generate_deployment_id()
@@ -608,15 +605,11 @@ def add_deployment(datetime):
 
     # Add new deployment
     deployments[deployment_id] = {
-        "deploymentStart": datetime.isoformat(),
-        "deploymentEnd": None,  # initially set to None
+        "deploymentStart": datetime.isoformat(selected_min_datetime),
+        "deploymentEnd": datetime.isoformat(selected_max_datetime), # this is not ctually selected, but calculated from the exif metadata
         "path": selected_folder,
+        "datetimeDiffSeconds": diff_min_datetime.total_seconds()
     }
-
-    # # Sort deployments (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
-    # sorted_deployments = dict(sorted(deployments.items(), key=lambda item: item[0].lower()))
-    # settings["projects"][project]["locations"][location]["deployments"] = sorted_deployments
-    # settings["projects"][project]["locations"][location]["selected_deployment"] = deployment_id
 
     # Save updated settings
     with open(map_file, "w") as file:
