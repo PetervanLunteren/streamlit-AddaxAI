@@ -1,22 +1,22 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from backend.utils import *
+
+
+
+
+from ads_utils.common import *
 
 
 # cd /Applications/AddaxAI_files/AddaxAI && conda activate env-streamlit-addaxai && cd streamlit-AddaxAI/frontend && streamlit run main.py >> streamlit_log.txt 2>&1 &
 
 # load language settings
-txts = load_txts()
-settings, _ = load_settings()
-# project_vars = load_project_vars()
+txts = load_lang_txts()
+# settings, _ = load_map()
 
-# st.write("project_vars:", project_vars)
-
-# exit()
-
-lang = settings["vars"]["global"]["lang"]
-mode = settings["vars"]["global"]["mode"]
+general_settings_vars = load_vars(section = "general_settings")
+lang = general_settings_vars["lang"]
+mode = general_settings_vars["mode"]
 
 st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
 
@@ -35,19 +35,9 @@ st.write("Fill in the information related to this deployment. A deployment refer
 
 
 ###### STEPPER BAR ######
-# --- Initialize state
 
-step = fetch_step(section="analyse_advanced")
+step = load_step(section="analyse_advanced")
 st.write("Current step:", step)
-
-# update_vars(section="analyse_advanced",
-#             updates={"step": 2})
-
-
-
-
-# step = fetch_step(section="analyse_advanced")
-# st.write("Current step:", step)
 
 # --- Create stepper
 stepper = StepperBar(
@@ -76,7 +66,7 @@ with st.container(border=True):
         with st.container(border=True):
             print_widget_label("Folder",
                                help_text="Select the folder where your deployment is located.")
-            selected_folder = browse_directory_widget(settings["vars"]["analyse_advanced"].get("selected_folder"))
+            selected_folder = browse_directory_widget()
 
             if selected_folder and os.path.isdir(selected_folder):
                 check_folder_metadata()
@@ -92,44 +82,93 @@ with st.container(border=True):
 
         with col_btn_next:
             if selected_folder and os.path.isdir(selected_folder):
-                if st.button(":material/arrow_circle_right: Next", use_container_width=True):
+                if st.button(":material/arrow_forward: Next", use_container_width=True):
                     update_vars(section="analyse_advanced",
-                                updates={"step": 1})
+                                updates={"step": 1}) # 0 indexed
                     st.rerun()
             else:
-                st.button(":material/arrow_circle_right: Next",
+                st.button(":material/arrow_forward: Next",
                           use_container_width=True,
                           disabled=True,
                           key = "project_next_button_dummy")
 
-    # folder selection
-    if step == 1:
+    # # folder selection
+    # if step == 1:
 
-        st.write("HELP TEXT")
+    #     st.write("HELP TEXT")
+
+    #     with st.container(border=True):
+    #         print_widget_label(
+    #             "Project", help_text="help text")
+
+    #         # Store selection in session state
+    #         if "projectID" not in st.session_state:
+    #             st.session_state.projectID = None
+
+    #         projectID = project_selector_widget()
+
+    #     if projectID:
+
+    #         # location metadata
+    #         with st.container(border=True):
+    #             print_widget_label(
+    #                 "Location", help_text="help text")
+    #             selected_locationID = location_selector_widget()
+    #         # st.write("")
+
+    #         # camera ID metadata
+    #         if selected_locationID:
+    #             with st.container(border=True):
+    #                 print_widget_label(
+    #                     "Start", help_text="help text")
+    #                 selected_datetime = datetime_selector_widget()
+
+    #             if selected_datetime:
+
+    #                 if st.button("DEBUG"):
+    #                     add_deployment(selected_datetime)
+
+    #     # place the buttons
+    #     col_btn_prev, col_btn_next = st.columns([1, 1])
+
+    #     # the previous button is always enabled
+    #     with col_btn_prev:
+    #         if st.button(":material/replay: Start over", use_container_width=True):
+    #             clear_vars(section="analyse_advanced")
+    #             st.rerun()
+
+    #     with col_btn_next:
+    #         if projectID:
+    #             if st.button(":material/arrow_forward: Next", use_container_width=True):
+    #                 update_vars(section="analyse_advanced",
+    #                             updates={"step": 2})
+    #                 st.rerun()
+    #         else:
+    #             st.button(":material/arrow_forward: Next",
+    #                       use_container_width=True, disabled=True)
+
+    elif step == 1:
 
         with st.container(border=True):
             print_widget_label(
                 "Project", help_text="help text")
 
-            # Store selection in session state
-            if "projectID" not in st.session_state:
-                st.session_state.projectID = None
+            # # Store selection in session state
+            # if "projectID" not in st.session_state:
+            #     st.session_state.projectID = None
 
-            projectID = project_selector_widget()
+            selected_projectID = project_selector_widget()
 
-        if projectID:
+
+
+        
+
+
+
+        if selected_projectID:
             # # Only update session state and save settings if value changed
-            # if st.session_state.get("projectID") != projectID:
-            #     st.session_state.projectID = projectID
-
-                # # adjust the selected project
-                # settings, _ = load_settings()
-                # settings["project"] = projectID
-                # with open(settings_file, "w") as file:
-                #     json.dump(settings, file, indent=2)
-
-            # # write the selected project ID to the settings
-            # settings["projectID"] = projectID
+            # if st.session_state.get("projectID") != selected_projectID:
+            #     st.session_state.projectID = selected_projectID
 
             # location metadata
             with st.container(border=True):
@@ -140,128 +179,45 @@ with st.container(border=True):
 
             # camera ID metadata
             if selected_locationID:
-                # with st.container(border=True):
-                # print_widget_label(
-                #     "Which camera was used?", help_text="This is a unique identifier for the physical camera device itself—not the location. Since cameras can be moved between different locations over time, this ID helps track the specific camera regardless of where it’s deployed. It’s important for camtrapDP export and allows you to filter or analyze data by camera device. You can use any naming convention you like, as long as you can clearly identify which specific device it refers to.\n\nExamples: Browning51, Reconyx-A3, Peter's backup cam, etc.")
-                # selected_cameraID = camera_selector_widget()
-                # st.write("")
-
-                # datetime metadata
-                # if selected_cameraID:
                 with st.container(border=True):
                     print_widget_label(
                         "Start", help_text="help text")
                     selected_datetime = datetime_selector_widget()
-                    # st.write("")
-                    # st.write("Selected datetime:", selected_datetime)
-                    # st.write("")
+                    
 
-                if selected_datetime:
 
-                    if st.button("DEBUG"):
-                        add_deployment(selected_datetime)
+                st.write("Selected datetime:", selected_datetime)
+                st.write("Selected location ID:", selected_locationID)
+
+
+
+
+                    # if st.button("DEBUG"):
+                    #     add_deployment(selected_datetime)
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
 
         # the previous button is always enabled
         with col_btn_prev:
-            if st.button(":material/arrow_circle_left: Previous", use_container_width=True):
-                update_vars(section="analyse_advanced",
-                            updates={"step": 0})
+            if st.button(":material/replay: Start over", use_container_width=True):
+                clear_vars(section="analyse_advanced")
                 st.rerun()
 
-        with col_btn_next:
-            if projectID:
-                if st.button(":material/arrow_circle_right: Next", use_container_width=True):
-                    update_vars(section="analyse_advanced",
-                                updates={"step": 2})
-                    st.rerun()
-            else:
-                st.button(":material/arrow_circle_right: Next",
-                          use_container_width=True, disabled=True)
-                
-                
-        # if st.button("debug"):
-        #     update_vars(section="analyse_advanced", updates={"step": 2,
-        #                                                      "selected_folder": selected_folder,
-        #                                                      "projectID": projectID})
-
-        # # if a selected_folder is selected, enable the next button
-        # if selected_folder and os.path.isdir(selected_folder):
-        #     with col_btn_next:
-        #         if st.button(":material/arrow_circle_right: Next", use_container_width=True):
-        #             update_vars(section="analyse_advanced", updates={"step": 3,
-        #                                                              "selected_folder": selected_folder})
-        #             st.rerun()
-        # else:
-        #     # dummy button to keep the layout
-        #     with col_btn_next:
-        #         st.button(":material/arrow_circle_right: Next",
-        #                   key = "folder_next_button_dummy",
-        #                   use_container_width=True,
-        #                   disabled=True)
+        if selected_projectID and selected_locationID and selected_datetime:
+                with col_btn_next:
+                    if selected_datetime:
+                        if st.button(":material/arrow_forward: Next", use_container_width=True):
+                            add_deployment(selected_datetime)
+                            update_vars(section="analyse_advanced",
+                                        updates={"step": 2}) # 0 indexed
+                            st.rerun()
+                    else:
+                        st.button(":material/arrow_forward: Next",
+                                use_container_width=True, disabled=True)
 
     elif step == 2:
-        # st.write("In this step, you can select the project to which this deployment belongs.")
-        # st.text_input("Project", key="project_input", placeholder="Select a project for your deployment")
-
-        with st.container(border=True):
-            print_widget_label(
-                "Project", help_text="help text")
-
-            # Store selection in session state
-            if "projectID" not in st.session_state:
-                st.session_state.projectID = None
-
-            projectID = project_selector_widget()
-
-        if projectID:
-            # Only update session state and save settings if value changed
-            if st.session_state.get("projectID") != projectID:
-                st.session_state.projectID = projectID
-
-                # # adjust the selected project
-                # settings, _ = load_settings()
-                # settings["project"] = projectID
-                # with open(settings_file, "w") as file:
-                #     json.dump(settings, file, indent=2)
-
-            # # write the selected project ID to the settings
-            # settings["projectID"] = projectID
-
-            # location metadata
-            with st.container(border=True):
-                print_widget_label(
-                    "Location", help_text="help text")
-                selected_locationID = location_selector_widget()
-            # st.write("")
-
-            # camera ID metadata
-            if selected_locationID:
-                # with st.container(border=True):
-                # print_widget_label(
-                #     "Which camera was used?", help_text="This is a unique identifier for the physical camera device itself—not the location. Since cameras can be moved between different locations over time, this ID helps track the specific camera regardless of where it’s deployed. It’s important for camtrapDP export and allows you to filter or analyze data by camera device. You can use any naming convention you like, as long as you can clearly identify which specific device it refers to.\n\nExamples: Browning51, Reconyx-A3, Peter's backup cam, etc.")
-                # selected_cameraID = camera_selector_widget()
-                # st.write("")
-
-                # datetime metadata
-                # if selected_cameraID:
-                with st.container(border=True):
-                    print_widget_label(
-                        "Start", help_text="help text")
-                    selected_datetime = datetime_selector_widget()
-                    # st.write("")
-                    # st.write("Selected datetime:", selected_datetime)
-                    # st.write("")
-
-                if selected_datetime:
-
-                    if st.button("DEBUG"):
-                        add_deployment(selected_datetime)
-
-    elif step == 2:
-        st.write("Here you can specify the location where the deployment was made.")
+        st.write("This is where you can choose the mdoel stuff!")
         st.text_input("Location", key="location_input",
                       placeholder="Specify the location for your deployment")
     elif step == 3:
@@ -432,8 +388,8 @@ st.write("")
 # #             # select species presence
 # #             if selected_cls_model:
 
-# #                 # fetch info about the selected model
-# #                 slected_model_info = fetch_all_model_info(
+# #                 # load info about the selected model
+# #                 slected_model_info = load_all_model_info(
 # #                     "cls")[selected_cls_model]
 
 # #                 # select classes

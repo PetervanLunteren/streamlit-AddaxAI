@@ -1,5 +1,12 @@
 
 
+# cd /Applications/AddaxAI_files/AddaxAI
+# conda activate env-streamlit-addaxai
+# cd streamlit-AddaxAI
+
+
+
+
 
 from appdirs import user_config_dir
 
@@ -12,9 +19,10 @@ import folium
 from PIL import Image
 
 AddaxAI_files = os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
-    AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "logo_square.png"), page_title="AddaxAI")
+    os.path.dirname(os.path.realpath(__file__))))
+
+# st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
+#     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "logo_square.png"), page_title="AddaxAI")
 
 # st.write(f"AddaxAI files: {AddaxAI_files}")
 
@@ -84,7 +92,6 @@ st.markdown("""
 # insert dependencies to system variables
 cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
 paths_to_add = [
-    # "/Users/peter/Desktop/streamlit_tree_selector/streamlit_tree_select",
     os.path.join(AddaxAI_files),
     os.path.join(AddaxAI_files, "cameratraps"),
     os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
@@ -111,7 +118,22 @@ for path in paths_to_add:
 
 os.environ["PYTHONPATH"] = PYTHONPATH_separator.join(existing_paths)
 
-from backend.utils import *
+# make sure the config file is set
+os.environ["STREAMLIT_CONFIG"] = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
+
+# with st.expander("sys.path", expanded=True):
+#     st.write("Current sys.path:")
+#     for p in sys.path:
+#         st.write(p)
+
+# with st.expander("Environment Variables", expanded=True):
+#     st.write("Current environment variables:")
+#     env_vars = {k: v for k, v in os.environ.items() if k.startswith("PYTHON") or k.startswith("CUDA") or k.startswith("PATH") or k.startswith("STREAMLIT")}
+#     for k, v in env_vars.items():
+#         st.write(f"{k}: {v}")
+
+from ads_utils.common import *
+
 
 
 # Custom CSS to style the button in the header
@@ -150,45 +172,41 @@ os.makedirs(config_dir, exist_ok=True)
 # these will remain constant over different versions of the app
 # so think of language settings, mode settings, etc.
 # locations per camera, paths to deployments, etc.
-settings_file = os.path.join(config_dir, "settings.json")
-if not os.path.exists(settings_file):
+map_file = os.path.join(config_dir, "map.json")
+if not os.path.exists(map_file):
 
     # start with a clean slate
-    settings = {
-        "lang": "en",  # default language
-        "mode": 1,  # default mode (0: simple, 1: advanced)
-        "selected_folder": None,
-        "selected_project": None,
+    map = {
         "projects": {}
     }
 
-    # start with a clean slate
-    settings = {
-        "vars": {
-            "global": {
-                "lang": "en",
-                "mode": 1,
-            },
-            "analyse_advanced": {
-            }
-        },
-        "projects": {}
-    }
+    with open(map_file, "w") as f:
+        json.dump(map, f, indent=2)
 
-    with open(settings_file, "w") as f:
-        json.dump(settings, f, indent=2)
+general_settings_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
+if not os.path.exists(general_settings_file):
+# if True:  # DEBUG
+    # create a default settings file
+    general_settings = {
+        "lang": "en",
+        "mode": 1,  # 0: simple mode, 1: advanced mode
+    }
+    with open(general_settings_file, "w") as f:
+        json.dump(general_settings, f, indent=2)
 
 
 # DEBUG
-# st.write(fetch_known_locations())
+# st.write(load_known_locations())
 
 
 # load language settings
-txts = load_txts()
+txts = load_lang_txts()
 # vars = load_project_vars()
-settings, _ = load_settings()
-lang = settings["vars"]["global"]["lang"]
-mode = settings["vars"]["global"]["mode"]
+# map, _ = load_map()
+
+general_settings_vars = load_vars(section = "general_settings")
+lang = general_settings_vars["lang"]
+mode = general_settings_vars["mode"]
 
 # render a dummy map with a marker so that the rest of the markers this session will be rendered
 m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)
@@ -223,28 +241,28 @@ except Exception as e:
 # page navigation
 # st.logo("/Users/peter/Desktop/streamlit_app/frontend/logo.png", size = "large")
 st.logo(os.path.join(AddaxAI_files, "AddaxAI",
-        "streamlit-AddaxAI", "frontend", "logo.png"), size="large")
+        "streamlit-AddaxAI", "assets", "images", "logo.png"), size="large")
 if mode == 0:  # simple mode
     analyse_sim_page = st.Page(
-        "analyse_simple.py", title=txts["analyse_txt"][lang], icon=":material/rocket_launch:")
+        os.path.join("pages", "analyse_simple.py"), title=txts["analyse_txt"][lang], icon=":material/rocket_launch:")
     pg = st.navigation([analyse_sim_page])
 elif mode == 1:  # advanced mode
     analyse_adv_page = st.Page(
-        "analyse_advanced.py", title=txts["analyse_txt"][lang], icon=":material/add:")
+        os.path.join("pages", "analyse_advanced.py"), title=txts["analyse_txt"][lang], icon=":material/add:")
     repeat_detection_elimination_page = st.Page(
-        "repeat_detection_elimination.py", title="Repeat detection elimination", icon=":material/reset_image:")
+        os.path.join("pages", "repeat_detection_elimination.py"), title="Repeat detection elimination", icon=":material/reset_image:")
     verify_page = st.Page(
-        "verify.py", title="Human verification", icon=":material/checklist:")
+        os.path.join("pages", "verify.py"), title="Human verification", icon=":material/checklist:")
     depth_estimation_page = st.Page(
-        "depth_estimation.py", title="Depth estimation", icon=":material/square_foot:")
+        os.path.join("pages", "depth_estimation.py"), title="Depth estimation", icon=":material/square_foot:")
     explore_page = st.Page(
-        "explore.py", title="Explore results", icon=":material/bar_chart_4_bars:")
+        os.path.join("pages", "explore.py"), title="Explore results", icon=":material/bar_chart_4_bars:")
     postprocess_page = st.Page(
-        "postprocess.py", title=txts["postprocess_txt"][lang], icon=":material/stylus_note:")
+        os.path.join("pages", "postprocess.py"), title=txts["postprocess_txt"][lang], icon=":material/stylus_note:")
     camera_management_page = st.Page(
-        "camera_management.py", title="Metadata management", icon=":material/photo_camera:")
+        os.path.join("pages", "camera_management.py"), title="Metadata management", icon=":material/photo_camera:")
     settings_page = st.Page(
-        "settings.py", title=txts["settings_txt"][lang], icon=":material/settings:")
+        os.path.join("pages", "settings.py"), title=txts["settings_txt"][lang], icon=":material/settings:")
     pg = st.navigation([analyse_adv_page, repeat_detection_elimination_page, verify_page,
                        depth_estimation_page, explore_page, postprocess_page, camera_management_page, settings_page])
 pg.run()
@@ -257,7 +275,10 @@ mode_options = {
 
 
 def on_mode_change():
-    save_global_vars({"mode": st.session_state["mode_selection"]})
+    # save_global_vars({"mode": st.session_state["mode_selection"]})
+    update_vars("general_settings", {
+        "mode": st.session_state["mode_selection"]
+    })
 
 
 mode_selected = st.sidebar.segmented_control(

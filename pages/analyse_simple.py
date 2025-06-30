@@ -3,10 +3,10 @@ import streamlit as st
 
 # st.set_page_config(layout="wide")
 
-from backend.utils import *
+from ads_utils.common import *
         
 # load language settings
-txts = load_txts()
+txts = load_lang_txts()
 # vars = load_vars()
 # lang = vars.get("lang", "en")
 # mode = vars.get("mode", 1)

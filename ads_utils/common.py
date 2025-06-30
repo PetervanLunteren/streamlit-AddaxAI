@@ -36,9 +36,9 @@ AddaxAI_files = os.path.dirname(os.path.dirname(
 CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
 DET_DIR = os.path.join(AddaxAI_files, "models", "det")
 
-# fetch camera IDs
+# load camera IDs
 config_dir = user_config_dir("AddaxAI")
-settings_file = os.path.join(config_dir, "settings.json")
+map_file = os.path.join(config_dir, "map.json")
 
 # set versions
 with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
@@ -57,7 +57,7 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 def project_selector_widget():
 
     # check what is already known and selected
-    projects, selected_projectID = fetch_known_projects()
+    projects, selected_projectID = load_known_projects()
 
     # if first project, show only button and no dropdown
     if projects == {}:
@@ -86,11 +86,16 @@ def project_selector_widget():
             add_new_project_popover("New")
 
         # adjust the selected project
-        settings, _ = load_settings()
-        if settings["vars"]["analyse_advanced"]["selected_projectID"] != selected_projectID:
-            settings["vars"]["analyse_advanced"]["selected_projectID"] = selected_projectID
-            with open(settings_file, "w") as file:
-                json.dump(settings, file, indent=2)
+        # map, _ = load_map()
+        analyse_advanced_vars = load_vars(section="analyse_advanced")
+        previous_projectID = analyse_advanced_vars.get("selected_projectID", None)
+        if previous_projectID != selected_projectID:
+            # analyse_advanced_vars["selected_projectID"] = selected_projectID
+            update_vars("analyse_advanced", {
+                "selected_projectID": selected_projectID
+            })
+            # with open(map_file, "w") as file:
+            #     json.dump(map, file, indent=2)
             st.rerun()
 
         # return
@@ -103,11 +108,16 @@ def project_selector_widget():
 def location_selector_widget():
 
     # load settings
-    coords_found_in_exif, exif_lat, exif_lng = fetch_vars(section="analyse_advanced",  # SESSION
-                                                          requested_vars=["coords_found_in_exif", "exif_lat", "exif_lng"])
+    # coords_found_in_exif, exif_lat, exif_lng = load_vars(section="analyse_advanced",  # SESSION
+    #                                                       requested_vars=["coords_found_in_exif", "exif_lat", "exif_lng"])
+
+    vars = load_vars(section="analyse_advanced")
+    coords_found_in_exif = vars.get("coords_found_in_exif", False)
+    exif_lat = vars.get("exif_lat", 0.0)
+    exif_lng = vars.get("exif_lng", 0.0)
 
     # check what is already known and selected
-    locations, location = fetch_known_locations()
+    locations, location = load_known_locations()
 
     # # calculate distance to closest known locations if coordinates are found in metadata
     # if "closest_location" not in st.session_state:
@@ -237,9 +247,18 @@ def match_locations(known_point, locations, max_distance_meters=50):
 
 def datetime_selector_widget():
 
-    # Initialize the session state for min_datetime_found if not set
-    if "min_datetime_found" not in st.session_state:
-        st.session_state.min_datetime_found = None
+    # init vars
+    vars = load_vars(section="analyse_advanced")
+    exif_min_datetime_str = vars.get("exif_min_datetime", None)
+    exif_min_datetime = (
+        datetime.fromisoformat(exif_min_datetime_str)
+        if exif_min_datetime_str is not None
+        else None
+    )
+
+    # Initialize the session state for exif_min_datetime if not set
+    # if "exif_min_datetime" not in st.session_state:
+    #     st.session_state.exif_min_datetime = None
         # if present, it will be of format "datetime.datetime(2013, 1, 17, 13, 5, 21)"
 
     # Pre-fill defaults
@@ -248,12 +267,12 @@ def datetime_selector_widget():
     default_minute = "--"
     default_second = "--"
 
-    if st.session_state.min_datetime_found:
+    if exif_min_datetime:
         # # In case it's stored as a string like "datetime.datetime(2013, 1, 17, 13, 5, 21)"
-        # if isinstance(st.session_state.min_datetime_found, str):
-        #     st.session_state.min_datetime_found = eval(st.session_state.min_datetime_found)
+        # if isinstance(st.session_state.exif_min_datetime, str):
+        #     st.session_state.exif_min_datetime = eval(st.session_state.exif_min_datetime)
 
-        dt = st.session_state.min_datetime_found
+        dt = exif_min_datetime
         default_date = dt.date()
         default_hour = f"{dt.hour:02d}"
         default_minute = f"{dt.minute:02d}"
@@ -281,7 +300,7 @@ def datetime_selector_widget():
         selected_second = st.selectbox(
             "Second", options=second_options, index=second_options.index(default_second))
 
-    if st.session_state.min_datetime_found:
+    if exif_min_datetime:
         info_box(
             f"Prefilled with the earliest datetime found in the metadata. If adjusted, the other datetimes will update automatically.",
             icon=":material/info:")
@@ -306,35 +325,42 @@ def datetime_selector_widget():
         return selected_datetime
 
 
-def fetch_known_projects():
-    settings, _ = load_settings()
-    projects = settings["projects"]
-    selected_projectID = settings["vars"]["analyse_advanced"].get(
+def load_known_projects():
+    map, _ = load_map()
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    projects = map["projects"]
+    selected_projectID = analyse_advanced_vars.get(
         "selected_projectID")
+    # st.write("DEBUG - Selected Project ID:", selected_projectID)
+    # st.write("DEBUG - Projects:", projects)
     return projects, selected_projectID
 
 
-def fetch_known_locations():
-    settings, _ = load_settings()
-    selected_projectID = settings["vars"]["analyse_advanced"].get(
+def load_known_locations():
+    map, _ = load_map()
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    selected_projectID = analyse_advanced_vars.get(
         "selected_projectID")
-    project = settings["projects"][selected_projectID]
-    selected_location = settings["vars"]["analyse_advanced"].get(
-        "selected_location")
+    project = map["projects"][selected_projectID]
+    selected_locationID = analyse_advanced_vars.get(
+        "selected_locationID")
     locations = project["locations"]
-    return locations, selected_location
+    return locations, selected_locationID
 
 
-def fetch_known_deployments():
-    settings, _ = load_settings()
-    selected_projectID = settings["vars"]["analyse_advanced"].get(
+def load_known_deployments():
+    settings, _ = load_map()
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    selected_projectID = analyse_advanced_vars.get(
         "selected_projectID")
     project = settings["projects"][selected_projectID]
-    location = project["location"]
-    location = project["locations"][location]
+    selected_locationID = analyse_advanced_vars.get(
+        "selected_locationID")
+    location = project["locations"][selected_locationID]
     deployments = location["deployments"]
-    selected_deployment = location["selected_deployment"]
-    return deployments, selected_deployment
+    selected_deploymentID = analyse_advanced_vars.get(
+        "selected_deploymentID")
+    return deployments, selected_deploymentID
 
 
 def generate_deployment_id():
@@ -437,7 +463,7 @@ class StepperBar:
         return stepper_html
 
 
-def fetch_step(section):
+def load_step(section):
     # load
     # settings, _ = load_settings()
     # selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
@@ -445,9 +471,9 @@ def fetch_step(section):
     # step = project_vars.get("step", 0)
     # return step
 
-    settings, _ = load_settings()
-    vars = settings["vars"].get(section)
-    step = vars.get("step", 0)
+    # settings, _ = load_map()
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    step = analyse_advanced_vars.get("step", 0)
     return step
 
 
@@ -479,35 +505,106 @@ def default_converter(obj):
         f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
 
-def update_vars(section, updates):
-    settings, settings_file = load_settings()
+def clear_vars(section):
+    """
+    Clear all variables in a specific section of the settings.
+    """
+    # settings, settings_file = load_map()
+    
+    # if not exist, create empty vars file
+    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+    if os.path.exists(vars_file):
+        os.remove(vars_file)
 
-    if "vars" not in settings:
-        settings["vars"] = {}
-    if section not in settings["vars"]:
-        settings["vars"][section] = {}
+# def load_vars(tool):
+
+#     vars    = load_vars(section="analyse_advanced")
+
+#     if not os.path.exists(map_file):
+#         # Create a new map with default values
+#         map_data = {
+#             "vars": {
+#                 "global": {
+#                     "lang": "en",
+#                     "mode": 0,
+#                 },
+#                 "analyse_advanced": {}
+#             },
+#             "projects": {}
+#         }
+#         with open(map_file, "w") as file:
+#             json.dump(map_data, file, indent=2)
+
+#     with open(map_file, "r") as file:
+#         settings = json.load(file)
+
+#     return settings, map_file
+
+def update_vars(section, updates):
+    # settings, settings_file = load_map()
+
+    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+    # /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/vars/general_settings.json
+    if not os.path.exists(vars_file):
+        with open(vars_file, "w", encoding="utf-8") as f:
+            json.dump({}, f, indent=2)
+
+    # read section vars
+    with open(vars_file, "r", encoding="utf-8") as f:
+        section_vars = json.load(f)
+        
+
+    # update
+    section_vars.update(updates)
+
+    # if "vars" not in settings:
+    #     settings["vars"] = {}
+    # if section not in settings["vars"]:
+    #     settings["vars"][section] = {}
 
     # Update only the section with any type of values
-    settings["vars"][section].update(updates)
+    # settings["vars"][section].update(updates)
 
     # Use `default=default_converter` to catch any lingering datetime objects
-    with open(settings_file, "w") as file:
-        json.dump(settings, file, indent=2, default=default_converter)
+    with open(vars_file, "w") as file:
+        json.dump(section_vars, file, indent=2, default=default_converter)
+
+
+
+
 
 
 def add_deployment(datetime):
 
-    settings, _ = load_settings()
-    selected_folder = settings["selected_folder"]
-    selected_projectID = settings["vars"]["analyse_advanced"].get(
+
+    # settings, _ = load_settings()
+    # selected_folder = settings["vars"]["analyse_advanced"].get(
+    #     "selected_folder")
+    # selected_projectID = settings["vars"]["analyse_advanced"].get(
+    #     "selected_projectID")
+    # project = settings["projects"][selected_projectID]
+    # location = project["location"]
+    # location = project["locations"][location]
+    # deployments = location["deployments"]
+    
+    map, _ = load_map()
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    selected_folder = analyse_advanced_vars.get(
+        "selected_folder")
+    selected_projectID = analyse_advanced_vars.get(
         "selected_projectID")
-    project = settings["projects"][selected_projectID]
-    location = project["location"]
-    location = project["locations"][location]
+    project = map["projects"][selected_projectID]
+    selected_locationID = analyse_advanced_vars.get(
+        "selected_locationID")
+    location = project["locations"][selected_locationID]
     deployments = location["deployments"]
 
     # generate a unique deployment ID
     deployment_id = generate_deployment_id()
+
+    update_vars("analyse_advanced", {
+        "selected_deploymentID": deployment_id,
+    })
 
     # Add new deployment
     deployments[deployment_id] = {
@@ -522,8 +619,8 @@ def add_deployment(datetime):
     # settings["projects"][project]["locations"][location]["selected_deployment"] = deployment_id
 
     # Save updated settings
-    with open(settings_file, "w") as file:
-        json.dump(settings, file, indent=2)
+    with open(map_file, "w") as file:
+        json.dump(map, file, indent=2)
 
     # Return list of deployments and index of the new one
     deployment_list = list(deployments.values())
@@ -534,8 +631,9 @@ def add_deployment(datetime):
 
 def add_location(location_id, lat, lon):
 
-    settings, _ = load_settings()
-    selected_projectID = settings["vars"]["analyse_advanced"].get(
+    settings, _ = load_map()
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    selected_projectID = analyse_advanced_vars.get(
         "selected_projectID")
     project = settings["projects"][selected_projectID]
     locations = project["locations"]
@@ -545,27 +643,36 @@ def add_location(location_id, lat, lon):
         raise ValueError(
             f"Location ID '{location_id}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
 
+
+
     # Add new location
     locations[location_id] = {
         "lat": lat,
         "lon": lon,
-        "selected_deployment": None,
+        # "selected_deployment": None,
         "deployments": {},
     }
 
-    # Sort locations (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
-    sorted_locations = dict(
-        sorted(locations.items(), key=lambda item: item[0].lower()))
-    settings["projects"][project]["locations"] = sorted_locations
-    settings["projects"][project]["location"] = location_id
+    # add the selected location ID to the vars
+    update_vars("analyse_advanced", {
+        "selected_locationID": location_id,
+    })
+    # analyse_advanced_vars = load_vars(section="analyse_advanced")
+    # analyse_advanced_vars["selected_locationID"] = location_id
+
+    # # Sort locations (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
+    # sorted_locations = dict(
+    #     sorted(locations.items(), key=lambda item: item[0].lower()))
+    # settings["projects"][selected_projectID]["locations"] = sorted_locations
+    # settings["projects"][selected_projectID]["location"] = location_id
 
     # Save updated settings
-    with open(settings_file, "w") as file:
+    with open(map_file, "w") as file:
         json.dump(settings, file, indent=2)
 
     # Return list of locations and index of the new one
-    location_list = list(sorted_locations.values())
-    selected_index = location_list.index(sorted_locations[location_id])
+    location_list = list(locations.values())
+    selected_index = location_list.index(locations[location_id])
 
     return selected_index, location_list
 
@@ -573,9 +680,12 @@ def add_location(location_id, lat, lon):
 # # show popup with model information
 def add_project(projectID, comments):
 
-    settings, settings_file = load_settings()
-    projects = settings["projects"]
+    map, map_file = load_map()
+    projects = map["projects"]
     projectIDs = projects.keys()
+
+    # analyse_advanced_vars = load_vars(section="analyse_advanced")
+    # selected_projectID = analyse_advanced_vars["selected_projectID"]
 
     # st.write(projectIDs)
 
@@ -587,18 +697,21 @@ def add_project(projectID, comments):
     # Add new project
     projects[projectID] = {
         "comments": comments,
-        # "location": None,
-        # "vars": {},
         "locations": {},
     }
 
-    settings["projects"] = projects  # add project
+    map["projects"] = projects  # add project
     # update selected project
-    settings["vars"]["analyse_advanced"]["selected_projectID"] = projectID
+    update_vars("analyse_advanced", {
+        "selected_projectID": projectID,
+        "selected_locationID": None,  # reset location selection
+        "selected_deploymentID": None,  # reset deployment selection
+    })
+    # map["vars"]["analyse_advanced"]["selected_projectID"] = projectID
 
     # Save updated settings
-    with open(settings_file, "w") as file:
-        json.dump(settings, file, indent=2)
+    with open(map_file, "w") as file:
+        json.dump(map, file, indent=2)
 
     # Return list of projects and index of the new one
     project_list = list(projects.values())
@@ -617,8 +730,8 @@ def add_new_project_popover(txt):
                         help="Define a new project",
                         use_container_width=True):
 
-            # fetch known projects IDs
-            known_projects, _ = fetch_known_projects()
+            # load known projects IDs
+            known_projects, _ = load_known_projects()
 
             # input for project ID
             print_widget_label("Unique project ID",
@@ -649,9 +762,11 @@ def add_new_project_popover(txt):
                     add_project(project_id, comments)
 
                     # reset session state variables before reloading
-                    st.session_state.clear()
+                    # st.session_state.clear()
                     popover_container.empty()
                     st.rerun()
+
+
 
 
 def add_new_location_popover(txt):
@@ -666,9 +781,14 @@ def add_new_location_popover(txt):
                         use_container_width=True):
 
             # init vars
-            lat_selected, lng_selected, exif_set, coords_found_in_exif = fetch_vars(section="analyse_advanced",  # SESSION`
-                                                                                    requested_vars=["lat_selected", "lng_selected", "exif_set", "coords_found_in_exif"])
-
+            vars = load_vars(section="analyse_advanced")
+            lat_selected = vars.get("lat_selected", None)
+            lng_selected = vars.get("lng_selected", None)
+            exif_set = vars.get("exif_set", False)
+            coords_found_in_exif = vars.get("coords_found_in_exif", False)
+            exif_lat = vars.get("exif_lat", None)
+            exif_lng = vars.get("exif_lng", None)
+            
             # # init session state vars
             # if "lat_selected" not in st.session_state:
             #     st.session_state.lat_selected = None
@@ -680,17 +800,22 @@ def add_new_location_popover(txt):
             #     st.session_state.coords_found_in_exif = False
 
             # update values if coordinates found in metadata
-            if st.session_state.coords_found_in_exif:
+            if coords_found_in_exif:
                 info_box(
-                    f"Coordinates from metadata have been preselected ({st.session_state.exif_lat:.6f}, {st.session_state.exif_lng:.6f}).")
-                if not st.session_state.exif_set:
-                    st.session_state.lat_selected = st.session_state.exif_lat
-                    st.session_state.lng_selected = st.session_state.exif_lng
-                    st.session_state.exif_set = True
+                    f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}).")
+                if not exif_set:
+                    # lat_selected = exif_lat
+                    # lng_selected = exif_lng
+                    # exif_set = True
+                    update_vars("analyse_advanced", {
+                        "lat_selected": exif_lat,
+                        "lng_selected": exif_lng,
+                        "exif_set": True,
+                    })
                     st.rerun()
 
-            # fetch known locations
-            known_locations, _ = fetch_known_locations()
+            # load known locations
+            known_locations, _ = load_known_locations()
 
             # base map
             m = fl.Map(
@@ -725,17 +850,17 @@ def add_new_location_popover(txt):
             if known_locations:
 
                 # add the selected location
-                if st.session_state.lat_selected and st.session_state.lng_selected:
+                if lat_selected and lng_selected:
                     fl.Marker(
-                        [st.session_state.lat_selected,
-                            st.session_state.lng_selected],
+                        [lat_selected,
+                            lng_selected],
                         title="Selected location",
                         tooltip="Selected location",
                         icon=fl.Icon(icon="camera", prefix="fa",
                                      color="darkred")
                     ).add_to(m)
-                    bounds.append([st.session_state.lat_selected,
-                                   st.session_state.lng_selected])
+                    bounds.append([lat_selected,
+                                   lng_selected])
 
                 # add the other known locations
                 for location_id, location_info in known_locations.items():
@@ -752,10 +877,10 @@ def add_new_location_popover(txt):
             else:
 
                 # add the selected location
-                if st.session_state.lat_selected and st.session_state.lng_selected:
+                if lat_selected and lng_selected:
                     fl.Marker(
-                        [st.session_state.lat_selected,
-                            st.session_state.lng_selected],
+                        [lat_selected,
+                            lng_selected],
                         title="Selected location",
                         tooltip="Selected location",
                         icon=fl.Icon(icon="camera", prefix="fa",
@@ -765,10 +890,10 @@ def add_new_location_popover(txt):
                     # only one marker so set bounds to the selected location
                     buffer = 0.001
                     bounds = [
-                        [st.session_state.lat_selected - buffer,
-                            st.session_state.lng_selected - buffer],
-                        [st.session_state.lat_selected + buffer,
-                            st.session_state.lng_selected + buffer]
+                        [lat_selected - buffer,
+                            lng_selected - buffer],
+                        [lat_selected + buffer,
+                            lng_selected + buffer]
                     ]
                     m.fit_bounds(bounds)
 
@@ -782,19 +907,23 @@ def add_new_location_popover(txt):
             # render map in center
             _, map_col, _ = st.columns([0.025, 0.95, 0.025])
             with map_col:
-                map_data = st_folium(m, height=300, width=700)
+                map_data = st_folium(m, height=325, width=700)
             # map_data = st_folium(m, height=300, width=700)
 
             # update lat lng widgets when clicking on map
             if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
-                st.session_state.lat_selected = map_data["last_clicked"]["lat"]
-                st.session_state.lng_selected = map_data["last_clicked"]["lng"]
-                fl.Marker(
-                    [st.session_state.lat_selected, st.session_state.lng_selected],
-                    title="Selected location",
-                    tooltip="Selected location",
-                    icon=fl.Icon(icon="camera", prefix="fa", color="green")
-                ).add_to(m)
+                lat_selected = map_data["last_clicked"]["lat"]
+                lng_selected = map_data["last_clicked"]["lng"]
+                # fl.Marker(
+                #     [lat_selected, lng_selected],
+                #     title="Selected location",
+                #     tooltip="Selected location",
+                #     icon=fl.Icon(icon="camera", prefix="fa", color="green")
+                # ).add_to(m)
+                update_vars("analyse_advanced", {
+                    "lat_selected": lat_selected,
+                    "lng_selected": lng_selected,
+                })
                 st.rerun()
 
             # user input
@@ -804,17 +933,17 @@ def add_new_location_popover(txt):
             with col1:
                 print_widget_label("Enter latitude or click on the map",
                                    help_text="Enter the latitude of the location.")
-                old_lat = st.session_state.get("lat_selected", 0.0)
+                old_lat = lat_selected if not None else 0.0
                 new_lat = st.number_input(
                     "Enter latitude or click on the map",
-                    value=st.session_state.lat_selected,
+                    value=lat_selected,
                     format="%.6f",
                     step=0.000001,
                     min_value=-90.0,
                     max_value=90.0,
                     label_visibility="collapsed",
                 )
-                st.session_state.lat_selected = new_lat
+                lat_selected = new_lat
                 if new_lat != old_lat:
                     st.rerun()
 
@@ -822,17 +951,17 @@ def add_new_location_popover(txt):
             with col2:
                 print_widget_label("Enter longitude or click on the map",
                                    help_text="Enter the longitude of the location.")
-                old_lng = st.session_state.get("lng_selected", 0.0)
+                old_lng = lng_selected if not None else 0.0
                 new_lng = st.number_input(
                     "Enter longitude or click on the map",
-                    value=st.session_state.lng_selected,
+                    value=lng_selected,
                     format="%.6f",
                     step=0.000001,
                     min_value=-180.0,
                     max_value=180.0,
                     label_visibility="collapsed",
                 )
-                st.session_state.lng_selected = new_lng
+                lng_selected = new_lng
                 if new_lng != old_lng:
                     st.rerun()
 
@@ -854,35 +983,50 @@ def add_new_location_popover(txt):
                 elif new_location_id in known_locations.keys():
                     st.error(
                         f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
-                elif st.session_state.lat_selected == 0.0 and st.session_state.lng_selected == 0.0:
+                elif lat_selected == 0.0 and lng_selected == 0.0:
                     st.error(
                         "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
+                elif lat_selected is None or lng_selected is None:
+                    st.error(
+                        "Error: Latitude and Longitude cannot be empty. Please select a valid location.")
                 else:
 
                     # if all good, add location
                     add_location(
-                        new_location_id, st.session_state.lat_selected, st.session_state.lng_selected)
+                        new_location_id, lat_selected, lng_selected)
                     new_location_id = None
 
                     # reset session state variables before reloading
-                    st.session_state.clear()
-                    st.session_state.coords_found_in_exif = False
+                    update_vars("analyse_advanced", {
+                        "coords_found_in_exif": False,
+                        "exif_set": False,
+                        "exif_lat": None,
+                        "exif_lng": None,
+                        "lat_selected": None,
+                        "lng_selected": None
+                    })
                     popover_container.empty()
                     st.rerun()
 
 
-def browse_directory_widget(selected_folder):
+def browse_directory_widget():
+    
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    selected_folder = analyse_advanced_vars.get("selected_folder")
+    
     col1, col2 = st.columns([1, 3], vertical_alignment="center")
     with col1:
         if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
             selected_folder = select_folder()
             # update_vars("selected_folder", selected_folder)
             # save_global_vars({"selected_folder": selected_folder})
+            clear_vars(section="analyse_advanced")
             update_vars(section="analyse_advanced",
                         updates={"selected_folder": selected_folder})
 
-            # reset session state variables
-            st.session_state.clear()
+            # # reset session state variables
+            # st.session_state.clear()
+            
 
     if not selected_folder:
         with col2:
@@ -900,7 +1044,7 @@ def browse_directory_widget(selected_folder):
 
 def select_folder():
     result = subprocess.run([sys.executable, os.path.join(
-        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "frontend", "folder_selector.py")], capture_output=True, text=True)
+        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "ads_utils", "folder_selector.py")], capture_output=True, text=True)
     folder_path = result.stdout.strip()
     if folder_path != "" and result.returncode == 0:
         return folder_path
@@ -914,7 +1058,7 @@ def select_folder():
 
 def select_model_widget(model_type, prev_selected_model):
     # prepare radio button options
-    model_info = fetch_all_model_info(model_type)
+    model_info = load_all_model_info(model_type)
     model_options = {}
     for key, info in model_info.items():
         model_options[key] = {"option": info["friendly_name"],
@@ -937,9 +1081,9 @@ def select_model_widget(model_type, prev_selected_model):
 # check which models are known and should be listed in the dpd
 
 
-def fetch_all_model_info(type):
+def load_all_model_info(type):
 
-    # fetch
+    # load
     model_info_json = os.path.join(
         AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
     with open(model_info_json, "r") as file:
@@ -1168,10 +1312,12 @@ def get_file_gps(file_path):
 
 def check_folder_metadata():
     with st.spinner("Checking data..."):
-        settings, _ = load_settings()
+        # settings, _ = load_map()
         # selected_folder = Path(settings["selected_folder"])
-        selected_folder = Path(
-            settings["vars"]["analyse_advanced"]["selected_folder"])
+        # selected_folder = Path(
+        #     settings["vars"]["analyse_advanced"]["selected_folder"])
+        analyse_advanced_vars = load_vars(section="analyse_advanced")
+        selected_folder = Path(analyse_advanced_vars.get("selected_folder"))
 
         datetimes = []
         gps_coords = []
@@ -1359,12 +1505,12 @@ def show_model_info(model_info):
                 f"Current version of AddaxAI (v{current_AA_version}) is able to use this model. No update required.")
 
 
-def fetch_model_info(model_name):
+def load_model_info(model_name):
     return json.load(open(os.path.join(CLS_DIR, model_name, "variables.json"), "r"))
 
 
 def save_cls_classes(cls_model_key, slected_classes):
-    # fetch
+    # load
     model_info_json = os.path.join(
         AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
     with open(model_info_json, "r") as file:
@@ -1407,20 +1553,20 @@ def save_cls_classes(cls_model_key, slected_classes):
 #     except IOError as e:
 #         st.warning(f"Error writing to file: {e}")
 
-def save_global_vars(new_data):
-    global_settings, settings_file = load_settings()
-    temp_file = settings_file + ".tmp"
+# def save_global_vars(new_data):
+#     global_settings, map_file = load_map()
+#     temp_file = settings_file + ".tmp"
 
-    # Update with new data
-    global_settings.update(new_data)
+#     # Update with new data
+#     global_settings.update(new_data)
 
-    # Atomic write to prevent file corruption
-    try:
-        with open(temp_file, "w", encoding="utf-8") as f:
-            json.dump(global_settings, f, indent=2)
-        os.replace(temp_file, settings_file)
-    except IOError as e:
-        raise RuntimeError(f"Error writing to settings file: {e}")
+#     # Atomic write to prevent file corruption
+#     try:
+#         with open(temp_file, "w", encoding="utf-8") as f:
+#             json.dump(global_settings, f, indent=2)
+#         os.replace(temp_file, settings_file)
+#     except IOError as e:
+#         raise RuntimeError(f"Error writing to settings file: {e}")
 
 
 def save_project_vars(new_data):
@@ -1445,7 +1591,7 @@ def save_project_vars(new_data):
     # except (json.JSONDecodeError, IOError):
     #     settings = {}
 
-    settings, settings_file = load_settings()
+    settings, settings_file = load_map()
     # current_project = settings["global_vars"]["current_project"]
     temp_file = settings_file + ".tmp"
 
@@ -1470,42 +1616,52 @@ def save_project_vars(new_data):
         raise RuntimeError(f"Error writing to settings file: {e}")
 
 
-def load_global_vars():
-    """Reads the global variables from the JSON file and returns them as a dictionary."""
+# def load_global_vars():
+#     """Reads the global variables from the JSON file and returns them as a dictionary."""
 
-    # Load full settings or initialize
-    try:
-        if os.path.exists(settings_file):
-            with open(settings_file, "r", encoding="utf-8") as f:
-                settings = json.load(f)
-        else:
-            settings = {}
-    except (json.JSONDecodeError, IOError):
-        settings = {}
+#     # Load full settings or initialize
+#     try:
+#         if os.path.exists(map_file):
+#             with open(map_file, "r", encoding="utf-8") as f:
+#                 settings = json.load(f)
+#         else:
+#             settings = {}
+#     except (json.JSONDecodeError, IOError):
+#         settings = {}
 
-    return settings.get("global_vars", {})
-
-
-def fetch_vars(section, requested_vars):
-    settings, _ = load_settings()
-    section_vars = settings["vars"][section]
-    return {var: section_vars.get(var, None) for var in requested_vars}.values()
+#     return settings.get("global_vars", {})
 
 
-def load_settings():
+def load_vars(section):
+
+    # if not exist, create empty vars file
+    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+    if not os.path.exists(vars_file):
+        with open(vars_file, "w", encoding="utf-8") as f:
+            json.dump({}, f, indent=2)
+    
+    # read section vars
+    with open(vars_file, "r", encoding="utf-8") as f:
+        section_vars = json.load(f)
+    
+    return section_vars
+    # return {var: section_vars.get(var, None) for var in requested_vars}.values()
+
+
+def load_map():
     """Reads the data from the JSON file and returns it as a dictionary."""
 
     # Load full settings or initialize
     try:
-        if os.path.exists(settings_file):
-            with open(settings_file, "r", encoding="utf-8") as f:
+        if os.path.exists(map_file):
+            with open(map_file, "r", encoding="utf-8") as f:
                 settings = json.load(f)
         else:
             settings = {}
     except (json.JSONDecodeError, IOError):
         settings = {}
 
-    return settings, settings_file
+    return settings, map_file
 
 # def load_project_vars():
 #     settings, _ = load_settings()
@@ -1514,10 +1670,9 @@ def load_settings():
 #     return current_project
 
 
-def load_txts():
-    # txts_fpath = "/Users/peter/Desktop/streamlit_app/frontend/txts.json"
+def load_lang_txts():
     txts_fpath = os.path.join(AddaxAI_files, "AddaxAI",
-                              "streamlit-AddaxAI", "frontend", "txts.json")
+                              "streamlit-AddaxAI", "assets", "language", "lang.json")
     with open(txts_fpath, "r", encoding="utf-8") as file:
         txts = json.load(file)
     return txts

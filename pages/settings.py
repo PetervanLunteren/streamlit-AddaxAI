@@ -3,14 +3,17 @@ import streamlit as st
 import sys
 import platform
 
-from backend.utils import *
+from ads_utils.common import *
+
+
 
 # load language settings
-txts = load_txts()
-settings, _ = load_settings()
-lang = settings["lang"]
-mode = settings["mode"]
+txts = load_lang_txts()
+# settings, _ = load_map()
 
+general_settings_vars = load_vars(section = "general_settings")
+lang = general_settings_vars["lang"]
+mode = general_settings_vars["mode"]
 
 lang_options = txts["languages"]
 lang_idx = list(lang_options.keys()).index(lang)
@@ -25,16 +28,16 @@ lang_selected = st.selectbox(
 
 
 # import settings file
-settings_, settings_file = load_settings()
+map, map_file = load_map()
 
-st.write("settings_file:", settings_file)
-if st.button("Open settings.json"):
+st.write("map_file:", map_file)
+if st.button("Open map.json"):
     if platform.system() == "Darwin":  # macOS
-        os.system(f'open "{settings_file}"')
+        os.system(f'open "{map_file}"')
     else:
         st.warning("This action is only supported on macOS.")
 with st.expander("Current settings", expanded=False):
-    st.write("settings:", settings_)
+    st.write("map:", map)
 with st.expander("st.session_state", expanded=False):
     st.write(st.session_state)
 
