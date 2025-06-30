@@ -105,3 +105,71 @@ Traceback (most recent call last):
     time.sleep(1)
     ^^^^^^^^^^
 AttributeError: type object 'datetime.time' has no attribute 'sleep'
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8504
+  Network URL: http://172.30.0.171:8504
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+2025-06-30 14:50:36.233 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 643, in code_to_exec
+    _mpa_v1(self._main_script_path)
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 164, in _mpa_v1
+    page.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 274, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 10, in <module>
+    from ads_utils.common import load_lang_txts, load_vars, load_step, StepperBar, print_widget_label, browse_directory_widget, update_vars, check_folder_metadata, project_selector_widget, clear_vars, datetime_selector_widget, location_selector_widget, add_deployment
+ImportError: cannot import name 'browse_directory_widget' from 'ads_utils.common' (/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/common.py)
+2025-06-30 14:51:40.878 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 10, in <module>
+    from ads_utils.common import load_lang_txts, load_vars, load_step, StepperBar, print_widget_label, browse_directory_widget, update_vars, check_folder_metadata, project_selector_widget, clear_vars, datetime_selector_widget, location_selector_widget, add_deployment
+ImportError: cannot import name 'browse_directory_widget' from 'ads_utils.common' (/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/common.py)
+2025-06-30 14:51:43.108 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 10, in <module>
+    from ads_utils.common import load_lang_txts, load_vars, load_step, StepperBar, print_widget_label, browse_directory_widget, update_vars, check_folder_metadata, project_selector_widget, clear_vars, datetime_selector_widget, location_selector_widget, add_deployment
+ImportError: cannot import name 'browse_directory_widget' from 'ads_utils.common' (/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/common.py)
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8505
+  Network URL: http://172.30.0.171:8505
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            

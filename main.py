@@ -130,7 +130,8 @@ os.environ["STREAMLIT_CONFIG"] = os.path.join(AddaxAI_files, "AddaxAI", "streaml
 #     for k, v in env_vars.items():
 #         st.write(f"{k}: {v}")
 
-from ads_utils.common import *
+# from ads_utils.common import *
+from ads_utils.common import load_lang_txts, load_vars, update_vars
 
 
 

@@ -1,19 +1,14 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime, timedelta
+import os
+from datetime import datetime
 
+# import local modules
+from ads_utils.common import load_lang_txts, load_vars, load_step, StepperBar, print_widget_label, update_vars, clear_vars
+from ads_utils.analyse_advanced import browse_directory_widget, check_folder_metadata, project_selector_widget, datetime_selector_widget, location_selector_widget, add_deployment
 
-
-
-from ads_utils.common import *
-
-
-# cd /Applications/AddaxAI_files/AddaxAI && conda activate env-streamlit-addaxai && cd streamlit-AddaxAI/frontend && streamlit run main.py >> streamlit_log.txt 2>&1 &
 
 # load language settings
 txts = load_lang_txts()
-# settings, _ = load_map()
-
 general_settings_vars = load_vars(section = "general_settings")
 lang = general_settings_vars["lang"]
 mode = general_settings_vars["mode"]
@@ -32,7 +27,6 @@ st.write(
 st.write("")
 st.subheader(":material/sd_card: Deployment information", divider="grey")
 st.write("Fill in the information related to this deployment. A deployment refers to all the images and videos stored on a single SD card retrieved from the field.")
-
 
 ###### STEPPER BAR ######
 
@@ -92,83 +86,15 @@ with st.container(border=True):
                           disabled=True,
                           key = "project_next_button_dummy")
 
-    # # folder selection
-    # if step == 1:
-
-    #     st.write("HELP TEXT")
-
-    #     with st.container(border=True):
-    #         print_widget_label(
-    #             "Project", help_text="help text")
-
-    #         # Store selection in session state
-    #         if "projectID" not in st.session_state:
-    #             st.session_state.projectID = None
-
-    #         projectID = project_selector_widget()
-
-    #     if projectID:
-
-    #         # location metadata
-    #         with st.container(border=True):
-    #             print_widget_label(
-    #                 "Location", help_text="help text")
-    #             selected_locationID = location_selector_widget()
-    #         # st.write("")
-
-    #         # camera ID metadata
-    #         if selected_locationID:
-    #             with st.container(border=True):
-    #                 print_widget_label(
-    #                     "Start", help_text="help text")
-    #                 selected_min_datetime = datetime_selector_widget()
-
-    #             if selected_min_datetime:
-
-    #                 if st.button("DEBUG"):
-    #                     add_deployment(selected_min_datetime)
-
-    #     # place the buttons
-    #     col_btn_prev, col_btn_next = st.columns([1, 1])
-
-    #     # the previous button is always enabled
-    #     with col_btn_prev:
-    #         if st.button(":material/replay: Start over", use_container_width=True):
-    #             clear_vars(section="analyse_advanced")
-    #             st.rerun()
-
-    #     with col_btn_next:
-    #         if projectID:
-    #             if st.button(":material/arrow_forward: Next", use_container_width=True):
-    #                 update_vars(section="analyse_advanced",
-    #                             updates={"step": 2})
-    #                 st.rerun()
-    #         else:
-    #             st.button(":material/arrow_forward: Next",
-    #                       use_container_width=True, disabled=True)
-
     elif step == 1:
 
         with st.container(border=True):
             print_widget_label(
                 "Project", help_text="help text")
 
-            # # Store selection in session state
-            # if "projectID" not in st.session_state:
-            #     st.session_state.projectID = None
-
             selected_projectID = project_selector_widget()
 
-
-
-        
-
-
-
         if selected_projectID:
-            # # Only update session state and save settings if value changed
-            # if st.session_state.get("projectID") != selected_projectID:
-            #     st.session_state.projectID = selected_projectID
 
             # location metadata
             with st.container(border=True):
@@ -183,17 +109,6 @@ with st.container(border=True):
                     print_widget_label(
                         "Start", help_text="help text")
                     selected_min_datetime = datetime_selector_widget()
-                    
-
-
-                st.write("Selected datetime:", selected_min_datetime)
-                st.write("Selected location ID:", selected_locationID)
-
-
-
-
-                    # if st.button("DEBUG"):
-                    #     add_deployment(selected_min_datetime)
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -210,9 +125,7 @@ with st.container(border=True):
                         if st.button(":material/arrow_forward: Next", use_container_width=True):
                             
                             update_vars(section="analyse_advanced",
-                                        updates={
-                                            # "step": 2,  # 0 indexed # DEBUG
-                                                 "step" : 1,
+                                        updates={"step": 2,  # 0 indexed
                                                  "selected_projectID": selected_projectID,
                                                  "selected_locationID": selected_locationID,
                                                  "selected_min_datetime": selected_min_datetime})
@@ -223,9 +136,17 @@ with st.container(border=True):
                                 use_container_width=True, disabled=True)
 
     elif step == 2:
-        st.write("This is where you can choose the mdoel stuff!")
-        st.text_input("Location", key="location_input",
-                      placeholder="Specify the location for your deployment")
+        st.write("MODEL STUFF!")
+
+        # select detection model
+        with st.container(border=True):
+            print_widget_label("Which model do you want to use to locate the animals?",
+                               help_text="Here you can select the model of your choosing.")
+            selected_det_model = select_model_widget(
+                "det", prev_selected_det_model)
+        st.write("")
+
+
     elif step == 3:
         st.write("In this step, you can select the camera used for the deployment.")
         st.text_input("Camera", key="camera_input",
@@ -234,104 +155,6 @@ with st.container(border=True):
         st.write("Finally, you can set the start date and time for the deployment. This is important for tracking when the data was collected.")
         st.date_input("Start Date", key="start_date_input",
                       value=datetime.now().date())
-
-
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-st.write("")
-
-##### END WORKING STEPPER BAR ######
-
-# # select folder
-# # st.write("")
-# with st.container(border=True):
-#     print_widget_label("Folder",
-#                        help_text="Select the folder where your deployment is located.")
-#     folder = browse_directory_widget(settings["folder"])
-
-#     if folder and os.path.isdir(folder):
-#         check_folder_metadata()
-#         # st.write(st.session_state)
-
-#     if folder and not os.path.isdir(folder):
-#         st.error("The selected folder does not exist. Please select a valid folder.")
-#         folder = None
-
-# st.write("")
-
-# # exit()
-
-# # prev_folder = project_vars.get("folder", None)
-
-
-# # if a folder is selected, show the model selection
-# if folder and os.path.isdir(folder):
-
-#     with st.container(border=True):
-#         print_widget_label(
-#             "Project", help_text="help text")
-
-#         # Store selection in session state
-#         if "projectID" not in st.session_state:
-#             st.session_state.projectID = None
-
-#         projectID = project_selector_widget()
-
-#     # # Update settings only if the selection has changed
-#     # if projectID and projectID != st.session_state.projectID:
-#     #     st.session_state.projectID = projectID
-
-#     if projectID:
-#         # Only update session state and save settings if value changed
-#         if st.session_state.get("projectID") != projectID:
-#             st.session_state.projectID = projectID
-
-#             # adjust the selected project
-#             settings, _ = load_settings()
-#             settings["project"] = projectID
-#             with open(settings_file, "w") as file:
-#                 json.dump(settings, file, indent=2)
-
-#         # # write the selected project ID to the settings
-#         # settings["projectID"] = projectID
-
-#         # location metadata
-#         with st.container(border=True):
-#             print_widget_label(
-#                 "Location", help_text="help text")
-#             selected_locationID = location_selector_widget()
-#         # st.write("")
-
-#         # camera ID metadata
-#         if selected_locationID:
-#             # with st.container(border=True):
-#             # print_widget_label(
-#             #     "Which camera was used?", help_text="This is a unique identifier for the physical camera device itself—not the location. Since cameras can be moved between different locations over time, this ID helps track the specific camera regardless of where it’s deployed. It’s important for camtrapDP export and allows you to filter or analyze data by camera device. You can use any naming convention you like, as long as you can clearly identify which specific device it refers to.\n\nExamples: Browning51, Reconyx-A3, Peter's backup cam, etc.")
-#             # selected_cameraID = camera_selector_widget()
-#             # st.write("")
-
-#             # datetime metadata
-#             # if selected_cameraID:
-#             with st.container(border=True):
-#                 print_widget_label(
-#                     "Start", help_text="help text")
-#                 selected_min_datetime = datetime_selector_widget()
-#                 # st.write("")
-#                 # st.write("Selected datetime:", selected_min_datetime)
-#                 # st.write("")
-
-#             if selected_min_datetime:
-
-#                 if st.button("DEBUG"):
-#                     add_deployment(selected_min_datetime)
 
 
 # #     # model section
@@ -363,13 +186,13 @@ st.write("")
 # #     # if the user just want to locate animals, then only select the detection model
 # #     if selected_model_type == 'LOCATE':
 
-# #         # select detection model
-# #         with st.container(border=True):
-# #             print_widget_label("Which model do you want to use to locate the animals?",
-# #                                help_text="Here you can select the model of your choosing.")
-# #             selected_det_model = select_model_widget(
-# #                 "det", prev_selected_det_model)
-# #         st.write("")
+        # select detection model
+        with st.container(border=True):
+            print_widget_label("Which model do you want to use to locate the animals?",
+                               help_text="Here you can select the model of your choosing.")
+            selected_det_model = select_model_widget(
+                "det", prev_selected_det_model)
+        st.write("")
 
 # #     # if the user want to indentify the species, then select both detection and classification models
 # #     elif selected_model_type == 'IDENTIFY':
