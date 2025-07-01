@@ -12,6 +12,8 @@ from appdirs import user_config_dir
 import statistics
 # from collections import defaultdict
 import subprocess
+import re
+import csv
 import string
 import math
 # import time as sleep_time
@@ -41,6 +43,7 @@ from ads_utils.common import load_vars, update_vars, info_box, load_map, print_w
 # set global variables
 AddaxAI_files = os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+AddaxAI_files_debug = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
 CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
 DET_DIR = os.path.join(AddaxAI_files, "models", "det")
 
@@ -861,7 +864,7 @@ def browse_directory_widget():
 
 def select_folder():
     result = subprocess.run([sys.executable, os.path.join(
-        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "ads_utils", "folder_selector.py")], capture_output=True, text=True)
+        AddaxAI_files_debug, "ads_utils", "folder_selector.py")], capture_output=True, text=True)
     folder_path = result.stdout.strip()
     if folder_path != "" and result.returncode == 0:
         return folder_path
@@ -875,38 +878,98 @@ def select_folder():
 
 def load_model_metadata():
     model_info_json = os.path.join(
-        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "assets", "model_meta" "model_meta.json")
+        AddaxAI_files_debug, "assets", "model_meta", "model_meta.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     return model_info
 
-def cls_model_selector_widget():
+def det_model_selector_widget(model_meta):
+    det_model_meta = model_meta["det"]
+
+    # Build model info tuples: (emoji + friendly_name for display, modelID, friendly_name for sorting)
+    model_items = [
+        (f"{meta.get('emoji', '')}\u00A0\u00A0{meta['friendly_name']}", modelID, meta["friendly_name"])
+        for modelID, meta in det_model_meta.items()
+    ]
     
-    # load model metadata
-    model_meta = load_model_metadata()
-    cls_model_meta = model_meta["cls"]
-    cls_modelIDs = list(cls_model_meta.keys())
-    
-    # HIERWAS IK
-    HIERWAS IK
+    # Sort by the friendly_name (3rd element of the tuple)
+    model_choices = sorted(model_items, key=lambda x: x[2].lower())
+    display_names = [item[0] for item in model_choices]
+    modelID_lookup = {**{item[0]: item[1] for item in model_choices}}
+
+    # Load previously selected model ID
     general_settings_vars = load_vars(section="general_settings")
-    previously_selected_modelID = general_settings_vars.get("selected_modelID", "EUR-DF-v1.3")
-    
+    previously_selected_det_modelID = general_settings_vars.get("previously_selected_det_modelID", "MD5A")
+
+    # Resolve previously selected modelID to display name
+    previously_selected_display_name = next(
+        (name for name, ID in modelID_lookup.items() if ID == previously_selected_det_modelID),
+        None
+    )
+
     col1, col2 = st.columns([3, 1])
-
-    # dropdown for existing projects
     with col1:
-        options = cls_modelIDs
-        selected_index = options.index(
-            selected_projectID) if selected_projectID in options else 0
-
-        # overwrite selected_projectID if user has selected a different project
-        selected_projectID = st.selectbox(
-            "Existing projects",
-            options=options,
-            index=selected_index,
+        selected_display_name = st.selectbox(
+            "Select a model for detection",
+            options=display_names,
+            index=display_names.index(previously_selected_display_name),
             label_visibility="collapsed"
         )
+
+        selected_modelID = modelID_lookup[selected_display_name]
+
+    with col2:
+        show_cls_model_info_popover(det_model_meta[selected_modelID])
+
+    return selected_modelID
+
+def cls_model_selector_widget(model_meta):
+    
+    cls_model_meta = model_meta["cls"]
+
+    # Build model info tuples: (emoji + friendly_name for display, modelID, friendly_name for sorting)
+    model_items = [
+        (f"{meta.get('emoji', '')}\u00A0\u00A0{meta['friendly_name']}", modelID, meta["friendly_name"])
+        for modelID, meta in cls_model_meta.items()
+    ]
+
+    # Sort by the friendly_name (3rd element of the tuple)
+    model_choices = sorted(model_items, key=lambda x: x[2].lower())
+
+    # Define the "NONE" entry for generic animal detection
+    none_display = "🐾  Generic animal detection (no identification)"
+    display_names = [none_display] + [item[0] for item in model_choices]
+    modelID_lookup = {none_display: "NONE", **{item[0]: item[1] for item in model_choices}}
+
+    # Load previously selected model ID
+    general_settings_vars = load_vars(section="general_settings")
+    previously_selected_modelID = general_settings_vars.get("selected_modelID", "EUR-DF-v1.3")
+
+    # Resolve previously selected modelID to display name
+    previously_selected_display_name = next(
+        (name for name, ID in modelID_lookup.items() if ID == previously_selected_modelID),
+        "NONE"
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        selected_display_name = st.selectbox(
+            "Select a model for classification",
+            options=display_names,
+            index=display_names.index(previously_selected_display_name),
+            label_visibility="collapsed"
+        )
+
+        selected_modelID = modelID_lookup[selected_display_name]
+
+    with col2:
+        if selected_modelID != "NONE":
+            show_cls_model_info_popover(cls_model_meta[selected_modelID])
+        else:
+            show_none_model_info_popover()
+
+    
+    return selected_modelID
 
     
 
@@ -940,7 +1003,7 @@ def load_all_model_info(type):
 
     # load
     model_info_json = os.path.join(
-        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
+        AddaxAI_files_debug, "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
 
@@ -1196,73 +1259,200 @@ def check_folder_metadata():
 
         # st.write(st.session_state)
 
-@st.dialog("Model information", width="large")
-def show_model_info(model_info):
-    friendly_name = model_info.get('friendly_name', None)
-    if friendly_name and friendly_name != "":
-        st.write("")
-        print_widget_label("Name", "rocket_launch")
-        st.write(friendly_name)
-    # print_widget_label("Name", "rocket_launch")
-    # st.write(model_name)
+def show_none_model_info_popover():
 
-    description = model_info.get('description', None)
-    if description and description != "":
-        st.write("")
-        print_widget_label("Description", "history_edu")
-        st.write(description)
+    popover_container = st.empty()
+    with popover_container.container():
+        with st.popover(f":material/info: Info",
+                        help="Model information",
+                        use_container_width=True):
+            st.write("This model is used for generic animal detection, without identifying specific species or classes.")
+            st.write("It is useful for detecting animals in images or videos without the need for specific classification.")
 
-    all_classes = model_info.get('all_classes', None)
-    if all_classes and all_classes != []:
-        st.write("")
-        print_widget_label("Classes", "pets")
-        formatted_classes = [all_classes[0].replace('_', ' ').capitalize(
-        )] + [cls.replace('_', ' ').lower() for cls in all_classes[1:]]
-        output = ', '.join(
-            formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
-        st.write(output)
+def show_none_model_info_popover():
+    # # use st.empty to create a popover container
+    # # so that it can be closed on button click
+    # # and the popover can be reused
+    # popover_container = st.empty()
+    # with popover_container.container():
+    with st.popover(
+        ":material/info: Info",
+        help="Model information",
+        use_container_width=True
+    ):
+        st.markdown(
+            """
+            **Generic animal detection (no identification)**
 
-    developer = model_info.get('developer', None)
-    if developer and developer != "":
-        st.write("")
-        print_widget_label("Developer", "code")
-        st.write(developer)
+            Selecting this option means the system will use a general-purpose detection model that locates and labels objects only as:
+            - *animal*
+            - *vehicle*
+            - *person*
 
-    owner = model_info.get('owner', None)
-    if owner and owner != "":
-        st.write("")
-        print_widget_label("Owner", "account_circle")
-        st.write(owner)
+            No species-level identification will be performed.
 
-    info_url = model_info.get('info_url', None)
-    if info_url and info_url != "":
-        st.write("")
-        print_widget_label("More information", "info")
-        st.write(info_url)
+            This option is helpful if:
+            - There is no suitable species identification model available.
+            - You want to filter out empty images.
+            - You want to ID the animals manually without using a idnetification model.
+            
+            If you want to use a specific species identification model, please select one from the dropdown menu.
+            """
+        )
 
-    citation = model_info.get('citation', None)
-    if citation and citation != "":
-        st.write("")
-        print_widget_label("Citation", "article")
-        st.write(citation)
+# format the class name for display
+def format_class_name(s):
+    if "http" in s:
+        return s  # leave as is
+    else:
+        s = s.replace('_', ' ')
+        s = s.strip()
+        s = s.lower()
+        return s
 
-    license = model_info.get('license', None)
-    if license and license != "":
-        st.write("")
-        print_widget_label("License", "copyright")
-        st.write(license)
+def show_cls_model_info_popover(model_info):
+    # use st.empty to create a popover container
+    # so that it can be closed on button click
+    # and the popover can be reused
+    popover_container = st.empty()
+    with popover_container.container():
+        with st.popover(f":material/info: Info",
+                        help="Model information",
+                        use_container_width=True):
 
-    min_version = model_info.get('min_version', None)
-    if min_version and min_version != "":
-        st.write("")
-        print_widget_label("Required AddaxAI version", "verified")
-        needs_EA_update_bool = requires_addaxai_update(min_version)
-        if needs_EA_update_bool:
-            st.write(
-                f"This model requires AddaxAI version {min_version}. Your current AddaxAI version {current_AA_version} will not be able to run this model. An update is required. Update via the [Addax Data Science website](https://addaxdatascience.com/addaxai/).")
-        else:
-            st.write(
-                f"Current version of AddaxAI (v{current_AA_version}) is able to use this model. No update required.")
+            friendly_name = model_info.get('friendly_name', None)
+            if friendly_name and friendly_name != "":
+                st.write("")
+                print_widget_label("Name", "rocket_launch")
+                st.write(friendly_name)
+
+            description = model_info.get('description', None)
+            if description and description != "":
+                st.write("")
+                print_widget_label("Description", "history_edu")
+                st.write(description)
+
+            all_classes = model_info.get('all_classes', None)
+            if all_classes and all_classes != []:
+                st.write("")
+                print_widget_label("Classes", "pets")
+                formatted_classes = [format_class_name(cls) for cls in all_classes]
+                if len(formatted_classes) == 1:
+                    string = formatted_classes[0] + "."
+                else:
+                    string = ', '.join(
+                        formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
+                st.write(string.capitalize())
+
+            developer = model_info.get('developer', None)
+            if developer and developer != "":
+                st.write("")
+                print_widget_label("Developer", "code")
+                st.write(developer)
+
+            owner = model_info.get('owner', None)
+            if owner and owner != "":
+                st.write("")
+                print_widget_label("Owner", "account_circle")
+                st.write(owner)
+
+            info_url = model_info.get('info_url', None)
+            if info_url and info_url != "":
+                st.write("")
+                print_widget_label("More information", "info")
+                st.write(info_url)
+
+            citation = model_info.get('citation', None)
+            if citation and citation != "":
+                st.write("")
+                print_widget_label("Citation", "article")
+                st.write(citation)
+
+            license = model_info.get('license', None)
+            if license and license != "":
+                st.write("")
+                print_widget_label("License", "copyright")
+                st.write(license)
+
+            min_version = model_info.get('min_version', None)
+            if min_version and min_version != "":
+                st.write("")
+                print_widget_label("Required AddaxAI version", "verified")
+                needs_EA_update_bool = requires_addaxai_update(min_version)
+                if needs_EA_update_bool:
+                    st.write(
+                        f"This model requires AddaxAI version {min_version}. Your current AddaxAI version {current_AA_version} will not be able to run this model. An update is required. Update via the [Addax Data Science website](https://addaxdatascience.com/addaxai/).")
+                else:
+                    st.write(
+                        f"Current version of AddaxAI (v{current_AA_version}) is able to use this model. No update required.")
+
+# @st.dialog("Model information", width="large")
+# def show_model_info(model_info):
+#     friendly_name = model_info.get('friendly_name', None)
+#     if friendly_name and friendly_name != "":
+#         st.write("")
+#         print_widget_label("Name", "rocket_launch")
+#         st.write(friendly_name)
+#     # print_widget_label("Name", "rocket_launch")
+#     # st.write(model_name)
+
+#     description = model_info.get('description', None)
+#     if description and description != "":
+#         st.write("")
+#         print_widget_label("Description", "history_edu")
+#         st.write(description)
+
+#     all_classes = model_info.get('all_classes', None)
+#     if all_classes and all_classes != []:
+#         st.write("")
+#         print_widget_label("Classes", "pets")
+#         formatted_classes = [all_classes[0].replace('_', ' ').capitalize(
+#         )] + [cls.replace('_', ' ').lower() for cls in all_classes[1:]]
+#         output = ', '.join(
+#             formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
+#         st.write(output)
+
+#     developer = model_info.get('developer', None)
+#     if developer and developer != "":
+#         st.write("")
+#         print_widget_label("Developer", "code")
+#         st.write(developer)
+
+#     owner = model_info.get('owner', None)
+#     if owner and owner != "":
+#         st.write("")
+#         print_widget_label("Owner", "account_circle")
+#         st.write(owner)
+
+#     info_url = model_info.get('info_url', None)
+#     if info_url and info_url != "":
+#         st.write("")
+#         print_widget_label("More information", "info")
+#         st.write(info_url)
+
+#     citation = model_info.get('citation', None)
+#     if citation and citation != "":
+#         st.write("")
+#         print_widget_label("Citation", "article")
+#         st.write(citation)
+
+#     license = model_info.get('license', None)
+#     if license and license != "":
+#         st.write("")
+#         print_widget_label("License", "copyright")
+#         st.write(license)
+
+#     min_version = model_info.get('min_version', None)
+#     if min_version and min_version != "":
+#         st.write("")
+#         print_widget_label("Required AddaxAI version", "verified")
+#         needs_EA_update_bool = requires_addaxai_update(min_version)
+#         if needs_EA_update_bool:
+#             st.write(
+#                 f"This model requires AddaxAI version {min_version}. Your current AddaxAI version {current_AA_version} will not be able to run this model. An update is required. Update via the [Addax Data Science website](https://addaxdatascience.com/addaxai/).")
+#         else:
+#             st.write(
+#                 f"Current version of AddaxAI (v{current_AA_version}) is able to use this model. No update required.")
 
 
 def load_model_info(model_name):
@@ -1272,7 +1462,7 @@ def load_model_info(model_name):
 def save_cls_classes(cls_model_key, slected_classes):
     # load
     model_info_json = os.path.join(
-        AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "model_info.json")
+        AddaxAI_files_debug, "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
@@ -1283,73 +1473,133 @@ def save_cls_classes(cls_model_key, slected_classes):
 
 
 
-def species_selector():
 
-    nodes = [
-        {
-            "label": "Class Mammalia", "value": "class_mammalia", "children": [
-                {
-                    "label": "Order Rodentia", "value": "order_rodentia", "children": [
-                        {
-                            "label": "Family Sciuridae (squirrels)", "value": "family_sciuridae", "children": [
-                                {
-                                    "label": "Genus Tamias (chipmunks)", "value": "genus_tamias", "children": [
-                                        {"label": "Tamias striatus (eastern chipmunk)",
-                                         "value": "tamias_striatus"},
-                                        # This one is a species in genus Tamiasciurus, might move later
-                                        {"label": "Tamiasciurus hudsonicus (red squirrel)", "value": "tamiasciurus_hudsonicus"}
-                                    ]
-                                },
-                                {
-                                    "label": "Genus Sciurus (tree squirrels)", "value": "genus_sciurus", "children": [
-                                        {"label": "Sciurus niger (eastern fox squirrel)",
-                                         "value": "sciurus_niger"},
-                                        {"label": "Sciurus carolinensis (eastern gray squirrel)",
-                                         "value": "sciurus_carolinensis"},
-                                    ]
-                                },
-                                {
-                                    "label": "Genus Marmota (marmots)", "value": "genus_marmota", "children": [
-                                        {"label": "Marmota monax (groundhog)",
-                                         "value": "marmota_monax"},
-                                        {"label": "Marmota flaviventris (yellow-bellied marmot)",
-                                         "value": "marmota_flaviventris"},
-                                    ]
-                                },
-                                {"label": "Otospermophilus beecheyi (california ground squirrel)",
-                                 "value": "otospermophilus_beecheyi"}
-                            ]
-                        },
-                        {
-                            "label": "Family Muridae (gerbils and relatives)", "value": "family_muridae", "children": [
-                                # add species/genus here if any
-                            ]
-                        },
-                        {
-                            "label": "Family Geomyidae (pocket gophers)", "value": "family_geomyidae", "children": [
-                                # add species/genus here if any
-                            ]
-                        },
-                        {
-                            "label": "Family Erethizontidae (new world porcupines)", "value": "family_erethizontidae", "children": [
-                                {"label": "Erethizon dorsatus (north american porcupine)",
-                                 "value": "erethizon_dorsatus"}
-                            ]
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "label": "Class Squamata", "value": "class_squamata", "children": [
-                {
-                    "label": "Order Squamata (squamates)", "value": "order_squamata"
-                    # could add families/genera/species here if you have them
-                }
-            ]
-        }
-    ]
 
+
+
+def load_taxon_mapping(cls_model_ID):
+    taxon_mapping_csv = os.path.join(
+        AddaxAI_files_debug, "models", "cls", cls_model_ID, "taxon-mapping.csv")
+
+    taxon_mapping = []
+    with open(taxon_mapping_csv, newline='', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            taxon_mapping.append(row)
+
+    return taxon_mapping
+
+
+
+
+
+
+# def slugify(text):
+#     """Create a slug-friendly string for the value keys."""
+#     text = text.lower()
+#     text = re.sub(r'\s+', '_', text)
+#     text = re.sub(r'[^a-z0-9_]+', '', text)
+#     return text
+
+def flatten_single_child_nodes(nodes):
+    flattened = []
+    for node in nodes:
+        if "children" in node and len(node["children"]) == 1:
+            child = node["children"][0]
+            grandchildren = child.get("children", [])
+
+            # If child is leaf (no children), use child's label and value (likely model_class)
+            if not grandchildren:
+                merged_label = child['label']
+                merged_value = child['value']
+                merged_children = []
+            else:
+                # Child has children, keep parent's label/value
+                merged_label = node['label']
+                merged_value = node['value']
+                merged_children = flatten_single_child_nodes(grandchildren)
+
+            merged_node = {
+                "label": merged_label,
+                "value": merged_value
+            }
+            if merged_children:
+                merged_node["children"] = merged_children
+
+            flattened.append(merged_node)
+
+        else:
+            new_node = node.copy()
+            if "children" in node and node["children"]:
+                new_node["children"] = flatten_single_child_nodes(node["children"])
+            flattened.append(new_node)
+    return flattened
+
+def build_taxon_tree(taxon_mapping):
+    root = {}
+    levels = ["level_class", "level_order", "level_family", "level_genus", "level_species"]
+
+    for entry in taxon_mapping:
+        current_level = root
+        last_taxon_name = None
+        for i, level in enumerate(levels):
+            taxon_name = entry.get(level)
+            if not taxon_name or taxon_name == "":
+                continue
+
+            is_last_level = (i == len(levels) - 1)
+
+            if not is_last_level:
+                if taxon_name == last_taxon_name:
+                    continue
+                label = taxon_name
+                value = taxon_name
+
+                if value not in current_level:
+                    current_level[value] = {
+                        "label": label,
+                        "value": value,
+                        "children": {}
+                    }
+                current_level = current_level[value]["children"]
+                last_taxon_name = taxon_name
+
+            else:
+                model_class = entry["model_class"].strip()
+                label = f"{taxon_name} <i>({model_class})</i>"
+                value = model_class
+                if value not in current_level:
+                    current_level[value] = {
+                        "label": label,
+                        "value": value,
+                        "children": {}
+                    }
+                # species is a leaf: do not update current_level
+
+    def dict_to_list(d):
+        result = []
+        for node_key, node_val in d.items():
+            children_list = dict_to_list(node_val["children"]) if node_val["children"] else []
+            node = {
+                "label": node_val["label"],
+                "value": node_val["value"]
+            }
+            if children_list:
+                node["children"] = children_list
+            result.append(node)
+        return result
+
+    raw_tree = dict_to_list(root)
+    flattened_tree = flatten_single_child_nodes(raw_tree)
+    return flattened_tree
+
+
+
+def species_selector_widget(taxon_mapping):
+    nodes = build_taxon_tree(taxon_mapping)
+    
+    # st.write(nodes)
+    
     # Initialize state
     if "selected_nodes" not in st.session_state:
         st.session_state.selected_nodes = []
@@ -1358,34 +1608,36 @@ def species_selector():
     if "last_selected" not in st.session_state:
         st.session_state.last_selected = {}
 
-    # UI
-    with st.popover("Select from tree", use_container_width=True):
-        selected = tree_select(
-            nodes,
-            check_model="leaf",
-            checked=st.session_state.selected_nodes,
-            expanded=st.session_state.expanded_nodes,
-            show_expand_all=True,
-            half_check_color="#086164",
-            check_color="#086164",
-            key="tree_select2"
-        )
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        
+        # UI - assuming tree_select is your widget for tree picking
+        with st.popover(":material/pets: Select", use_container_width=True):
+            selected = tree_select(
+                nodes,
+                check_model="leaf",
+                checked=st.session_state.selected_nodes,
+                expanded=st.session_state.expanded_nodes,
+                show_expand_all=True,
+                half_check_color="#086164",
+                check_color="#086164",
+                key="tree_select2"
+            )
 
-    # If the selection is new, update and rerun
-    if selected is not None:
-        new_checked = selected.get("checked", [])
-        new_expanded = selected.get("expanded", [])
-        last_checked = st.session_state.last_selected.get("checked", [])
-        last_expanded = st.session_state.last_selected.get("expanded", [])
+        # Handle selection update and rerun
+        if selected is not None:
+            new_checked = selected.get("checked", [])
+            new_expanded = selected.get("expanded", [])
+            last_checked = st.session_state.last_selected.get("checked", [])
+            last_expanded = st.session_state.last_selected.get("expanded", [])
 
-        if new_checked != last_checked or new_expanded != last_expanded:
-            st.session_state.selected_nodes = new_checked
-            st.session_state.expanded_nodes = new_expanded
-            st.session_state.last_selected = selected
-            st.rerun()  # 🔁 Force a rerun so the component picks up the change
+            if new_checked != last_checked or new_expanded != last_expanded:
+                st.session_state.selected_nodes = new_checked
+                st.session_state.expanded_nodes = new_expanded
+                st.session_state.last_selected = selected
+                st.rerun()  # Force rerun
 
-    # Feedback
-
+    # Count leaf nodes
     def count_leaf_nodes(nodes):
         count = 0
         for node in nodes:
@@ -1395,9 +1647,149 @@ def species_selector():
                 count += 1
         return count
 
-    # Example usage
-    leaf_count = count_leaf_nodes(nodes)
-    # st.write(f"Number of leaf nodes: {leaf_count}")
+    with col1:
+        leaf_count = count_leaf_nodes(nodes)
+        text = f"You have selected {len(st.session_state.selected_nodes)} of {leaf_count} classes. "
+        st.markdown(
+    f"""
+    <div style="background-color: #f0f2f6; padding: 7px; border-radius: 5px;">
+        &nbsp;&nbsp;{text}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+    # st.write("Selected nodes:", st.session_state.selected_nodes)
 
-    st.write("You selected:", len(st.session_state.selected_nodes),
-             " of ", leaf_count, "classes")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def species_selector_widget(taxon_mapping):
+
+#     nodes = [
+#         {
+#             "label": "Class Mammalia", "value": "class_mammalia", "children": [
+#                 {
+#                     "label": "Order Rodentia", "value": "order_rodentia", "children": [
+#                         {
+#                             "label": "Family Sciuridae (squirrels)", "value": "family_sciuridae", "children": [
+#                                 {
+#                                     "label": "Genus Tamias (chipmunks)", "value": "genus_tamias", "children": [
+#                                         {"label": "Tamias striatus (eastern chipmunk)",
+#                                          "value": "tamias_striatus"},
+#                                         # This one is a species in genus Tamiasciurus, might move later
+#                                         {"label": "Tamiasciurus hudsonicus (red squirrel)", "value": "tamiasciurus_hudsonicus"}
+#                                     ]
+#                                 },
+#                                 {
+#                                     "label": "Genus Sciurus (tree squirrels)", "value": "genus_sciurus", "children": [
+#                                         {"label": "Sciurus niger (eastern fox squirrel)",
+#                                          "value": "sciurus_niger"},
+#                                         {"label": "Sciurus carolinensis (eastern gray squirrel)",
+#                                          "value": "sciurus_carolinensis"},
+#                                     ]
+#                                 },
+#                                 {
+#                                     "label": "Genus Marmota (marmots)", "value": "genus_marmota", "children": [
+#                                         {"label": "Marmota monax (groundhog)",
+#                                          "value": "marmota_monax"},
+#                                         {"label": "Marmota flaviventris (yellow-bellied marmot)",
+#                                          "value": "marmota_flaviventris"},
+#                                     ]
+#                                 },
+#                                 {"label": "Otospermophilus beecheyi (california ground squirrel)",
+#                                  "value": "otospermophilus_beecheyi"}
+#                             ]
+#                         },
+#                         {
+#                             "label": "Family Muridae (gerbils and relatives)", "value": "family_muridae", "children": [
+#                                 # add species/genus here if any
+#                             ]
+#                         },
+#                         {
+#                             "label": "Family Geomyidae (pocket gophers)", "value": "family_geomyidae", "children": [
+#                                 # add species/genus here if any
+#                             ]
+#                         },
+#                         {
+#                             "label": "Family Erethizontidae (new world porcupines)", "value": "family_erethizontidae", "children": [
+#                                 {"label": "Erethizon dorsatus (north american porcupine)",
+#                                  "value": "erethizon_dorsatus"}
+#                             ]
+#                         }
+#                     ]
+#                 }
+#             ]
+#         },
+#         {
+#             "label": "Class Squamata", "value": "class_squamata", "children": [
+#                 {
+#                     "label": "Order Squamata (squamates)", "value": "order_squamata"
+#                     # could add families/genera/species here if you have them
+#                 }
+#             ]
+#         }
+#     ]
+
+#     # Initialize state
+#     if "selected_nodes" not in st.session_state:
+#         st.session_state.selected_nodes = []
+#     if "expanded_nodes" not in st.session_state:
+#         st.session_state.expanded_nodes = []
+#     if "last_selected" not in st.session_state:
+#         st.session_state.last_selected = {}
+
+#     # UI
+#     with st.popover("Select from tree", use_container_width=True):
+#         selected = tree_select(
+#             nodes,
+#             check_model="leaf",
+#             checked=st.session_state.selected_nodes,
+#             expanded=st.session_state.expanded_nodes,
+#             show_expand_all=True,
+#             half_check_color="#086164",
+#             check_color="#086164",
+#             key="tree_select2"
+#         )
+
+#     # If the selection is new, update and rerun
+#     if selected is not None:
+#         new_checked = selected.get("checked", [])
+#         new_expanded = selected.get("expanded", [])
+#         last_checked = st.session_state.last_selected.get("checked", [])
+#         last_expanded = st.session_state.last_selected.get("expanded", [])
+
+#         if new_checked != last_checked or new_expanded != last_expanded:
+#             st.session_state.selected_nodes = new_checked
+#             st.session_state.expanded_nodes = new_expanded
+#             st.session_state.last_selected = selected
+#             st.rerun()  # 🔁 Force a rerun so the component picks up the change
+
+#     # Feedback
+
+#     def count_leaf_nodes(nodes):
+#         count = 0
+#         for node in nodes:
+#             if "children" in node and node["children"]:
+#                 count += count_leaf_nodes(node["children"])
+#             else:
+#                 count += 1
+#         return count
+
+#     # Example usage
+#     leaf_count = count_leaf_nodes(nodes)
+#     # st.write(f"Number of leaf nodes: {leaf_count}")
+
+#     st.write("You selected:", len(st.session_state.selected_nodes),
+#              " of ", leaf_count, "classes")

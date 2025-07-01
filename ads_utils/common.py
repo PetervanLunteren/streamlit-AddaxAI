@@ -131,18 +131,18 @@ class StepperBar:
         return stepper_html
 
 
-def load_step(section):
-    # load
-    # settings, _ = load_settings()
-    # selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
-    # project_vars = settings["projects"][project]["vars"]
-    # step = project_vars.get("step", 0)
-    # return step
+# def load_step(section):
+#     # load
+#     # settings, _ = load_settings()
+#     # selected_projectID = settings["vars"]["analyse_advanced"].get("selected_projectID")
+#     # project_vars = settings["projects"][project]["vars"]
+#     # step = project_vars.get("step", 0)
+#     # return step
 
-    # settings, _ = load_map()
-    analyse_advanced_vars = load_vars(section="analyse_advanced")
-    step = analyse_advanced_vars.get("step", 0)
-    return step
+#     # settings, _ = load_map()
+#     analyse_advanced_vars = load_vars(section="analyse_advanced")
+#     step = analyse_advanced_vars.get("step", 0)
+#     return step
 
 
 

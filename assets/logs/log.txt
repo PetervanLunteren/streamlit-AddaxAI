@@ -173,3 +173,385 @@ ImportError: cannot import name 'browse_directory_widget' from 'ads_utils.common
   $ xcode-select --install
   $ pip install watchdog
             
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://172.30.0.95:8501
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+2025-07-01 09:14:51.976 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 643, in code_to_exec
+    _mpa_v1(self._main_script_path)
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 164, in _mpa_v1
+    page.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 7, in <module>
+    from ads_utils.analyse_advanced import browse_directory_widget, check_folder_metadata, project_selector_widget, datetime_selector_widget, location_selector_widget, add_deployment
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 891
+    HIERWAS IK
+            ^^
+SyntaxError: invalid syntax
+2025-07-01 09:17:41.565 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 152, in <module>
+    selected_det_model = cls_model_selector_widget()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 886, in cls_model_selector_widget
+    model_meta = load_model_metadata()
+                 ^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 879, in load_model_metadata
+    with open(model_info_json, "r") as file:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/assets/model_metamodel_meta.json'
+2025-07-01 09:27:56.054 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 152, in <module>
+    selected_det_model = cls_model_selector_widget()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 878, in cls_model_selector_widget
+    model_meta = load_model_metadata()
+                 ^^^^^^^^^^^^^^^^^^^
+NameError: name 'load_model_metadata' is not defined
+2025-07-01 09:49:28.542 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 152, in <module>
+    selected_det_model = cls_model_selector_widget()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 924, in cls_model_selector_widget
+    show_model_info_popover(cls_model_meta[selected_modelID])
+                            ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'NONE'
+2025-07-01 09:50:12.587 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 152, in <module>
+    selected_det_model = cls_model_selector_widget()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 924, in cls_model_selector_widget
+    show_model_info_popover(cls_model_meta[selected_modelID])
+                            ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+KeyError: 'NONE'
+2025-07-01 10:06:05.901 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 156, in <module>
+    selected_det_model = cls_model_selector_widget()
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: cls_model_selector_widget() missing 1 required positional argument: 'model_meta'
+2025-07-01 10:06:27.335 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 164, in <module>
+    selected_det_model = det_model_selector_widget(model_meta)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 915, in det_model_selector_widget
+    index=display_names.index(previously_selected_display_name),
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: 'NONE' is not in list
+2025-07-01 10:08:06.786 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 164, in <module>
+    selected_det_model = det_model_selector_widget(model_meta)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 912, in det_model_selector_widget
+    index=display_names.index(previously_selected_display_name),
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: 'MD5A' is not in list
+2025-07-01 10:08:29.213 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 164, in <module>
+    selected_det_model = det_model_selector_widget(model_meta)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 913, in det_model_selector_widget
+    index=display_names.index(previously_selected_display_name),
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: 'MD5A' is not in list
+2025-07-01 10:09:16.768 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 164, in <module>
+    selected_det_model = det_model_selector_widget(model_meta)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 914, in det_model_selector_widget
+    index=display_names.index(previously_selected_display_name),
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: 'MD5A' is not in list
+2025-07-01 10:09:39.181 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 164, in <module>
+    selected_det_model = det_model_selector_widget(model_meta)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 918, in det_model_selector_widget
+    index=display_names.index(previously_selected_display_name),
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: 'MD5A' is not in list
+2025-07-01 10:11:38.506 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 164, in <module>
+    selected_det_model = det_model_selector_widget(model_meta)
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 926, in det_model_selector_widget
+    show_cls_model_info_popover(cls_model_meta[selected_modelID])
+                                ^^^^^^^^^^^^^^
+NameError: name 'cls_model_meta' is not defined
+2025-07-01 11:03:55.048 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 199, in <module>
+    taxon_mapping = model_meta[selected_cls_model]["taxon_mapping"]
+                    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+KeyError: 'EUR-DF-v1.3'
+2025-07-01 11:04:09.127 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 199, in <module>
+    taxon_mapping = model_meta["cls"][selected_cls_model]["taxon_mapping"]
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+KeyError: 'taxon_mapping'
+2025-07-01 11:04:36.414 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 200, in <module>
+    species_selector_widget(taxon_mapping)
+TypeError: species_selector_widget() takes 0 positional arguments but 1 was given
+2025-07-01 11:54:46.714 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 200, in <module>
+    species_selector_widget(taxon_mapping)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 1544, in species_selector_widget
+    nodes = build_taxon_tree(taxon_mapping)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 1509, in build_taxon_tree
+    value = slugify(label)
+            ^^^^^^^
+NameError: name 'slugify' is not defined
+2025-07-01 12:17:45.079 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 7, in <module>
+    from ads_utils.analyse_advanced import (browse_directory_widget,
+ImportError: cannot import name 'load_taxon_mapping' from 'ads_utils.analyse_advanced' (/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py)
+2025-07-01 12:18:50.979 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 7, in <module>
+    from ads_utils.analyse_advanced import (browse_directory_widget,
+ImportError: cannot import name 'load_taxon_mapping' from 'ads_utils.analyse_advanced' (/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py)
+2025-07-01 12:19:04.226 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 201, in <module>
+    taxon_mapping = load_taxon_mapping(selected_cls_model)
+                    ^^^^^^^^^^^^^^^^^^
+NameError: name 'load_taxon_mapping' is not defined
+2025-07-01 12:19:30.853 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 297, in run
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 201, in <module>
+    taxon_mapping = load_taxon_mapping(selected_cls_model)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/ads_utils/analyse_advanced.py", line 1485, in load_taxon_mapping
+    with open(taxon_mapping_csv, newline='', encoding='utf-8') as f:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/cls/NAM-ADS-v1/taxon_mapping.csv'
+2025-07-01 13:21:30.345 Uncaught app execution
+Traceback (most recent call last):
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/main.py", line 275, in <module>
+    pg.run()
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/navigation/page.py", line 293, in run
+    code = ctx.pages_manager.get_page_script_byte_code(str(self._page))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/pages_manager.py", line 162, in get_page_script_byte_code
+    return self._script_cache.get_bytecode(script_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_cache.py", line 72, in get_bytecode
+    filebody = magic.add_magic(filebody, script_path)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/magic.py", line 46, in add_magic
+    tree = ast.parse(code, script_path, "exec")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/peter/miniforge3/envs/env-streamlit-addaxai/lib/python3.11/ast.py", line 50, in parse
+    return compile(source, filename, mode, flags,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/pages/analyse_advanced.py", line 272
+    species_selector_widget(taxon_mapping)
+IndentationError: unexpected indent
