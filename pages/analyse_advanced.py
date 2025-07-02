@@ -2,6 +2,8 @@ import streamlit as st
 import os
 from datetime import datetime
 
+# todo: only read the vars files here, not in the ads_utils module
+
 # import local modules
 from ads_utils.common import load_lang_txts, load_vars, StepperBar, print_widget_label, update_vars, clear_vars
 from ads_utils.analyse_advanced import (browse_directory_widget,
@@ -198,8 +200,30 @@ with st.container(border=True):
         selected_cls_model = analyse_advanced_vars["selected_cls_model"]
         taxon_mapping = load_taxon_mapping(selected_cls_model)
         # st.write(taxon_mapping)
+        with st.container(border=True):
+            print_widget_label("Species presence",
+                                help_text="Here you can select the model of your choosing.")
+            selected_species = species_selector_widget(taxon_mapping)
+        
+        st.write("Selected species:", selected_species)
+            
+        # place the buttons
+        col_btn_prev, col_btn_next = st.columns([1, 1])
 
-        species_selector_widget(taxon_mapping)
+        # the previous button is always enabled
+        with col_btn_prev:
+            if st.button(":material/replay: Start over", use_container_width=True):
+                clear_vars(section="analyse_advanced")
+                st.rerun()
+
+        with col_btn_next:
+            if st.button(":material/arrow_forward: Next", use_container_width=True):
+
+                update_vars(section="analyse_advanced",
+                            updates={"step": 3})  # 0 indexed
+                # todo: update vars with selected species
+                
+                st.rerun()
 
         # elif step == 4:
         #     st.write("Finally, you can set the start date and time for the deployment. This is important for tracking when the data was collected.")

@@ -5,7 +5,6 @@
 
 
 
-
 from appdirs import user_config_dir
 
 import streamlit as st

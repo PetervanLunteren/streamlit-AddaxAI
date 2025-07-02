@@ -17,7 +17,7 @@ import csv
 import string
 import math
 # import time as sleep_time
-from datetime import datetime, time #, timedelta
+from datetime import datetime, time  # , timedelta
 # from datetime import datetime
 import os
 from pathlib import Path
@@ -31,19 +31,17 @@ from hachoir.parser import createParser
 import piexif
 
 
-
-
 # local imports
 from cameratraps.megadetector.detection.video_utils import VIDEO_EXTENSIONS
 from cameratraps.megadetector.utils.path_utils import IMG_EXTENSIONS
 from ads_utils.common import load_vars, update_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update
 
 
-
 # set global variables
 AddaxAI_files = os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-AddaxAI_files_debug = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
+AddaxAI_files_debug = os.path.join(
+    AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
 CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
 DET_DIR = os.path.join(AddaxAI_files, "models", "det")
 
@@ -54,7 +52,6 @@ map_file = os.path.join(config_dir, "map.json")
 # set versions
 with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
-
 
 
 def project_selector_widget():
@@ -91,7 +88,8 @@ def project_selector_widget():
         # adjust the selected project
         # map, _ = load_map()
         analyse_advanced_vars = load_vars(section="analyse_advanced")
-        previous_projectID = analyse_advanced_vars.get("selected_projectID", None)
+        previous_projectID = analyse_advanced_vars.get(
+            "selected_projectID", None)
         if previous_projectID != selected_projectID:
             # analyse_advanced_vars["selected_projectID"] = selected_projectID
             update_vars("analyse_advanced", {
@@ -262,7 +260,7 @@ def datetime_selector_widget():
     # Initialize the session state for exif_min_datetime if not set
     # if "exif_min_datetime" not in st.session_state:
     #     st.session_state.exif_min_datetime = None
-        # if present, it will be of format "datetime.datetime(2013, 1, 17, 13, 5, 21)"
+    # if present, it will be of format "datetime.datetime(2013, 1, 17, 13, 5, 21)"
 
     # Pre-fill defaults
     default_date = None
@@ -376,10 +374,7 @@ def generate_deployment_id():
     return f"dep-{rand_str_1}-{rand_str_2}"
 
 
-
-
 def add_deployment(selected_min_datetime):
-
 
     # settings, _ = load_settings()
     # selected_folder = settings["vars"]["analyse_advanced"].get(
@@ -390,7 +385,7 @@ def add_deployment(selected_min_datetime):
     # location = project["location"]
     # location = project["locations"][location]
     # deployments = location["deployments"]
-    
+
     map, _ = load_map()
     analyse_advanced_vars = load_vars(section="analyse_advanced")
     selected_folder = analyse_advanced_vars.get(
@@ -402,24 +397,26 @@ def add_deployment(selected_min_datetime):
         "selected_locationID")
     location = project["locations"][selected_locationID]
     deployments = location["deployments"]
-    
+
     # check what the exif datetime is
-    exif_min_datetime_str = analyse_advanced_vars.get("exif_min_datetime", None)
+    exif_min_datetime_str = analyse_advanced_vars.get(
+        "exif_min_datetime", None)
     exif_min_datetime = (
         datetime.fromisoformat(exif_min_datetime_str)
         if exif_min_datetime_str is not None
         else None
     )
-    exif_max_datetime_str = analyse_advanced_vars.get("exif_max_datetime", None)
+    exif_max_datetime_str = analyse_advanced_vars.get(
+        "exif_max_datetime", None)
     exif_max_datetime = (
         datetime.fromisoformat(exif_max_datetime_str)
         if exif_max_datetime_str is not None
         else None
     )
-    
+
     # then calculate the difference between the selected datetime and the exif datetime
     diff_min_datetime = selected_min_datetime - exif_min_datetime
-    
+
     # Adjust exif_max_datetime if selected_min_datetime is later than exif_min_datetime
     selected_max_datetime = exif_max_datetime + diff_min_datetime
 
@@ -433,7 +430,8 @@ def add_deployment(selected_min_datetime):
     # Add new deployment
     deployments[deployment_id] = {
         "deploymentStart": datetime.isoformat(selected_min_datetime),
-        "deploymentEnd": datetime.isoformat(selected_max_datetime), # this is not ctually selected, but calculated from the exif metadata
+        # this is not ctually selected, but calculated from the exif metadata
+        "deploymentEnd": datetime.isoformat(selected_max_datetime),
         "path": selected_folder,
         "datetimeDiffSeconds": diff_min_datetime.total_seconds()
     }
@@ -462,8 +460,6 @@ def add_location(location_id, lat, lon):
     if location_id in locations.keys():
         raise ValueError(
             f"Location ID '{location_id}' already exists. Please choose a unique ID, or select existing project from dropdown menu.")
-
-
 
     # Add new location
     locations[location_id] = {
@@ -587,8 +583,6 @@ def add_new_project_popover(txt):
                     st.rerun()
 
 
-
-
 def add_new_location_popover(txt):
 
     # use st.empty to create a popover container
@@ -608,7 +602,7 @@ def add_new_location_popover(txt):
             coords_found_in_exif = vars.get("coords_found_in_exif", False)
             exif_lat = vars.get("exif_lat", None)
             exif_lng = vars.get("exif_lng", None)
-            
+
             # # init session state vars
             # if "lat_selected" not in st.session_state:
             #     st.session_state.lat_selected = None
@@ -830,11 +824,11 @@ def add_new_location_popover(txt):
 
 
 def browse_directory_widget():
-    
+
     analyse_advanced_vars = load_vars(section="analyse_advanced")
     selected_folder = analyse_advanced_vars.get("selected_folder")
-    
-    col1, col2 = st.columns([1, 3], vertical_alignment="center")
+
+    col1, col2 = st.columns([1, 3])#, vertical_alignment="center")
     with col1:
         if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
             selected_folder = select_folder()
@@ -846,19 +840,37 @@ def browse_directory_widget():
 
             # # reset session state variables
             # st.session_state.clear()
-            
 
     if not selected_folder:
         with col2:
-            st.write('<span style="color: grey;"> None selected...</span>',
-                     unsafe_allow_html=True)
+            # st.write('<span style="color: grey;"> None selected...</span>',
+            #          unsafe_allow_html=True)
+            text = f'<span style="color: grey;"> None selected...</span>'
+            st.markdown(
+                f"""
+                    <div style="background-color: #f0f2f6; padding: 7px; border-radius: 8px;">
+                        &nbsp;&nbsp;{text}
+                    </div>
+                    """,
+                unsafe_allow_html=True
+            )
     else:
         with col2:
             folder_short = "..." + \
                 selected_folder[-45:] if len(
                     selected_folder) > 45 else selected_folder
+            # st.markdown(
+            #     f'Selected folder <code style="color:#086164; font-family:monospace;">{folder_short}</code>', unsafe_allow_html=True)
+            
+            text = f"Selected &nbsp;&nbsp;<code style='color:#086164; font-family:monospace;'>{folder_short}</code>"
             st.markdown(
-                f'Selected folder <code style="color:#086164; font-family:monospace;">{folder_short}</code>', unsafe_allow_html=True)
+                f"""
+                    <div style="background-color: #f0f2f6; padding: 7px; border-radius: 8px;">
+                        &nbsp;&nbsp;{text}
+                    </div>
+                    """,
+                unsafe_allow_html=True
+            )
     return selected_folder
 
 
@@ -883,15 +895,17 @@ def load_model_metadata():
         model_info = json.load(file)
     return model_info
 
+
 def det_model_selector_widget(model_meta):
     det_model_meta = model_meta["det"]
 
     # Build model info tuples: (emoji + friendly_name for display, modelID, friendly_name for sorting)
     model_items = [
-        (f"{meta.get('emoji', '')}\u00A0\u00A0{meta['friendly_name']}", modelID, meta["friendly_name"])
+        (f"{meta.get('emoji', '')}\u00A0\u00A0{meta['friendly_name']}",
+         modelID, meta["friendly_name"])
         for modelID, meta in det_model_meta.items()
     ]
-    
+
     # Sort by the friendly_name (3rd element of the tuple)
     model_choices = sorted(model_items, key=lambda x: x[2].lower())
     display_names = [item[0] for item in model_choices]
@@ -899,11 +913,13 @@ def det_model_selector_widget(model_meta):
 
     # Load previously selected model ID
     general_settings_vars = load_vars(section="general_settings")
-    previously_selected_det_modelID = general_settings_vars.get("previously_selected_det_modelID", "MD5A")
+    previously_selected_det_modelID = general_settings_vars.get(
+        "previously_selected_det_modelID", "MD5A")
 
     # Resolve previously selected modelID to display name
     previously_selected_display_name = next(
-        (name for name, ID in modelID_lookup.items() if ID == previously_selected_det_modelID),
+        (name for name, ID in modelID_lookup.items()
+         if ID == previously_selected_det_modelID),
         None
     )
 
@@ -923,13 +939,15 @@ def det_model_selector_widget(model_meta):
 
     return selected_modelID
 
+
 def cls_model_selector_widget(model_meta):
-    
+
     cls_model_meta = model_meta["cls"]
 
     # Build model info tuples: (emoji + friendly_name for display, modelID, friendly_name for sorting)
     model_items = [
-        (f"{meta.get('emoji', '')}\u00A0\u00A0{meta['friendly_name']}", modelID, meta["friendly_name"])
+        (f"{meta.get('emoji', '')}\u00A0\u00A0{meta['friendly_name']}",
+         modelID, meta["friendly_name"])
         for modelID, meta in cls_model_meta.items()
     ]
 
@@ -939,15 +957,18 @@ def cls_model_selector_widget(model_meta):
     # Define the "NONE" entry for generic animal detection
     none_display = "🐾  Generic animal detection (no identification)"
     display_names = [none_display] + [item[0] for item in model_choices]
-    modelID_lookup = {none_display: "NONE", **{item[0]: item[1] for item in model_choices}}
+    modelID_lookup = {none_display: "NONE", **
+                      {item[0]: item[1] for item in model_choices}}
 
     # Load previously selected model ID
     general_settings_vars = load_vars(section="general_settings")
-    previously_selected_modelID = general_settings_vars.get("selected_modelID", "EUR-DF-v1.3")
+    previously_selected_modelID = general_settings_vars.get(
+        "selected_modelID", "SAH-DRY-ADS-v1")
 
     # Resolve previously selected modelID to display name
     previously_selected_display_name = next(
-        (name for name, ID in modelID_lookup.items() if ID == previously_selected_modelID),
+        (name for name, ID in modelID_lookup.items()
+         if ID == previously_selected_modelID),
         "NONE"
     )
 
@@ -968,10 +989,7 @@ def cls_model_selector_widget(model_meta):
         else:
             show_none_model_info_popover()
 
-    
     return selected_modelID
-
-    
 
 
 def select_model_widget(model_type, prev_selected_model):
@@ -997,8 +1015,6 @@ def select_model_widget(model_type, prev_selected_model):
     return selected_model
 
 
-
-
 def load_all_model_info(type):
 
     # load
@@ -1020,8 +1036,6 @@ def load_all_model_info(type):
 
     # return
     return sorted_det_models
-
-
 
 
 def get_image_datetime(file_path):
@@ -1259,6 +1273,7 @@ def check_folder_metadata():
 
         # st.write(st.session_state)
 
+
 def show_none_model_info_popover():
 
     popover_container = st.empty()
@@ -1266,8 +1281,11 @@ def show_none_model_info_popover():
         with st.popover(f":material/info: Info",
                         help="Model information",
                         use_container_width=True):
-            st.write("This model is used for generic animal detection, without identifying specific species or classes.")
-            st.write("It is useful for detecting animals in images or videos without the need for specific classification.")
+            st.write(
+                "This model is used for generic animal detection, without identifying specific species or classes.")
+            st.write(
+                "It is useful for detecting animals in images or videos without the need for specific classification.")
+
 
 def show_none_model_info_popover():
     # # use st.empty to create a popover container
@@ -1301,6 +1319,8 @@ def show_none_model_info_popover():
         )
 
 # format the class name for display
+
+
 def format_class_name(s):
     if "http" in s:
         return s  # leave as is
@@ -1309,6 +1329,7 @@ def format_class_name(s):
         s = s.strip()
         s = s.lower()
         return s
+
 
 def show_cls_model_info_popover(model_info):
     # use st.empty to create a popover container
@@ -1336,7 +1357,8 @@ def show_cls_model_info_popover(model_info):
             if all_classes and all_classes != []:
                 st.write("")
                 print_widget_label("Classes", "pets")
-                formatted_classes = [format_class_name(cls) for cls in all_classes]
+                formatted_classes = [format_class_name(
+                    cls) for cls in all_classes]
                 if len(formatted_classes) == 1:
                     string = formatted_classes[0] + "."
                 else:
@@ -1472,11 +1494,6 @@ def save_cls_classes(cls_model_key, slected_classes):
         json.dump(model_info, file, indent=4)
 
 
-
-
-
-
-
 def load_taxon_mapping(cls_model_ID):
     taxon_mapping_csv = os.path.join(
         AddaxAI_files_debug, "models", "cls", cls_model_ID, "taxon-mapping.csv")
@@ -1490,10 +1507,6 @@ def load_taxon_mapping(cls_model_ID):
     return taxon_mapping
 
 
-
-
-
-
 # def slugify(text):
 #     """Create a slug-friendly string for the value keys."""
 #     text = text.lower()
@@ -1501,45 +1514,117 @@ def load_taxon_mapping(cls_model_ID):
 #     text = re.sub(r'[^a-z0-9_]+', '', text)
 #     return text
 
-def flatten_single_child_nodes(nodes):
-    flattened = []
+# def flatten_single_child_nodes(nodes):
+#     flattened = []
+#     for node in nodes:
+#         if "children" in node and len(node["children"]) == 1:
+#             child = node["children"][0]
+#             grandchildren = child.get("children", [])
+
+#             # If child is leaf (no children), use child's label and value (likely model_class)
+#             if not grandchildren:
+#                 merged_label = child['label']
+#                 merged_value = child['value']
+#                 merged_children = []
+#             else:
+#                 # Child has children, keep parent's label/value
+#                 merged_label = node['label']
+#                 merged_value = node['value']
+#                 merged_children = flatten_single_child_nodes(grandchildren)
+
+#             merged_node = {
+#                 "label": merged_label,
+#                 "value": merged_value
+#             }
+#             if merged_children:
+#                 merged_node["children"] = merged_children
+
+#             flattened.append(merged_node)
+
+#         else:
+#             new_node = node.copy()
+#             if "children" in node and node["children"]:
+#                 new_node["children"] = flatten_single_child_nodes(node["children"])
+#             flattened.append(new_node)
+#     return flattened
+
+def sort_leaf_first(nodes):
+    leaves = []
+    parents = []
+
+    for node in nodes:
+        # Determine if it's a leaf or has children
+        if "children" in node and node["children"]:
+            # Recurse into children first
+            node["children"] = sort_leaf_first(node["children"])
+            parents.append(node)
+        else:
+            leaves.append(node)
+
+    # Sort both groups alphabetically by label (case-insensitive)
+    leaves.sort(key=lambda x: x["label"].lower())
+    parents.sort(key=lambda x: x["label"].lower())
+
+    return leaves + parents
+
+def merge_single_redundant_nodes(nodes):
+    merged = []
     for node in nodes:
         if "children" in node and len(node["children"]) == 1:
             child = node["children"][0]
-            grandchildren = child.get("children", [])
 
-            # If child is leaf (no children), use child's label and value (likely model_class)
-            if not grandchildren:
-                merged_label = child['label']
-                merged_value = child['value']
-                merged_children = []
-            else:
-                # Child has children, keep parent's label/value
-                merged_label = node['label']
-                merged_value = node['value']
-                merged_children = flatten_single_child_nodes(grandchildren)
+            # Compare prefixes to see if they're redundant
+            parent_prefix = node["label"].split(" ")[0]
+            child_prefix = child["label"].split(" ")[0]
 
-            merged_node = {
-                "label": merged_label,
-                "value": merged_value
-            }
-            if merged_children:
-                merged_node["children"] = merged_children
+            if parent_prefix == child_prefix:
+                # Replace parent node with child's label and value
+                node["label"] = child["label"]
+                node["value"] = child["value"]
 
-            flattened.append(merged_node)
+                # If the child has children, adopt them; else remove children entirely
+                grandkids = child.get("children", [])
+                if grandkids:
+                    node["children"] = merge_single_redundant_nodes(grandkids)
+                else:
+                    node.pop("children", None)  # make it a real leaf node
 
-        else:
-            new_node = node.copy()
-            if "children" in node and node["children"]:
-                new_node["children"] = flatten_single_child_nodes(node["children"])
-            flattened.append(new_node)
-    return flattened
+        # If still has children (not replaced), recurse into them
+        if "children" in node and node["children"]:
+            node["children"] = merge_single_redundant_nodes(node["children"])
+
+        merged.append(node)
+    return merged
 
 def build_taxon_tree(taxon_mapping):
     root = {}
-    levels = ["level_class", "level_order", "level_family", "level_genus", "level_species"]
+    levels = ["level_class", "level_order",
+              "level_family", "level_genus", "level_species"]
 
     for entry in taxon_mapping:
+        
+        # If no proper class level, place under "Unknown taxonomy"
+        if not entry.get("level_class", "").startswith("class "):
+            unknown_key = "<i>Unknown taxonomy</i>"
+            if unknown_key not in root:
+                root[unknown_key] = {
+                    "label": unknown_key,
+                    "value": unknown_key,
+                    "children": {}
+                }
+            current_level = root[unknown_key]["children"]
+
+            model_class = entry["model_class"].strip()
+            label = f"<b>{model_class}</b>"
+            value = model_class
+            if value not in current_level:
+                current_level[value] = {
+                    "label": label,
+                    "value": value,
+                    "children": {}
+                }
+            continue  # Skip the normal taxonomic loop
+        
         current_level = root
         last_taxon_name = None
         for i, level in enumerate(levels):
@@ -1566,7 +1651,13 @@ def build_taxon_tree(taxon_mapping):
 
             else:
                 model_class = entry["model_class"].strip()
-                label = f"{taxon_name} <i>({model_class})</i>"
+                if taxon_name.startswith("class ") or \
+                    taxon_name.startswith("order ") or \
+                        taxon_name.startswith("family ") or \
+                            taxon_name.startswith("genus "):
+                    label = f"{taxon_name} (<b>{model_class}</b>, <i>unspecified)</i>"
+                else:
+                    label = f"{taxon_name} (<b>{model_class}</b>)"
                 value = model_class
                 if value not in current_level:
                     current_level[value] = {
@@ -1579,7 +1670,8 @@ def build_taxon_tree(taxon_mapping):
     def dict_to_list(d):
         result = []
         for node_key, node_val in d.items():
-            children_list = dict_to_list(node_val["children"]) if node_val["children"] else []
+            children_list = dict_to_list(
+                node_val["children"]) if node_val["children"] else []
             node = {
                 "label": node_val["label"],
                 "value": node_val["value"]
@@ -1590,16 +1682,26 @@ def build_taxon_tree(taxon_mapping):
         return result
 
     raw_tree = dict_to_list(root)
-    flattened_tree = flatten_single_child_nodes(raw_tree)
-    return flattened_tree
+    merged_tree = merge_single_redundant_nodes(raw_tree)
+    sorted_tree = sort_leaf_first(merged_tree)
+    return sorted_tree
 
-
+def get_all_leaf_values(nodes):
+    leaf_values = []
+    for node in nodes:
+        if "children" in node and node["children"]:
+            # Recurse into children
+            leaf_values.extend(get_all_leaf_values(node["children"]))
+        else:
+            # Leaf node
+            leaf_values.append(node["value"])
+    return leaf_values
 
 def species_selector_widget(taxon_mapping):
     nodes = build_taxon_tree(taxon_mapping)
-    
+
     # st.write(nodes)
-    
+
     # Initialize state
     if "selected_nodes" not in st.session_state:
         st.session_state.selected_nodes = []
@@ -1608,21 +1710,38 @@ def species_selector_widget(taxon_mapping):
     if "last_selected" not in st.session_state:
         st.session_state.last_selected = {}
 
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        
+
+
+    col1, col2 = st.columns([1, 3])
+    with col1:
+
+
+
         # UI - assuming tree_select is your widget for tree picking
         with st.popover(":material/pets: Select", use_container_width=True):
-            selected = tree_select(
-                nodes,
-                check_model="leaf",
-                checked=st.session_state.selected_nodes,
-                expanded=st.session_state.expanded_nodes,
-                show_expand_all=True,
-                half_check_color="#086164",
-                check_color="#086164",
-                key="tree_select2"
-            )
+            
+            butn_col1, butn_col2 = st.columns([1, 1])
+            with butn_col1:
+                if st.button(":material/select_check_box: Select all", key="expand_all_button", use_container_width=True):
+                    # st.session_state.selected_nodes = [node["value"] for node in nodes]
+                    st.session_state.selected_nodes = get_all_leaf_values(nodes)
+                    # st.rerun()  # Force rerun to update the tree
+            with butn_col2:
+                if st.button(":material/check_box_outline_blank: Select none", key="collapse_all_button", use_container_width=True):
+                    st.session_state.selected_nodes = []
+                    # st.rerun()
+                    
+            with st.container(border=True):
+                selected = tree_select(
+                    nodes,
+                    check_model="leaf",
+                    checked=st.session_state.selected_nodes,
+                    expanded=st.session_state.expanded_nodes,
+                    show_expand_all=True,
+                    half_check_color="#086164",
+                    check_color="#086164",
+                    key="tree_select2"
+                )
 
         # Handle selection update and rerun
         if selected is not None:
@@ -1647,32 +1766,20 @@ def species_selector_widget(taxon_mapping):
                 count += 1
         return count
 
-    with col1:
+    with col2:
         leaf_count = count_leaf_nodes(nodes)
-        text = f"You have selected {len(st.session_state.selected_nodes)} of {leaf_count} classes. "
+        text = f"You have selected <code style='color:#086164; font-family:monospace;'>{len(st.session_state.selected_nodes)}</code> of <code style='color:#086164; font-family:monospace;'>{leaf_count}</code> classes. "
         st.markdown(
-    f"""
-    <div style="background-color: #f0f2f6; padding: 7px; border-radius: 5px;">
-        &nbsp;&nbsp;{text}
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+            f"""
+                <div style="background-color: #f0f2f6; padding: 7px; border-radius: 8px;">
+                    &nbsp;&nbsp;{text}
+                </div>
+                """,
+            unsafe_allow_html=True
+        )
+    
+    return st.session_state.selected_nodes
     # st.write("Selected nodes:", st.session_state.selected_nodes)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # def species_selector_widget(taxon_mapping):
