@@ -250,25 +250,25 @@ st.logo(os.path.join(AddaxAI_files, "AddaxAI",
         "streamlit-AddaxAI", "assets", "images", "logo.png"), size="large")
 if mode == 0:  # simple mode
     analyse_sim_page = st.Page(
-        os.path.join("pages", "analyse_simple.py"), title=txts["analyse_txt"][lang], icon=":material/rocket_launch:")
+        os.path.join("tools", "analyse_simple.py"), title=txts["analyse_txt"][lang], icon=":material/rocket_launch:")
     pg = st.navigation([analyse_sim_page])
 elif mode == 1:  # advanced mode
     analyse_adv_page = st.Page(
-        os.path.join("pages", "analyse_advanced.py"), title=txts["analyse_txt"][lang], icon=":material/add:")
+        os.path.join("tools", "analyse_advanced.py"), title=txts["analyse_txt"][lang], icon=":material/add:")
     repeat_detection_elimination_page = st.Page(
-        os.path.join("pages", "repeat_detection_elimination.py"), title="Repeat detection elimination", icon=":material/reset_image:")
+        os.path.join("tools", "repeat_detection_elimination.py"), title="Repeat detection elimination", icon=":material/reset_image:")
     verify_page = st.Page(
-        os.path.join("pages", "verify.py"), title="Human verification", icon=":material/checklist:")
+        os.path.join("tools", "verify.py"), title="Human verification", icon=":material/checklist:")
     depth_estimation_page = st.Page(
-        os.path.join("pages", "depth_estimation.py"), title="Depth estimation", icon=":material/square_foot:")
+        os.path.join("tools", "depth_estimation.py"), title="Depth estimation", icon=":material/square_foot:")
     explore_page = st.Page(
-        os.path.join("pages", "explore.py"), title="Explore results", icon=":material/bar_chart_4_bars:")
+        os.path.join("tools", "explore.py"), title="Explore results", icon=":material/bar_chart_4_bars:")
     postprocess_page = st.Page(
-        os.path.join("pages", "postprocess.py"), title=txts["postprocess_txt"][lang], icon=":material/stylus_note:")
+        os.path.join("tools", "postprocess.py"), title=txts["postprocess_txt"][lang], icon=":material/stylus_note:")
     camera_management_page = st.Page(
-        os.path.join("pages", "camera_management.py"), title="Metadata management", icon=":material/photo_camera:")
+        os.path.join("tools", "camera_management.py"), title="Metadata management", icon=":material/photo_camera:")
     settings_page = st.Page(
-        os.path.join("pages", "settings.py"), title=txts["settings_txt"][lang], icon=":material/settings:")
+        os.path.join("tools", "settings.py"), title=txts["settings_txt"][lang], icon=":material/settings:")
     pg = st.navigation([analyse_adv_page, repeat_detection_elimination_page, verify_page,
                        depth_estimation_page, explore_page, postprocess_page, camera_management_page, settings_page])
 pg.run()

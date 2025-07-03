@@ -16,7 +16,7 @@ import re
 import csv
 import string
 import math
-# import time as sleep_time
+import time as sleep_time
 from datetime import datetime, time  # , timedelta
 # from datetime import datetime
 import os
@@ -1696,6 +1696,70 @@ def get_all_leaf_values(nodes):
             # Leaf node
             leaf_values.append(node["value"])
     return leaf_values
+
+selected_species = ["cow", "dog", "cat"]
+# the json is here: /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/cls/SAH-DRY-ADS-v1/variables.json
+# it looks like this:
+# {
+#     "model_fname": "sub_saharan_drylands_v1.pt",
+#     "description": "The Sub-Saharan Drylands model is a deep learning image classifier trained on 13 million camera trap images from diverse ecosystems across eastern and southern Africa. Covering 328 categories, primarily at the species level, it supports taxonomic fallback, predicting higher-level taxa (e.g., genus or family) when species-level certainty is low. The model is designed for wildlife identification across savannas, dry forests, arid shrublands, and semi-desert habitats. Training data includes images from South Africa, Tanzania, Kenya, Mozambique, Botswana, Namibia, Rwanda, Madagascar, and Uganda. All training images are open-source and available via LILA BC (https://lila.science/).",
+#     "developer": "Addax Data Science",
+#     "env": "pytorch",
+#     "type": "addax-sdzwa-pt",
+#     "download_info": [
+#     ],
+#     "citation": "https://joss.theoj.org/papers/10.21105/joss.05581",
+#     "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+#     "total_download_size": "215 MB",
+#     "info_url": "https://addaxdatascience.com/",
+#     "all_classes": [
+#     ],
+#     "selected_classes": [
+#     ],
+#     "var_cls_detec_thresh": "0.40",
+#     "var_cls_detec_thresh_default": "0.40",
+#     "var_cls_class_thresh": "0.50",
+#     "var_cls_class_thresh_default": "0.50",
+#     "var_smooth_cls_animal": false,
+#     "var_tax_levels_idx": 0,
+#     "var_tax_fallback": true,
+#     "min_version": "6.16"
+# }
+# the selected_species should go into the "selected_classes" field of the json file
+
+    
+    
+def write_selected_species(selected_species, cls_model_ID):
+    # Construct the path to the JSON file
+    json_path = os.path.join(AddaxAI_files_debug, "models", "cls", cls_model_ID, "variables.json")
+    
+    # Load the existing JSON content
+    with open(json_path, "r") as f:
+        data = json.load(f)
+        
+    # test
+    all_classes = data["all_classes"]
+    
+    missing = set(all_classes) - set(selected_species)  # in all_classes but not in selected_species
+    extra = set(selected_species) - set(all_classes)    # in selected_species but not in all_classes
+
+    st.write("Missing species:", len(missing))
+    st.write("Missing species:", sorted(missing))
+    st.write("Extra species:", len(extra))
+    st.write("Extra species:", sorted(extra))
+    
+    st.write("are the lists the same:", sorted(all_classes) == sorted(selected_species))
+        
+    sleep_time.sleep(5)
+    
+    # Update the selected_classes field
+    data["selected_classes"] = selected_species
+    
+    # Write the updated content back to the file
+    with open(json_path, "w") as f:
+        json.dump(data, f, indent=4)
+
+
 
 def species_selector_widget(taxon_mapping):
     nodes = build_taxon_tree(taxon_mapping)

@@ -17,6 +17,7 @@ from ads_utils.analyse_advanced import (browse_directory_widget,
                                         det_model_selector_widget,
                                         species_selector_widget,
                                         load_taxon_mapping,
+                                        write_selected_species
                                         )
 
 
@@ -218,10 +219,12 @@ with st.container(border=True):
 
         with col_btn_next:
             if st.button(":material/arrow_forward: Next", use_container_width=True):
-
                 update_vars(section="analyse_advanced",
                             updates={"step": 3})  # 0 indexed
-                # todo: update vars with selected species
+                write_selected_species(selected_species = selected_species,
+                                       cls_model_ID = analyse_advanced_vars["selected_cls_model"])
+
+                
                 
                 st.rerun()
 
