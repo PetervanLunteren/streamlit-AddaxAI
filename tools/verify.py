@@ -59,6 +59,7 @@ if 'filtered_df' in st.session_state:
         st.markdown("*Here comes the actual verification of the images... I though to make use of these tools and see if we can make it work for our cause*")
         st.write("Streamlit Image Labelling (https://github.com/lit26/streamlit-img-label)")
         st.write("Streamlit Image Annotation (https://github.com/hirune924/Streamlit-Image-Annotation)")
+        st.write("perhaps you can check out how they do it here: https://github.com/microsoft/aerial_wildlife_detection?tab=readme-ov-file#demo")
     
     
     
