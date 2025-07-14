@@ -1,3 +1,4 @@
+from ads_utils import init_paths
 
 from streamlit_tree_select import tree_select
 import os
@@ -30,11 +31,14 @@ from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 import piexif
 
+# st.write("sys.path:", sys.path)
+# st.write("length of sys.path:", len(sys.path))
+# st.write("This is the module its looking for: /Applications/AddaxAI_files/cameratraps/megadetector/detection/video_utils.py")
 
 # local imports
 from cameratraps.megadetector.detection.video_utils import VIDEO_EXTENSIONS
 from cameratraps.megadetector.utils.path_utils import IMG_EXTENSIONS
-from ads_utils.common import load_vars, update_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update
+from ads_utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update
 
 
 # set global variables
@@ -416,6 +420,7 @@ def add_deployment(selected_min_datetime):
 
     # then calculate the difference between the selected datetime and the exif datetime
     diff_min_datetime = selected_min_datetime - exif_min_datetime
+    # TODO: if the exif_min_datetime is None, it errors. fix that.
 
     # Adjust exif_max_datetime if selected_min_datetime is later than exif_min_datetime
     selected_max_datetime = exif_max_datetime + diff_min_datetime
@@ -596,18 +601,18 @@ def add_new_location_popover(txt):
 
             # init vars
             vars = load_vars(section="analyse_advanced")
-            lat_selected = vars.get("lat_selected", None)
-            lng_selected = vars.get("lng_selected", None)
+            selected_lat = vars.get("selected_lat", None)
+            selected_lng = vars.get("selected_lng", None)
             exif_set = vars.get("exif_set", False)
             coords_found_in_exif = vars.get("coords_found_in_exif", False)
             exif_lat = vars.get("exif_lat", None)
             exif_lng = vars.get("exif_lng", None)
 
             # # init session state vars
-            # if "lat_selected" not in st.session_state:
-            #     st.session_state.lat_selected = None
-            # if "lng_selected" not in st.session_state:
-            #     st.session_state.lng_selected = None
+            # if "selected_lat" not in st.session_state:
+            #     st.session_state.selected_lat = None
+            # if "selected_lng" not in st.session_state:
+            #     st.session_state.selected_lng = None
             # if "exif_set" not in st.session_state:
             #     st.session_state.exif_set = False
             # if "coords_found_in_exif" not in st.session_state:
@@ -618,12 +623,12 @@ def add_new_location_popover(txt):
                 info_box(
                     f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}).")
                 if not exif_set:
-                    # lat_selected = exif_lat
-                    # lng_selected = exif_lng
+                    # selected_lat = exif_lat
+                    # selected_lng = exif_lng
                     # exif_set = True
                     update_vars("analyse_advanced", {
-                        "lat_selected": exif_lat,
-                        "lng_selected": exif_lng,
+                        "selected_lat": exif_lat,
+                        "selected_lng": exif_lng,
                         "exif_set": True,
                     })
                     st.rerun()
@@ -664,17 +669,17 @@ def add_new_location_popover(txt):
             if known_locations:
 
                 # add the selected location
-                if lat_selected and lng_selected:
+                if selected_lat and selected_lng:
                     fl.Marker(
-                        [lat_selected,
-                            lng_selected],
+                        [selected_lat,
+                            selected_lng],
                         title="Selected location",
                         tooltip="Selected location",
                         icon=fl.Icon(icon="camera", prefix="fa",
                                      color="darkred")
                     ).add_to(m)
-                    bounds.append([lat_selected,
-                                   lng_selected])
+                    bounds.append([selected_lat,
+                                   selected_lng])
 
                 # add the other known locations
                 for location_id, location_info in known_locations.items():
@@ -691,10 +696,10 @@ def add_new_location_popover(txt):
             else:
 
                 # add the selected location
-                if lat_selected and lng_selected:
+                if selected_lat and selected_lng:
                     fl.Marker(
-                        [lat_selected,
-                            lng_selected],
+                        [selected_lat,
+                            selected_lng],
                         title="Selected location",
                         tooltip="Selected location",
                         icon=fl.Icon(icon="camera", prefix="fa",
@@ -704,10 +709,10 @@ def add_new_location_popover(txt):
                     # only one marker so set bounds to the selected location
                     buffer = 0.001
                     bounds = [
-                        [lat_selected - buffer,
-                            lng_selected - buffer],
-                        [lat_selected + buffer,
-                            lng_selected + buffer]
+                        [selected_lat - buffer,
+                            selected_lng - buffer],
+                        [selected_lat + buffer,
+                            selected_lng + buffer]
                     ]
                     m.fit_bounds(bounds)
 
@@ -726,17 +731,17 @@ def add_new_location_popover(txt):
 
             # update lat lng widgets when clicking on map
             if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
-                lat_selected = map_data["last_clicked"]["lat"]
-                lng_selected = map_data["last_clicked"]["lng"]
+                selected_lat = map_data["last_clicked"]["lat"]
+                selected_lng = map_data["last_clicked"]["lng"]
                 # fl.Marker(
-                #     [lat_selected, lng_selected],
+                #     [selected_lat, selected_lng],
                 #     title="Selected location",
                 #     tooltip="Selected location",
                 #     icon=fl.Icon(icon="camera", prefix="fa", color="green")
                 # ).add_to(m)
                 update_vars("analyse_advanced", {
-                    "lat_selected": lat_selected,
-                    "lng_selected": lng_selected,
+                    "selected_lat": selected_lat,
+                    "selected_lng": selected_lng,
                 })
                 st.rerun()
 
@@ -747,17 +752,17 @@ def add_new_location_popover(txt):
             with col1:
                 print_widget_label("Enter latitude or click on the map",
                                    help_text="Enter the latitude of the location.")
-                old_lat = lat_selected if not None else 0.0
+                old_lat = selected_lat if not None else 0.0
                 new_lat = st.number_input(
                     "Enter latitude or click on the map",
-                    value=lat_selected,
+                    value=selected_lat,
                     format="%.6f",
                     step=0.000001,
                     min_value=-90.0,
                     max_value=90.0,
                     label_visibility="collapsed",
                 )
-                lat_selected = new_lat
+                selected_lat = new_lat
                 if new_lat != old_lat:
                     st.rerun()
 
@@ -765,17 +770,17 @@ def add_new_location_popover(txt):
             with col2:
                 print_widget_label("Enter longitude or click on the map",
                                    help_text="Enter the longitude of the location.")
-                old_lng = lng_selected if not None else 0.0
+                old_lng = selected_lng if not None else 0.0
                 new_lng = st.number_input(
                     "Enter longitude or click on the map",
-                    value=lng_selected,
+                    value=selected_lng,
                     format="%.6f",
                     step=0.000001,
                     min_value=-180.0,
                     max_value=180.0,
                     label_visibility="collapsed",
                 )
-                lng_selected = new_lng
+                selected_lng = new_lng
                 if new_lng != old_lng:
                     st.rerun()
 
@@ -797,17 +802,17 @@ def add_new_location_popover(txt):
                 elif new_location_id in known_locations.keys():
                     st.error(
                         f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
-                elif lat_selected == 0.0 and lng_selected == 0.0:
+                elif selected_lat == 0.0 and selected_lng == 0.0:
                     st.error(
                         "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
-                elif lat_selected is None or lng_selected is None:
+                elif selected_lat is None or selected_lng is None:
                     st.error(
                         "Error: Latitude and Longitude cannot be empty. Please select a valid location.")
                 else:
 
                     # if all good, add location
                     add_location(
-                        new_location_id, lat_selected, lng_selected)
+                        new_location_id, selected_lat, selected_lng)
                     new_location_id = None
 
                     # reset session state variables before reloading
@@ -816,8 +821,8 @@ def add_new_location_popover(txt):
                         "exif_set": False,
                         "exif_lat": None,
                         "exif_lng": None,
-                        "lat_selected": None,
-                        "lng_selected": None
+                        "selected_lat": None,
+                        "selected_lng": None
                     })
                     popover_container.empty()
                     st.rerun()
@@ -1727,6 +1732,57 @@ selected_species = ["cow", "dog", "cat"]
 # }
 # the selected_species should go into the "selected_classes" field of the json file
 
+def add_deployment_to_queue():
+    
+    # todo: this all needs to be st.session_state based, 
+    
+    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    process_queue = analyse_advanced_vars.get("process_queue", [])
+    # previous_process_queue = analyse_advanced_vars.get("process_queue", [])
+    # process_queue = analyse_advanced_vars.get("process_queue", []).copy() # copy to avoid mutating the original list in session state
+
+    
+    selected_folder = analyse_advanced_vars["selected_folder"]
+    selected_projectID = analyse_advanced_vars["selected_projectID"]
+    selected_locationID = analyse_advanced_vars["selected_locationID"]
+    # selected_lat = analyse_advanced_vars["selected_lat"]
+    # selected_lng = analyse_advanced_vars["selected_lng"]
+    selected_min_datetime = analyse_advanced_vars["selected_min_datetime"]
+    # selected_deploymentID = analyse_advanced_vars["selected_deploymentID"]
+    selected_det_modelID = analyse_advanced_vars["selected_det_modelID"]
+    selected_cls_modelID = analyse_advanced_vars["selected_cls_modelID"]
+    # deployment_start_file = analyse_advanced_vars["deployment_start_file"]
+    # deployment_start_datetime = analyse_advanced_vars["deployment_start_datetime"]
+    
+    # Create a new deployment entry
+    new_deployment = {
+        "selected_folder": selected_folder,
+        "selected_projectID": selected_projectID,
+        "selected_locationID": selected_locationID,
+        # "selected_lat": selected_lat,
+        # "selected_lng": selected_lng,
+        "selected_min_datetime": selected_min_datetime,
+        # "selected_deploymentID": selected_deploymentID,
+        "selected_det_modelID": selected_det_modelID,
+        "selected_cls_modelID": selected_cls_modelID,
+        # "deployment_start_file": deployment_start_file,
+        # "deployment_start_datetime": deployment_start_datetime
+    }
+    
+    # Add the new deployment to the queue
+    # st.write(f"previous_process_queue: {previous_process_queue}")
+    
+    # updated_process_queue = [new_deployment] + previous_process_queue
+    # st.write(f"updated_process_queue: {updated_process_queue}")
+    
+    # sleep_time.sleep(10)  # simulate processing time
+    
+    process_queue.append(new_deployment)
+
+    # write back to the vars file
+    replace_vars(section="analyse_advanced", new_vars = {"process_queue": process_queue})
+    
+    # return
     
     
 def write_selected_species(selected_species, cls_model_ID):
@@ -1737,20 +1793,20 @@ def write_selected_species(selected_species, cls_model_ID):
     with open(json_path, "r") as f:
         data = json.load(f)
         
-    # test
-    all_classes = data["all_classes"]
+    # # test
+    # all_classes = data["all_classes"]
     
-    missing = set(all_classes) - set(selected_species)  # in all_classes but not in selected_species
-    extra = set(selected_species) - set(all_classes)    # in selected_species but not in all_classes
+    # missing = set(all_classes) - set(selected_species)  # in all_classes but not in selected_species
+    # extra = set(selected_species) - set(all_classes)    # in selected_species but not in all_classes
 
-    st.write("Missing species:", len(missing))
-    st.write("Missing species:", sorted(missing))
-    st.write("Extra species:", len(extra))
-    st.write("Extra species:", sorted(extra))
+    # st.write("Missing species:", len(missing))
+    # st.write("Missing species:", sorted(missing))
+    # st.write("Extra species:", len(extra))
+    # st.write("Extra species:", sorted(extra))
     
-    st.write("are the lists the same:", sorted(all_classes) == sorted(selected_species))
+    # st.write("are the lists the same:", sorted(all_classes) == sorted(selected_species))
         
-    sleep_time.sleep(5)
+    # sleep_time.sleep(5)
     
     # Update the selected_classes field
     data["selected_classes"] = selected_species

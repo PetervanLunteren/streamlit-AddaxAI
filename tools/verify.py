@@ -1,13 +1,27 @@
+# from ads_utils import init_paths
+
 import streamlit as st
 import os
-from backend.utils import print_widget_label
+from ads_utils.common import print_widget_label
 import pandas as pd
 
 st.markdown("*This would be where the users can verify their predictions. Somthing where you first select which label and conf range you are interested in, and then verify that selection*")
 
-# debug this needs to be real data somehow
-csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "namibia-example-images", "results_detections.csv")
-df = pd.read_csv(csv_path)
+# # debug this needs to be real data somehow
+# csv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "namibia-example-images", "results_detections.csv")
+# df = pd.read_csv(csv_path)
+
+
+dummy_df = {
+    "location": ["Location1", "Location1", "Location2", "Location2", "Location3"],
+    "deployment": ["Deployment1", "Deployment2", "Deployment1", "Deployment2", "Deployment1"],
+    "label": ["Lion", "Elephant", "Lion", "Elephant", "Lion"],
+    "confidence": [0.95, 0.85, 0.90, 0.80, 0.75],
+    "human_verified": [True, False, True, False, True],
+    "absolute_path": ["/images/"] * 5,
+    "relative_path": ["img1.jpg", "img2.jpg", "img3.jpg", "img4.jpg", "img5.jpg"]
+}
+df = pd.DataFrame(dummy_df)
 
 with st.form(key="verify_form", clear_on_submit=False):
 

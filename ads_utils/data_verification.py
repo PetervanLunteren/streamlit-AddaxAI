@@ -5,7 +5,7 @@ from st_aggrid import AgGrid
 import pandas as pd
 from st_aggrid import GridOptionsBuilder
 import os
-from backend.utils import print_widget_label
+from ads_utils.common import print_widget_label
 
 def get_location_deployment_nested_dict(df):
     

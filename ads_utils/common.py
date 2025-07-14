@@ -160,10 +160,23 @@ def clear_vars(section):
     """
     # settings, settings_file = load_map()
     
+    # TODO: this is messing with the queue. it is deleting the queue too...
+    # it should clear only the temp vars in the section, so if we are back to st.session_state, ot should clear only the session state vars of the selected session.
+    
     # if not exist, create empty vars file
     vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
-    if os.path.exists(vars_file):
-        os.remove(vars_file)
+    # if os.path.exists(vars_file): # temorarily disabled
+    #     os.remove(vars_file)
+
+def replace_vars(section, new_vars):
+    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+
+    # # Ensure the directory exists (optional, but safe)
+    # os.makedirs(os.path.dirname(vars_file), exist_ok=True)
+
+    # Overwrite with only the new updates
+    with open(vars_file, "w", encoding="utf-8") as file:
+        json.dump(new_vars, file, indent=2, default=default_converter)
 
 def update_vars(section, updates):
     # settings, settings_file = load_map()
@@ -181,14 +194,6 @@ def update_vars(section, updates):
 
     # update
     section_vars.update(updates)
-
-    # if "vars" not in settings:
-    #     settings["vars"] = {}
-    # if section not in settings["vars"]:
-    #     settings["vars"][section] = {}
-
-    # Update only the section with any type of values
-    # settings["vars"][section].update(updates)
 
     # Use `default=default_converter` to catch any lingering datetime objects
     with open(vars_file, "w") as file:

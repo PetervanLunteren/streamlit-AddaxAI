@@ -1,8 +1,15 @@
 import streamlit as st
 import os
 from datetime import datetime
+import time as sleep_time
+from ads_utils import init_paths
 
 # todo: only read the vars files here, not in the ads_utils module
+# todo: make project select in the sidebar, all tools need a project no need to select it every time
+# todo: revert everything back to st.session state, no need to use vars files, only write the vars to file if added to the queue
+
+# todo: do the working, selected_lat, selected_lon, selected_cls_modelID, selected_det_modelID. 
+# todo: also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
 
 # import local modules
 from ads_utils.common import load_lang_txts, load_vars, StepperBar, print_widget_label, update_vars, clear_vars
@@ -17,7 +24,7 @@ from ads_utils.analyse_advanced import (browse_directory_widget,
                                         det_model_selector_widget,
                                         species_selector_widget,
                                         load_taxon_mapping,
-                                        write_selected_species
+                                        add_deployment_to_queue
                                         )
 
 
@@ -32,322 +39,295 @@ step = analyse_advanced_vars.get("step", 0)
 lang = general_settings_vars["lang"]
 mode = general_settings_vars["mode"]
 
+# 
+processing_bool = analyse_advanced_vars.get("processing", False)
+if processing_bool:
+    st.warning("The queue is currently being processed. Please wait until the processing is finished before adding new deployments to the queue.")
+    # st.progress(0, "Processing queue...")  # TODO: this should be a real progress bar
+    
+    progress_bar = st.progress(0)
 
-st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
+    for i in range(100):
+        sleep_time.sleep(0.03)  # adjust speed
+        progress_bar.progress(i + 1)
 
-# header
-st.header(":material/rocket_launch: Add deployment to database", divider="grey")
-st.write(
-    "You can analyze one deployment at a time using AI models. "
-    "A deployment refers to all the images and videos stored on a single SD card retrieved from the field. "
-    "This typically corresponds to one physical camera at one location during a specific period. "
-    "The analysis results are saved to a recognition file, which can then be used by other tools in the platform."
-)
+    # st.success("Done!")
+    update_vars(section="analyse_advanced", updates={"processing": False})
+    st.rerun()  # this should rerun the page to show the updated state
+    
+    # st.stop()
+    
+if not processing_bool:
 
-st.write("")
-st.subheader(":material/sd_card: Deployment information", divider="grey")
-st.write("Fill in the information related to this deployment. A deployment refers to all the images and videos stored on a single SD card retrieved from the field.")
+    st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
 
-###### STEPPER BAR ######
+    # header
+    st.header(":material/rocket_launch: Add deployment to database", divider="grey")
+    st.write(
+        "You can analyze one deployment at a time using AI models. "
+        "A deployment refers to all the images and videos stored on a single SD card retrieved from the field. "
+        "This typically corresponds to one physical camera at one location during a specific period. "
+        "The analysis results are saved to a recognition file, which can then be used by other tools in the platform."
+    )
 
-st.write("Current step:", step)
-
-# --- Create stepper
-stepper = StepperBar(
-    steps=["Folder", "Deployment", "Model", "Species", "Run"],
-    orientation="horizontal",
-    active_color="#086164",
-    completed_color="#0861647D",
-    inactive_color="#dadfeb"
-)
-stepper.set_step(step)
-
-# this is the stepper bar that will be used to navigate through the steps of the deployment creation process
-with st.container(border=True):
-
-    # stepper bar progress
     st.write("")
-    st.markdown(stepper.display(), unsafe_allow_html=True)
-    st.divider()
+    st.subheader(":material/sd_card: Deployment information", divider="grey")
+    st.write("Fill in the information related to this deployment. A deployment refers to all the images and videos stored on a single SD card retrieved from the field.")
 
-    # folder selection
-    if step == 0:
+    ###### STEPPER BAR ######
 
-        st.write("Here you can select the folder where your deployment is located. ")
+    st.write("Current step:", step)
 
-        # select folder
-        with st.container(border=True):
-            print_widget_label("Folder",
-                               help_text="Select the folder where your deployment is located.")
-            selected_folder = browse_directory_widget()
+    # --- Create stepper
+    stepper = StepperBar(
+        steps=["Folder", "Deployment", "Model", "Species"],
+        orientation="horizontal",
+        active_color="#086164",
+        completed_color="#0861647D",
+        inactive_color="#dadfeb"
+    )
+    stepper.set_step(step)
 
-            if selected_folder and os.path.isdir(selected_folder):
-                check_folder_metadata()
-                # st.write(st.session_state)
+    # this is the stepper bar that will be used to navigate through the steps of the deployment creation process
+    with st.container(border=True):
 
-            if selected_folder and not os.path.isdir(selected_folder):
-                st.error(
-                    "The selected folder does not exist. Please select a valid folder.")
-                selected_folder = None
+        # stepper bar progress
+        st.write("")
+        st.markdown(stepper.display(), unsafe_allow_html=True)
+        st.divider()
 
-        # place the buttons
-        col_btn_prev, col_btn_next = st.columns([1, 1])
+        # folder selection
+        if step == 0:
 
-        with col_btn_next:
-            if selected_folder and os.path.isdir(selected_folder):
-                if st.button(":material/arrow_forward: Next", use_container_width=True):
-                    update_vars(section="analyse_advanced",
-                                updates={"step": 1})  # 0 indexed
-                    st.rerun()
-            else:
-                st.button(":material/arrow_forward: Next",
-                          use_container_width=True,
-                          disabled=True,
-                          key="project_next_button_dummy")
+            st.write("Here you can select the folder where your deployment is located. ")
 
-    elif step == 1:
-
-        with st.container(border=True):
-            print_widget_label(
-                "Project", help_text="help text")
-
-            selected_projectID = project_selector_widget()
-
-        if selected_projectID:
-
-            # location metadata
+            # select folder
             with st.container(border=True):
-                print_widget_label(
-                    "Location", help_text="help text")
-                selected_locationID = location_selector_widget()
-            # st.write("")
+                print_widget_label("Folder",
+                                help_text="Select the folder where your deployment is located.")
+                selected_folder = browse_directory_widget()
 
-            # camera ID metadata
-            if selected_locationID:
-                with st.container(border=True):
-                    print_widget_label(
-                        "Start", help_text="help text")
-                    selected_min_datetime = datetime_selector_widget()
+                if selected_folder and os.path.isdir(selected_folder):
+                    check_folder_metadata()
+                    # st.write(st.session_state)
 
-        # place the buttons
-        col_btn_prev, col_btn_next = st.columns([1, 1])
+                if selected_folder and not os.path.isdir(selected_folder):
+                    st.error(
+                        "The selected folder does not exist. Please select a valid folder.")
+                    selected_folder = None
 
-        # the previous button is always enabled
-        with col_btn_prev:
-            if st.button(":material/replay: Start over", use_container_width=True):
-                clear_vars(section="analyse_advanced")
-                st.rerun()
+            # place the buttons
+            col_btn_prev, col_btn_next = st.columns([1, 1])
 
-        if selected_projectID and selected_locationID and selected_min_datetime:
             with col_btn_next:
-                if selected_min_datetime:
+                if selected_folder and os.path.isdir(selected_folder):
                     if st.button(":material/arrow_forward: Next", use_container_width=True):
-
                         update_vars(section="analyse_advanced",
-                                    updates={"step": 2,  # 0 indexed
-                                             "selected_projectID": selected_projectID,
-                                             "selected_locationID": selected_locationID,
-                                             "selected_min_datetime": selected_min_datetime})
-                        add_deployment(
-                            selected_min_datetime=selected_min_datetime)
+                                    updates={"step": 1})  # 0 indexed
                         st.rerun()
                 else:
                     st.button(":material/arrow_forward: Next",
-                              use_container_width=True, disabled=True)
+                            use_container_width=True,
+                            disabled=True,
+                            key="project_next_button_dummy")
 
-    elif step == 2:
-        st.write("MODEL STUFF!")
+        elif step == 1:
 
-        # # load model metadata
-        # model_meta = load_model_metadata()
+            with st.container(border=True):
+                print_widget_label(
+                    "Project", help_text="help text")
 
-        # select cls model
-        with st.container(border=True):
-            print_widget_label("Species identification model",
-                               help_text="Here you can select the model of your choosing.")
-            selected_cls_model = cls_model_selector_widget(model_meta)
-        # st.write("")
+                selected_projectID = project_selector_widget()
 
-        # select detection model
+            if selected_projectID:
 
-        with st.container(border=True):
-            print_widget_label("Animal detection model",
-                               help_text="The species identification model you selected above requires a detection model to locate the animals in the images. Here you can select the model of your choosing.")
-            selected_det_model = det_model_selector_widget(model_meta)
-        # st.write("")
+                # location metadata
+                with st.container(border=True):
+                    print_widget_label(
+                        "Location", help_text="help text")
+                    selected_locationID = location_selector_widget()
+                # st.write("")
 
-        # place the buttons
-        col_btn_prev, col_btn_next = st.columns([1, 1])
+                # camera ID metadata
+                if selected_locationID:
+                    with st.container(border=True):
+                        print_widget_label(
+                            "Start", help_text="help text")
+                        selected_min_datetime = datetime_selector_widget()
 
-        # the previous button is always enabled
-        with col_btn_prev:
-            if st.button(":material/replay: Start over", use_container_width=True):
-                clear_vars(section="analyse_advanced")
-                st.rerun()
+            # place the buttons
+            col_btn_prev, col_btn_next = st.columns([1, 1])
 
-        with col_btn_next:
-            if st.button(":material/arrow_forward: Next", use_container_width=True):
+            # the previous button is always enabled
+            with col_btn_prev:
+                if st.button(":material/replay: Start over", use_container_width=True):
+                    clear_vars(section="analyse_advanced") # this is messing with the queue. it is deleting the queue too...
+                    st.rerun()
 
-                update_vars(section="analyse_advanced",
-                            updates={"step": 3,  # 0 indexed
-                                     "selected_cls_model": selected_cls_model,
-                                     "selected_det_model": selected_det_model})
-                st.rerun()
+            if selected_projectID and selected_locationID and selected_min_datetime:
+                with col_btn_next:
+                    if selected_min_datetime:
+                        if st.button(":material/arrow_forward: Next", use_container_width=True):
 
-    elif step == 3:
+                            update_vars(section="analyse_advanced",
+                                        updates={"step": 2,  # 0 indexed
+                                                "selected_projectID": selected_projectID,
+                                                "selected_locationID": selected_locationID,
+                                                "selected_min_datetime": selected_min_datetime})
+                            add_deployment(
+                                selected_min_datetime=selected_min_datetime)
+                            st.rerun()
+                    else:
+                        st.button(":material/arrow_forward: Next",
+                                use_container_width=True, disabled=True)
 
-        st.write("Species Selection!")
+        elif step == 2:
+            st.write("MODEL STUFF!")
 
-        selected_cls_model = analyse_advanced_vars["selected_cls_model"]
-        taxon_mapping = load_taxon_mapping(selected_cls_model)
-        # st.write(taxon_mapping)
-        with st.container(border=True):
-            print_widget_label("Species presence",
+            # # load model metadata
+            # model_meta = load_model_metadata()
+
+            # select cls model
+            with st.container(border=True):
+                print_widget_label("Species identification model",
                                 help_text="Here you can select the model of your choosing.")
-            selected_species = species_selector_widget(taxon_mapping)
-        
-        st.write("Selected species:", selected_species)
-            
-        # place the buttons
-        col_btn_prev, col_btn_next = st.columns([1, 1])
-
-        # the previous button is always enabled
-        with col_btn_prev:
-            if st.button(":material/replay: Start over", use_container_width=True):
-                clear_vars(section="analyse_advanced")
-                st.rerun()
-
-        with col_btn_next:
-            if st.button(":material/arrow_forward: Next", use_container_width=True):
-                update_vars(section="analyse_advanced",
-                            updates={"step": 3})  # 0 indexed
-                write_selected_species(selected_species = selected_species,
-                                       cls_model_ID = analyse_advanced_vars["selected_cls_model"])
-
-                
-                
-                st.rerun()
-
-        # elif step == 4:
-        #     st.write("Finally, you can set the start date and time for the deployment. This is important for tracking when the data was collected.")
-        # st.date_input("Start Date", key="start_date_input",
-        # value = datetime.now().date())
-
-
-            # #     # model section
-            # #     st.write("")
-            # #     st.subheader(":material/smart_toy: Model settings", divider="gray")
-
-
-            # # # prev_selected_cls_model = project_vars.get("selected_cls_model", "EUR-DF-v1.3")
-            # # # prev_selected_det_model = project_vars.get("selected_det_model", "MD5A")
-            # # # prev_selected_model_type = project_vars.get("selected_model_type", 'IDENTIFY')
-
-
-            # #     # widget to select the model type
-            # #     with st.container(border=True):
-            # #         print_widget_label("Would you like to only locate where the animals are or also identify their species?",
-            # #                            help_text="Choose whether you want the model to simply show where animals are, or also classify them by species.")
-            # #         selected_model_type = radio_buttons_with_captions(
-            # #             option_caption_dict={
-            # #                 "IDENTIFY": {"option": "Identify",
-            # #                              "caption": "Detect animals and automatically identify their species."},
-            # #                 "LOCATE": {"option": "Locate",
-            # #                            "caption": "Just detect animals and show where they are — I’ll identify them myself."}
-            # #             },
-            # #             key="model_type",
-            # #             scrollable=False,
-            # #             default_option=prev_selected_model_type)
-            # #     st.write("")
-
-            # #     # if the user just want to locate animals, then only select the detection model
-            # #     if selected_model_type == 'LOCATE':
-
-            # # select detection model
-            # with st.container(border=True):
-            #     print_widget_label("Which model do you want to use to locate the animals?",
-            #                        help_text="Here you can select the model of your choosing.")
-            #     selected_det_model = select_model_widget(
-            #         "det", prev_selected_det_model)
+                selected_cls_modelID = cls_model_selector_widget(model_meta)
             # st.write("")
 
-            # #     # if the user want to indentify the species, then select both detection and classification models
-            # #     elif selected_model_type == 'IDENTIFY':
+            # select detection model
 
-            # #         # select detection model
-            # #         with st.container(border=True):
-            # #             print_widget_label("Which model do you want to use to locate the animals?",
-            # #                                help_text="Here you can select the model of your choosing.")
-            # #             selected_det_model = select_model_widget(
-            # #                 "det", prev_selected_det_model)
-            # #         st.write("")
+            with st.container(border=True):
+                print_widget_label("Animal detection model",
+                                help_text="The species identification model you selected above requires a detection model to locate the animals in the images. Here you can select the model of your choosing.")
+                selected_det_modelID = det_model_selector_widget(model_meta)
+            # st.write("")
 
-            # #         # select classification model
-            # #         if selected_det_model:
-            # #             with st.container(border=True):
-            # #                 print_widget_label("Which model do you want to use to locate the animals?",
-            # #                                    help_text="Here you can select the model of your choosing.")
-            # #                 selected_cls_model = select_model_widget(
-            # #                     "cls", prev_selected_cls_model)
-            # #             st.write("")
+            # place the buttons
+            col_btn_prev, col_btn_next = st.columns([1, 1])
 
-            # #             # select species presence
-            # #             if selected_cls_model:
+            # the previous button is always enabled
+            with col_btn_prev:
+                if st.button(":material/replay: Start over", use_container_width=True):
+                    clear_vars(section="analyse_advanced")
+                    st.rerun()
 
-            # #                 # load info about the selected model
-            # #                 slected_model_info = load_all_model_info(
-            # #                     "cls")[selected_cls_model]
+            with col_btn_next:
+                if st.button(":material/arrow_forward: Next", use_container_width=True):
 
-            # #                 # select classes
-            # #                 with st.container(border=True):
-            # #                     print_widget_label("Which species are present in your project area?",
-            # #                                        help_text="Select the species that are present in your project area.")
-            # #                     selected_classes = multiselect_checkboxes(slected_model_info['all_classes'],
-            # #                                                               slected_model_info['selected_classes'])
-            # #                 st.write("")
+                    update_vars(section="analyse_advanced",
+                                updates={"step": 3,  # 0 indexed
+                                        "selected_cls_modelID": selected_cls_modelID,
+                                        "selected_det_modelID": selected_det_modelID})
+                    st.rerun()
 
-            # #     # deployment metadata section is always shown, regardless of the model type
-            # #     if selected_model_type:
-            # #         print("dummy print to avoid streamlit warning")
+        elif step == 3:
+
+            st.write("Species Selection!")
+
+            selected_cls_modelID = analyse_advanced_vars["selected_cls_modelID"]
+            taxon_mapping = load_taxon_mapping(selected_cls_modelID)
+            # st.write(taxon_mapping)
+            with st.container(border=True):
+                print_widget_label("Species presence",
+                                    help_text="Here you can select the model of your choosing.")
+                selected_species = species_selector_widget(taxon_mapping)
+            
+            st.write("Selected species:", selected_species)
+                
+            # place the buttons
+            col_btn_prev, col_btn_next = st.columns([1, 1])
+
+            # the previous button is always enabled
+            with col_btn_prev:
+                if st.button(":material/replay: Start over", use_container_width=True):
+                    clear_vars(section="analyse_advanced")
+                    st.rerun()
+
+            with col_btn_next: 
+                if st.button(":material/playlist_add: Add to queue", use_container_width=True, type="primary"):
+                    update_vars(section="analyse_advanced",
+                                updates={"step": 0})  # 0 indexed
+                    add_deployment_to_queue()
+                    
+                    # write_selected_species(selected_species = selected_species,
+                    #                        cls_model_ID = analyse_advanced_vars["selected_cls_modelID"])
+
+                    
+                    
+                    st.rerun()
 
 
-            # # # st.write(check_start_datetime())
-
-            # # #
-            # # # from streamlit_datetime_picker import date_time_picker, date_range_picker
-
-            # # # dt = date_time_picker(placeholder='Enter your birthday')
-
-            # # # Get date
 
 
-            # # # # Get time (hour and minute only)
-            # # # time = st.time_input("Select a time", step = 60)
 
-            # # # # Combine
-            # # # dt = datetime.combine(date, time)
-
-            # # # st.write("Selected datetime (no seconds):", dt)
+    # TODO: this shouldnt be in the same var as the other step vars etc., but step etc should be in the session state
+    # for now its fine, but rename it also that collabroators know that this is not the same as the step vars
 
 
-            # # st.write("")
-            # # st.write("")
-            # # st.write("")
-            # # if st.button(":material/rocket_launch: Let's go!", key="save_vars_button", use_container_width=True, type="primary"):
+    # def start_processing_queue():
+        # update_vars(section = "analyse_advanced", updates = {"processing": True})
+        
 
-            # #     if selected_model_type == 'IDENTIFY':
-            # #         save_project_vars({"folder": folder,
-            # #                           "selected_model_type": selected_model_type,
-            # #                           "selected_det_model": selected_det_model,
-            # #                           "selected_cls_model": selected_cls_model})
+        
+        
+        # st.rerun()
 
-            # #         st.write("DEBUG: selected_cls_model", selected_cls_model)
 
-            # #         # TODO: this is saving it to the wrong place, it should be saved to models/cls/<model_name>/variables.json
-            # #         save_cls_classes(selected_cls_model, selected_classes)
-            # #     elif selected_model_type == 'LOCATE':
-            # #         save_project_vars({"folder": folder,
-            # #                           "selected_model_type": selected_model_type,
-            # #                           "selected_det_model": selected_det_model})
+    st.write("")
+    st.subheader(":material/traffic_jam: Process queue", divider="grey")
+    process_queue = analyse_advanced_vars.get("process_queue", [])
+    if len(process_queue) == 0:
+        st.write("You currently have no deployments in the queue. Please add a deployment to the queue to start processing.")
+        st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary", disabled=True,
+                help="You need to add a deployment to the queue first.")
+    else:
+        st.write(f"You currently have {len(process_queue)} deployments in the queue.")
+        # col1, _ = st.columns([1, 1])
+        # with col1:
+        if st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary"):
+            # st.write("Processing queue...") # TODO
+            
+            
+            update_vars(section="analyse_advanced",
+                        updates={"processing": True}) 
+            st.rerun()
+            
+            # st.rerun()  # this should start the processing of the queue, but for now it just reruns the page
+        # with st.expander("View queue details", expanded=True):
+        with st.container(border=True, height=320):
+            for i, deployment in enumerate(process_queue):
+                with st.container(border=True):
+                    selected_folder = deployment['selected_folder']
+                    selected_projectID = deployment['selected_projectID']
+                    selected_locationID = deployment['selected_locationID']
+                    selected_min_datetime = deployment['selected_min_datetime']
+                    selected_det_modelID = deployment['selected_det_modelID']
+                    selected_cls_modelID = deployment['selected_cls_modelID']
+                    col1, col2, col3 = st.columns([6, 1, 1])
+                    
+                    
 
-            # #     st.success("Variables saved successfully!")
+                    
+                    with col1:
+                        folder_short = "..." + selected_folder[-45:] if len(selected_folder) > 45 else selected_folder
+                        text = f"Folder &nbsp;&nbsp;<code style='color:#086164; font-family:monospace;'>{folder_short}</code>"
+                        st.markdown(
+                            f"""
+                                <div style="background-color: #f0f2f6; padding: 7px; border-radius: 8px;">
+                                    &nbsp;&nbsp;{text}
+                                </div>
+                                """,
+                            unsafe_allow_html=True
+                        )
+                        
+                        
+                    with col2:
+                        st.button(":material/delete:", help= "Remove from queue", key=f"remove_{i}",
+                                use_container_width=True)
+                    with col3:
+                        # st.popover(f"Process {deployment['selected_folder']}")
+                        with st.popover(":material/visibility:", help = "Show details", use_container_width=True):                        
+                            st.write(f"**Project**: {deployment['selected_projectID']}")
+                            st.write(f"**Location**: {deployment['selected_locationID']}")
+                            st.write(f"**Species identification model**: {deployment['selected_cls_modelID']}")
+                            st.write(f"**Animal detection model**: {deployment['selected_det_modelID']}")

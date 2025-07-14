@@ -2,7 +2,7 @@
 
 # cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
 
-
+from ads_utils import init_paths
 
 
 from appdirs import user_config_dir
@@ -18,8 +18,55 @@ from PIL import Image
 AddaxAI_files = os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.realpath(__file__))))
 
+
+# from ads_utils import init_paths # import init_paths  # this will set the sys.path and PYTHONPATH variables
+
+# # insert dependencies to system variables
+# cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
+# paths_to_add = [
+#     os.path.join(AddaxAI_files),
+#     os.path.join(AddaxAI_files, "cameratraps"),
+#     os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
+#     os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
+#     os.path.join(AddaxAI_files, "AddaxAI")
+# ]
+# if cuda_toolkit_path:
+#     paths_to_add.append(os.path.join(cuda_toolkit_path, "bin"))
+# for path in paths_to_add:
+#     if path not in sys.path:
+#         sys.path.insert(0, path)
+
+# # Update PYTHONPATH env var without duplicates
+# PYTHONPATH_separator = ":" if platform.system() != "Windows" else ";"
+# existing_paths = os.environ.get("PYTHONPATH", "").split(PYTHONPATH_separator)
+
+# # Remove empty strings, duplicates, and keep order
+# existing_paths = [p for i, p in enumerate(
+#     existing_paths) if p and p not in existing_paths[:i]]
+
+# for path in paths_to_add:
+#     if path not in existing_paths:
+#         existing_paths.append(path)
+
+# os.environ["PYTHONPATH"] = PYTHONPATH_separator.join(existing_paths)
+
+# make sure the config file is set
+os.environ["STREAMLIT_CONFIG"] = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
+
+
+
+
+
+
 st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), page_title="AddaxAI")
+
+
+
+
+
+
+
 
 # st.write(f"AddaxAI files: {AddaxAI_files}")
 
@@ -86,37 +133,6 @@ st.markdown("""
 # # Set PYTHONPATH
 # os.environ["PYTHONPATH"] = ":".join(updated_pythonpath)
 
-# insert dependencies to system variables
-cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
-paths_to_add = [
-    os.path.join(AddaxAI_files),
-    os.path.join(AddaxAI_files, "cameratraps"),
-    os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
-    os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
-    os.path.join(AddaxAI_files, "AddaxAI")
-]
-if cuda_toolkit_path:
-    paths_to_add.append(os.path.join(cuda_toolkit_path, "bin"))
-for path in paths_to_add:
-    if path not in sys.path:
-        sys.path.insert(0, path)
-
-# Update PYTHONPATH env var without duplicates
-PYTHONPATH_separator = ":" if platform.system() != "Windows" else ";"
-existing_paths = os.environ.get("PYTHONPATH", "").split(PYTHONPATH_separator)
-
-# Remove empty strings, duplicates, and keep order
-existing_paths = [p for i, p in enumerate(
-    existing_paths) if p and p not in existing_paths[:i]]
-
-for path in paths_to_add:
-    if path not in existing_paths:
-        existing_paths.append(path)
-
-os.environ["PYTHONPATH"] = PYTHONPATH_separator.join(existing_paths)
-
-# make sure the config file is set
-os.environ["STREAMLIT_CONFIG"] = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
 
 # with st.expander("sys.path", expanded=True):
 #     st.write("Current sys.path:")
