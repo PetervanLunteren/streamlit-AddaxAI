@@ -3,9 +3,9 @@ import os
 import sys
 import platform
 
-AddaxAI_files = os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.realpath(__file__))))
-          
+AddaxAI_files = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.realpath(__file__)))))
+
 # insert dependencies to system variables
 cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
 paths_to_add = [

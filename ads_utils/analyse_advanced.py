@@ -35,9 +35,13 @@ import piexif
 # st.write("length of sys.path:", len(sys.path))
 # st.write("This is the module its looking for: /Applications/AddaxAI_files/cameratraps/megadetector/detection/video_utils.py")
 
+
+# sys.path.insert(0, '/Applications/AddaxAI_files/cameratraps')
+
+
 # local imports
-from cameratraps.megadetector.detection.video_utils import VIDEO_EXTENSIONS
-from cameratraps.megadetector.utils.path_utils import IMG_EXTENSIONS
+from megadetector.detection.video_utils import VIDEO_EXTENSIONS
+from megadetector.utils.path_utils import IMG_EXTENSIONS
 from ads_utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update
 
 

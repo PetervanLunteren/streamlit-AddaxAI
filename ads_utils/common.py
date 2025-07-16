@@ -45,6 +45,165 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
 
+
+
+class MultiProgressBars:
+    def __init__(self, expander_label="Progress Bars", expanded=True):
+        self.expander = st.expander(expander_label, expanded=expanded)
+        self.bars = {}
+        self.states = {}
+        self.max_values = {}
+
+        self.active_prefixes = {}  # pbar_id -> prefix while running
+        self.pre_labels = {}       # pbar_id -> label before start
+        self.done_labels = {}      # pbar_id -> label when done
+
+    def add_pbar(self, pbar_id, pre_label, max_value=100, active_prefix="", done_label="✅ Done"):
+        if pbar_id in self.bars:
+            raise ValueError(f"Progress bar '{pbar_id}' already exists.")
+
+        container = self.expander.container()
+        self.states[pbar_id] = 0
+        self.max_values[pbar_id] = max_value
+        self.active_prefixes[pbar_id] = active_prefix
+        self.pre_labels[pbar_id] = pre_label
+        self.done_labels[pbar_id] = done_label
+
+        self.bars[pbar_id] = container.progress(0, text=pre_label)
+
+    def update(self, pbar_id, n=1, text=""):
+        if pbar_id not in self.bars:
+            raise ValueError(f"Progress bar '{pbar_id}' not found.")
+
+        self.states[pbar_id] += n
+        if self.states[pbar_id] > self.max_values[pbar_id]:
+            self.states[pbar_id] = self.max_values[pbar_id]
+
+        progress = self.states[pbar_id] / self.max_values[pbar_id]
+
+        if self.states[pbar_id] >= self.max_values[pbar_id]:
+            display_text = self.done_labels[pbar_id]
+        else:
+            prefix = self.active_prefixes.get(pbar_id, "")
+            display_text = f"{prefix} {text}".strip()
+
+        self.bars[pbar_id].progress(progress, text=display_text)
+
+    def reset(self, pbar_id):
+        if pbar_id not in self.bars:
+            raise ValueError(f"Progress bar '{pbar_id}' not found.")
+        self.states[pbar_id] = 0
+        self.bars[pbar_id].progress(0, text=self.pre_labels[pbar_id])
+
+    def generate_label_from_tqdm(self, pbar):
+        """Generate a status label from tqdm instance with percent, rate, elapsed, and ETA."""
+        fmt = pbar.format_dict
+        
+        # st.write(fmt)  # Debugging line to see the format dictionary
+
+        n = fmt.get("n", "?")
+        total = fmt.get("total", "?")
+        rate = fmt.get("rate")
+        unit = fmt.get("unit")
+        # st.write(f"n: {n}, total: {total}, rate: {rate}, unit: {unit}")
+        elapsed = fmt.get("elapsed")
+
+        percent_str = ""
+        if isinstance(n, (int, float)) and isinstance(total, (int, float)) and total > 0:
+            percent = int(n / total * 100)
+            percent_str = f":material/clock_loader_40: {percent}%"
+
+        rate_str = f":material/speed: {rate:.1f}/s" if rate and rate > 0 else ""
+        # elapsed_str = f":material/timer: {elapsed:.1f}s" if elapsed is not None else ""
+
+        # # ETA computation
+        # eta_str = ""
+        # if rate and rate > 0 and isinstance(n, (int, float)) and isinstance(total, (int, float)):
+        #     remaining = (total - n) / rate
+        #     if remaining >= 60:
+        #         mins = int(remaining // 60)
+        #         secs = int(remaining % 60)
+        #         eta_str = f":material/share_eta: {mins}:{secs:02d} min"
+        #     else:
+        #         eta_str = f":material/share_eta: {remaining:.1f}s"
+
+        def format_duration(seconds):
+            if seconds is None:
+                return ""
+            seconds = int(seconds)
+            h = seconds // 3600
+            m = (seconds % 3600) // 60
+            s = seconds % 60
+            if h > 0:
+                return f"{h:d}:{m:02d}:{s:02d}"
+            else:
+                return f"{m:d}:{s:02d}"
+
+        elapsed_str = f":material/timer: {format_duration(elapsed)}" if elapsed is not None else ""
+
+        if rate and rate > 0 and isinstance(n, (int, float)) and isinstance(total, (int, float)):
+            remaining = (total - n) / rate
+            eta_str = f":material/sports_score: {format_duration(remaining)}"
+        else:
+            eta_str = ""
+
+        label = f":material/laps: {n}/{total}"
+        components = [label, percent_str, rate_str, elapsed_str, eta_str]
+        return " \u00A0\u00A0\u00A0 \t | \u00A0\u00A0\u00A0 ".join(filter(None, components))
+
+
+
+
+# class MultiProgressBars:
+#     def __init__(self, expander_label="Progress Bars", expanded=True):
+#         self.expander = st.expander(expander_label, expanded=expanded)
+#         self.bars = {}       # pbar_id -> progress bar widget
+#         self.labels = {}     # pbar_id -> label placeholder
+#         self.states = {}     # pbar_id -> current value
+#         self.max_values = {} # pbar_id -> max value
+
+#     def add_pbar(self, pbar_id, label, max_value=100):
+#         """Add a new progress bar with label and max value."""
+#         if pbar_id in self.bars:
+#             raise ValueError(f"Progress bar with id '{pbar_id}' already exists.")
+
+#         container = self.expander.container()
+#         label_placeholder = container.empty()
+#         progress_bar = container.progress(0)
+#         label_placeholder.text(label)
+
+#         self.bars[pbar_id] = progress_bar
+#         self.labels[pbar_id] = label_placeholder
+#         self.states[pbar_id] = 0
+#         self.max_values[pbar_id] = max_value
+
+#     def update(self, pbar_id, n=1):
+#         """Increase progress by n and update the bar."""
+#         if pbar_id not in self.bars:
+#             raise ValueError(f"Progress bar with id '{pbar_id}' not found.")
+#         self.states[pbar_id] += n
+#         # Clamp to max_value
+#         if self.states[pbar_id] > self.max_values[pbar_id]:
+#             self.states[pbar_id] = self.max_values[pbar_id]
+#         progress_fraction = self.states[pbar_id] / self.max_values[pbar_id]
+#         self.bars[pbar_id].progress(progress_fraction)
+
+#     def set_description(self, pbar_id, text):
+#         """Update the label text."""
+#         if pbar_id not in self.labels:
+#             raise ValueError(f"Progress bar with id '{pbar_id}' not found.")
+#         self.labels[pbar_id].text(text)
+
+#     def reset(self, pbar_id):
+#         """Reset a progress bar to zero."""
+#         if pbar_id not in self.bars:
+#             raise ValueError(f"Progress bar with id '{pbar_id}' not found.")
+#         self.states[pbar_id] = 0
+#         self.bars[pbar_id].progress(0)
+
+
+
+
 class StepperBar:
     def __init__(self, steps, orientation='horizontal', active_color='blue', completed_color='green', inactive_color='gray'):
         self.steps = steps
