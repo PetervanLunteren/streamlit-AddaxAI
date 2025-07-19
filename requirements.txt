@@ -1,0 +1,7 @@
+streamlit
+pandas
+streamlit-tree-select
+streamlit-antd-components
+streamlit-nested-layout
+appdirs
+folium
