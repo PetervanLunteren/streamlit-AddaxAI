@@ -4,6 +4,7 @@ from datetime import datetime
 import tarfile
 import requests
 from tqdm import tqdm
+import subprocess
 import time as sleep_time
 from ads_utils import init_paths
 from streamlit_modal import Modal
@@ -29,7 +30,8 @@ from ads_utils.analyse_advanced import (browse_directory_widget,
                                         det_model_selector_widget,
                                         species_selector_widget,
                                         load_taxon_mapping,
-                                        add_deployment_to_queue
+                                        add_deployment_to_queue,
+                                        run_env_installer
                                         )
 
 
@@ -48,47 +50,193 @@ mode = general_settings_vars["mode"]
 
 
 
+
+
 # DEBUG
-if st.button("Download and extract1", use_container_width=True):
+modal_1 = Modal(f"Installing ENV", key="installing-env", show_close_button=False)
 
-    url = "https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-empty-debug.tar.xz"
-    local_filename = "envs/env-empty-debug.tar.xz"
+if st.button("Show installation modal", use_container_width=True):
+    modal_1.open()
 
-    response = requests.get(url, stream=True)
-    response.raise_for_status()
-    total_size = int(response.headers.get('content-length', 0))
+if modal_1.is_open():
+    with modal_1.container():
+        # st.write("Ready to install.")
+        # st.write("This may take a few minutes. Do not refresh the page.")
 
-    # show progress bars
-    pbars = MultiProgressBars("Installing virual environment")
-    pbars.add_pbar("download", "Waiting to download...", "Downloading...", "Download complete!", max_value=total_size)
-    pbars.add_pbar("extract", "Waiting to extract...", "Extracting...", "Extraction complete!", max_value=None)
+        # if st.button("Run installer now", key="run-installer"):
+        run_env_installer(modal_1, "env-empty-debug")
 
-    # download progress bar
-    block_size = 1024
-    pbar = tqdm(total=total_size / (1024 * 1024), unit='MB', unit_scale=False, unit_divisor=1)
-    with open(local_filename, 'wb') as f:
-        for data in response.iter_content(block_size):
-            f.write(data)
-            mb = len(data) / (1024 * 1024)
-            pbar.update(mb)
-            label = pbars.generate_label_from_tqdm(pbar)
-            pbars.update("download", n=len(data), text=label)
-    pbar.close()
+
+
+
+
+# if st.button("Download and extract1", use_container_width=True):
+#     modal_1.open()
+#     run_env_installer(modal_1, "env-empty-debug")
+
     
-    # Extract progress bar
-    with tarfile.open(local_filename, mode="r:xz") as tar:
-        members = tar.getmembers()
-        pbars.set_max_value("extract", len(members))  # ✅ This is clean and intuitive
-        pbar = tqdm(total=len(members), unit="file", unit_scale=False)
-        for member in members:
-            tar.extract(member, path="envs/")
-            pbar.update(1)
-            label = pbars.generate_label_from_tqdm(pbar)
-            pbars.update("extract", n=1, text=label)
-        pbar.close()
+                    
+# if modal_1.is_open():
+#     with modal_1.container():
+        
+#         info_box(
+#             "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
+#             "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources."
+#         )
+
+#         url = "https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-empty-debug.tar.xz"
+#         local_filename = "envs/env-empty-debug.tar.xz"
+
+#         response = requests.get(url, stream=True)
+#         response.raise_for_status()
+#         total_size = int(response.headers.get('content-length', 0))
+
+#         # show progress bars
+#         pbars = MultiProgressBars("Installing virual environment")
+#         pbars.add_pbar("download", "Waiting to download...", "Downloading...", "Download complete!", max_value=total_size)
+#         pbars.add_pbar("extract", "Waiting to extract...", "Extracting...", "Extraction complete!", max_value=None)
+#         pbars.add_status("install", "Waiting to install...", "Installing...", "Installation complete!")
+
+#         # download progress bar
+#         block_size = 1024
+#         pbar = tqdm(total=total_size / (1024 * 1024), unit='MB', unit_scale=False, unit_divisor=1)
+#         with open(local_filename, 'wb') as f:
+#             for data in response.iter_content(block_size):
+#                 f.write(data)
+#                 mb = len(data) / (1024 * 1024)
+#                 pbar.update(mb)
+#                 label = pbars.generate_label_from_tqdm(pbar)
+#                 pbars.update("download", n=len(data), text=label)
+#         pbar.close()
+        
+#         # Extract progress bar
+#         with tarfile.open(local_filename, mode="r:xz") as tar:
+#             members = tar.getmembers()
+#             pbars.set_max_value("extract", len(members))  # ✅ This is clean and intuitive
+#             pbar = tqdm(total=len(members), unit="files", unit_scale=False)
+#             for member in members:
+#                 tar.extract(member, path="envs/")
+#                 pbar.update(1)
+#                 label = pbars.generate_label_from_tqdm(pbar)
+#                 pbars.update("extract", n=1, text=label)
+#             pbar.close()
+        
+#         # pip install requirements
+        
+        
+        
+#         # install_placeholder.write("")
+
+#         pip_cmd =                 [
+#                     "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python",
+#                     "-m", "pip", "install",
+#                     "-r", "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt"
+#                 ]
+        
+        
+#         # Trigger pip install
+
+#         status = pbars.update_status("install", phase="mid")
+
+#         with status:
+#             with st.container(border=True, height=300):
+#                 output_placeholder = st.empty()
+#                 live_output = "Booting up pip installation...\n\n"
+#                 output_placeholder.code(live_output)
+
+#                 process = subprocess.Popen(
+#                     pip_cmd,
+#                     stdout=subprocess.PIPE,
+#                     stderr=subprocess.STDOUT,
+#                     text=True,
+#                     bufsize=1
+#                 )
+
+#                 for line in process.stdout:
+#                     live_output += line
+#                     output_placeholder.code(live_output)
+
+#                 process.wait()
+
+#         pbars.update_status("install", phase="post")
     
-    # pip install requirements
-    os.system("/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python -m pip install -r /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt")
+    
+    
+#     modal_1.close()
+    
+    
+    
+    
+    
+    
+    
+    
+    # status = pbars.update_status("install", phase="mid")
+    
+    
+    # pip_cmd =                 [
+    #                 "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python",
+    #                 "-m", "pip", "install",
+    #                 "-r", "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt"
+    #             ]
+    
+    # with status:
+    #     with st.container(border=True, height=300):
+    #         output_placeholder = st.empty()
+    #         live_output = "Booting up pip installation...\n\n"
+    #         output_placeholder.code(live_output)
+
+    #         process = subprocess.Popen(
+    #             pip_cmd,
+    #             stdout=subprocess.PIPE,
+    #             stderr=subprocess.STDOUT,
+    #             text=True,
+    #             bufsize=1
+    #         )
+
+    #         for line in process.stdout:
+    #             live_output += line
+    #             output_placeholder.code(live_output)
+
+    #         process.wait()
+    #         pbars.update_status("install", phase="post")
+    
+    
+    
+
+    # with st.status("Installing required Python packages...", expanded=False) as status:
+    #     with st.container(border=True, height=300):
+    #         output_placeholder = st.empty()
+    #         live_output = "Booting up pip installation...\n\n"
+    #         output_placeholder.code(live_output)
+
+    #         process = subprocess.Popen(
+    #             [
+    #                 "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python",
+    #                 "-m", "pip", "install",
+    #                 "-r", "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt"
+    #             ],
+    #             stdout=subprocess.PIPE,
+    #             stderr=subprocess.STDOUT,
+    #             text=True,
+    #             bufsize=1  # Line-buffered
+    #         )
+
+    #         # Read pip output line by line and update display
+    #         for line in process.stdout:
+    #             live_output += line
+    #             output_placeholder.code(live_output)
+
+    #         return_code = process.wait()
+
+    #         if return_code == 0:
+    #             status.update(label="Packages installed successfully!", state="complete")
+    #         else:
+    #             status.update(label="Package installation failed", state="error")
+
+
+            
+    # os.system("/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python -m pip install -r /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt")
     
 
 
@@ -124,7 +272,7 @@ if st.button("Download and extract1", use_container_width=True):
     #     label = pbars.generate_label_from_tqdm(pbar)
     #     pbars.update("extract", n=1, text=label)
 
-    pbar.close()
+    # pbar.close()
     # pbars.set_description("download", "Done!")
     # pbars.set_description("extract", "Done!")
 

@@ -23,6 +23,9 @@ from datetime import datetime, time  # , timedelta
 import os
 from pathlib import Path
 from datetime import datetime
+import tarfile
+import requests
+
 from PIL import Image
 # from st_flexible_callout_elements import flexible_callout
 import random
@@ -30,6 +33,8 @@ from PIL.ExifTags import TAGS
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 import piexif
+from tqdm import tqdm
+from streamlit_modal import Modal
 
 # st.write("sys.path:", sys.path)
 # st.write("length of sys.path:", len(sys.path))
@@ -42,7 +47,7 @@ import piexif
 # local imports
 from megadetector.detection.video_utils import VIDEO_EXTENSIONS
 from megadetector.utils.path_utils import IMG_EXTENSIONS
-from ads_utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update
+from ads_utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars
 
 
 # set global variables
@@ -60,6 +65,118 @@ map_file = os.path.join(config_dir, "map.json")
 # set versions
 with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
+
+
+
+
+
+
+def run_env_installer(
+    modal: Modal,
+    env_name: str,
+):
+    
+    # modal = Modal(f"Installing ENV", key="installing-env", show_close_button=False)
+    # modal.open()
+    # if modal.is_open():
+    #     with modal.container():
+            
+        info_box(
+            "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
+            "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources."
+        )
+        
+        if st.button("Cancel", use_container_width=True):
+            st.warning("Installation cancelled. You can try again later.")
+            sleep_time.sleep(2)
+            modal.close()
+            return
+
+        url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/{env_name}.tar.xz"
+        local_filename = f"envs/{env_name}.tar.xz"
+
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        total_size = int(response.headers.get('content-length', 0))
+
+        # show progress bars
+        pbars = MultiProgressBars("Installing virual environment")
+        pbars.add_pbar("download", "Waiting to download...", "Downloading...", "Download complete!", max_value=total_size)
+        pbars.add_pbar("extract", "Waiting to extract...", "Extracting...", "Extraction complete!", max_value=None)
+        pbars.add_status("install", "Waiting to install...", "Installing...", "Installation complete!")
+
+        # download progress bar
+        block_size = 1024
+        pbar = tqdm(total=total_size / (1024 * 1024), unit='MB', unit_scale=False, unit_divisor=1)
+        with open(local_filename, 'wb') as f:
+            for data in response.iter_content(block_size):
+                f.write(data)
+                mb = len(data) / (1024 * 1024)
+                pbar.update(mb)
+                label = pbars.generate_label_from_tqdm(pbar)
+                pbars.update("download", n=len(data), text=label)
+        pbar.close()
+        
+        # Extract progress bar
+        with tarfile.open(local_filename, mode="r:xz") as tar:
+            members = tar.getmembers()
+            pbars.set_max_value("extract", len(members))  # ✅ This is clean and intuitive
+            pbar = tqdm(total=len(members), unit="files", unit_scale=False)
+            for member in members:
+                tar.extract(member, path="envs/")
+                pbar.update(1)
+                label = pbars.generate_label_from_tqdm(pbar)
+                pbars.update("extract", n=1, text=label)
+            pbar.close()
+        
+        # pip install requirements
+        
+        
+        
+        # install_placeholder.write("")
+
+        pip_cmd =                 [
+                    f"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/{env_name}/bin/python",
+                    "-m", "pip", "install",
+                    "-r", f"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/{env_name}/macos/requirements.txt"
+                ]
+        
+        
+        # Trigger pip install
+
+        status = pbars.update_status("install", phase="mid")
+
+        with status:
+            with st.container(border=True, height=300):
+                output_placeholder = st.empty()
+                live_output = "Booting up pip installation...\n\n"
+                output_placeholder.code(live_output)
+
+                process = subprocess.Popen(
+                    pip_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+
+                for line in process.stdout:
+                    live_output += line
+                    output_placeholder.code(live_output)
+
+                process.wait()
+
+        pbars.update_status("install", phase="post")
+        
+        modal.close()
+    
+    
+    # modal.close()
+
+
+
+
+
 
 
 def project_selector_widget():

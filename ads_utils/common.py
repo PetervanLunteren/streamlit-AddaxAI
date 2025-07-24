@@ -14,6 +14,7 @@ from appdirs import user_config_dir
 # import subprocess
 # import string
 from tqdm import tqdm
+import subprocess
 # import math
 # import time as sleep_time
 from datetime import datetime #, time, timedelta
@@ -23,6 +24,8 @@ import os
 from datetime import datetime
 # from PIL import Image
 from st_flexible_callout_elements import flexible_callout
+import requests
+import tarfile
 # import random
 # from PIL.ExifTags import TAGS
 # from hachoir.metadata import extractMetadata
@@ -50,10 +53,6 @@ with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
 
 
 
-
-
-
-
 class MultiProgressBars:
     def __init__(self, expander_label="Progress Bars", expanded=True):
         self.expander = st.expander(expander_label, expanded=expanded)
@@ -63,6 +62,7 @@ class MultiProgressBars:
         self.active_prefixes = {}
         self.pre_labels = {}
         self.done_labels = {}
+        self.statuses = {}
 
     def add_pbar(self, pbar_id, pre_label, active_prefix, done_label, max_value=None):
         container = self.expander.container()
@@ -97,6 +97,43 @@ class MultiProgressBars:
 
         self.bars[pbar_id].progress(progress, text=display_text)
 
+    def add_status(self, status_id, pre_label="Waiting...", mid_label="Working...", post_label="Done!"):
+        import streamlit_nested_layout
+        container = self.expander.container()
+        text_placeholder = container.empty()
+        status_placeholder = container.empty()  # for the st.status()
+
+        # Initial small gray text
+        text_placeholder.markdown(f"<span style='font-size: 0.9rem;'>{pre_label}</span>", unsafe_allow_html=True)
+
+        self.statuses[status_id] = {
+            "text": text_placeholder,
+            "status": status_placeholder,
+            "labels": (pre_label, mid_label, post_label),
+            "status_obj": None,
+        }
+
+    def update_status(self, status_id, phase: str):
+        if status_id not in self.statuses:
+            return None
+
+        labels = self.statuses[status_id]["labels"]
+        text = self.statuses[status_id]["text"]
+        status_slot = self.statuses[status_id]["status"]
+
+        if phase == "mid":
+            text.markdown(f"<span style='font-size: 0.9rem;'>{labels[1]}</span>", unsafe_allow_html=True)
+            status = status_slot.status("Details", expanded=False)
+            self.statuses[status_id]["status_obj"] = status
+            return status
+
+        elif phase == "post":
+            text.markdown(f"<span style='font-size: 0.9rem;'>{labels[2]}</span>", unsafe_allow_html=True)
+            status_obj = self.statuses[status_id]["status_obj"]
+            if status_obj:
+                status_obj.update(label="Details", state="complete")
+
+
     def generate_label_from_tqdm(self, pbar):
         fmt = pbar.format_dict
         n = fmt.get("n", 0)
@@ -116,7 +153,7 @@ class MultiProgressBars:
         eta_str = f":material/sports_score: {fmt_time((total - n) / rate)}" if rate and total > n else ""
         label = f":material/laps: {n:.1f} {unit} / {total:.1f} {unit}"
         label_divider = " \u00A0\u00A0\u00A0 | \u00A0\u00A0\u00A0 "
-        return label_divider + label_divider.join(filter(None, [percent_str, label, rate_str, elapsed_str, eta_str]))
+        return label_divider +label_divider.join(filter(None, [percent_str, label, rate_str, elapsed_str, eta_str]))
 
 
 
