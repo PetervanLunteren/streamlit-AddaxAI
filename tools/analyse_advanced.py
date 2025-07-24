@@ -1,6 +1,9 @@
 import streamlit as st
 import os
 from datetime import datetime
+import tarfile
+import requests
+from tqdm import tqdm
 import time as sleep_time
 from ads_utils import init_paths
 from streamlit_modal import Modal
@@ -46,65 +49,80 @@ mode = general_settings_vars["mode"]
 
 
 # DEBUG
+if st.button("Download and extract1", use_container_width=True):
 
-import random
-from tqdm import tqdm
+    url = "https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-empty-debug.tar.xz"
+    local_filename = "envs/env-empty-debug.tar.xz"
 
-if st.button("Debug: Show vars", use_container_width=True):
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    total_size = int(response.headers.get('content-length', 0))
 
-    # pbars = MultiProgressBars("📦 Deployment Tasks")
+    # show progress bars
+    pbars = MultiProgressBars("Installing virual environment")
+    pbars.add_pbar("download", "Waiting to download...", "Downloading...", "Download complete!", max_value=total_size)
+    pbars.add_pbar("extract", "Waiting to extract...", "Extracting...", "Extraction complete!", max_value=None)
 
-    # pbars.add_pbar("download", "Downloading files...")
-    # pbars.add_pbar("process", "Processing...")
-
-    # for i in range(100):
-    #     speed = round(random.uniform(5.0, 10.0), 1)
-    #     pbars.update("download", n=1, text=f"Downloading... :material/speed: {speed}/s | 📊 {i+1}%")
-    #     sleep_time.sleep(0.01)
-
-    # for i in range(50):
-    #     speed = round(random.uniform(1.0, 3.0), 1)
-    #     pbars.update("process", n=1, text=f"🧪 Processing | ⚡ {speed}/s | 📊 {int((i+1)/50*100)}%")
-    #     sleep_time.sleep(0.015)
-
-    # pbars.set_description("download", "✅ Download complete!")
-    # pbars.set_description("process", "✅ Processing complete!")
+    # download progress bar
+    block_size = 1024
+    pbar = tqdm(total=total_size / (1024 * 1024), unit='MB', unit_scale=False, unit_divisor=1)
+    with open(local_filename, 'wb') as f:
+        for data in response.iter_content(block_size):
+            f.write(data)
+            mb = len(data) / (1024 * 1024)
+            pbar.update(mb)
+            label = pbars.generate_label_from_tqdm(pbar)
+            pbars.update("download", n=len(data), text=label)
+    pbar.close()
     
+    # Extract progress bar
+    with tarfile.open(local_filename, mode="r:xz") as tar:
+        members = tar.getmembers()
+        pbars.set_max_value("extract", len(members))  # ✅ This is clean and intuitive
+        pbar = tqdm(total=len(members), unit="file", unit_scale=False)
+        for member in members:
+            tar.extract(member, path="envs/")
+            pbar.update(1)
+            label = pbars.generate_label_from_tqdm(pbar)
+            pbars.update("extract", n=1, text=label)
+        pbar.close()
     
-    pbars = MultiProgressBars("📦 Running Process")
-    # pbars.add_pbar("c", max_value=100, prefix="Downloading...")
-
-    pbars.add_pbar(
-        "download",
-        pre_label="Waiting to download...",
-        active_prefix="Downloading...",
-        done_label="Download complete!",
-        max_value=100
-    )
-
-    pbars.add_pbar(
-        "extract",
-        pre_label="Waiting to extract...",
-        active_prefix="Extracting...",
-        done_label="Extraction complete!",
-        max_value=100
-    )
+    # pip install requirements
+    os.system("/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python -m pip install -r /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt")
     
-    # pbars.add_pbar("extract", max_value=100, prefix="Extracting...")
 
-    pbar = tqdm(total=100)
-    for _ in range(100):
-        sleep_time.sleep(0.02)
-        pbar.update(1)
-        label = pbars.generate_label_from_tqdm(pbar)
-        pbars.update("download", n=1, text=label)
 
-    pbar = tqdm(total=100)
-    for _ in range(100):
-        sleep_time.sleep(0.2)
-        pbar.update(1)
-        label = pbars.generate_label_from_tqdm(pbar)
-        pbars.update("extract", n=1, text=label)
+
+# import tarfile
+# import os
+
+    # # Open the archive
+    # with tarfile.open(local_filename, mode="r:xz") as tar:
+    #     members = tar.getmembers()
+    #     total_files = len(members)
+
+    #     # Reset tqdm and Streamlit progress bar for extraction
+    #     pbar = tqdm(total=total_files, unit="file", unit_scale=False)
+
+    #     for i, member in enumerate(members):
+    #         tar.extract(member, path="envs/")  # extract to a directory
+    #         pbar.update(1)
+
+    #         label = pbars.generate_label_from_tqdm(pbar)
+    #         pbars.update("extract", n=1, text=label)
+    #         sleep_time.sleep(0.1)  # Simulate some processing time
+            
+    #         # st.write(label)
+
+    #     pbar.close()
+
+
+    # pbar = tqdm(total=100)
+    # for _ in range(100):
+    #     sleep_time.sleep(0.2)
+    #     pbar.update(1)
+    #     label = pbars.generate_label_from_tqdm(pbar)
+    #     pbars.update("extract", n=1, text=label)
 
     pbar.close()
     # pbars.set_description("download", "Done!")

@@ -1,4 +1,13 @@
-.DS_Store
+# Ignore everything in envs/
+envs/*
+
+# But do NOT ignore the envs/reqs/ directory and its contents
+!envs/reqs/
+!envs/reqs/**
+
+
+# rest of the instructions (order matters!)
+**/.DS_Store
 **/__pycache__/
 pyproject.toml
 vars/*
