@@ -6,14 +6,14 @@ import requests
 from tqdm import tqdm
 import subprocess
 import time as sleep_time
-from ads_utils import init_paths
+from utils import init_paths
 import sys
 from streamlit_modal import Modal
 import streamlit.components.v1 as components
 
-from ads_utils.config import *
+from utils.config import *
 
-# todo: only read the vars files here, not in the ads_utils module
+# todo: only read the vars files here, not in the utils module
 # todo: make project select in the sidebar, all tools need a project no need to select it every time
 # todo: revert everything back to st.session state, no need to use vars files, only write the vars to file if added to the queue
 
@@ -21,8 +21,8 @@ from ads_utils.config import *
 # todo: also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
 
 # import local modules
-from ads_utils.common import load_lang_txts, load_vars, StepperBar, print_widget_label, update_vars, clear_vars, info_box, MultiProgressBars
-from ads_utils.analyse_advanced import (browse_directory_widget,
+from utils.common import load_lang_txts, load_vars, StepperBar, print_widget_label, update_vars, clear_vars, info_box, MultiProgressBars
+from utils.analyse_advanced import (browse_directory_widget,
                                         check_folder_metadata,
                                         project_selector_widget,
                                         datetime_selector_widget,
@@ -409,8 +409,8 @@ else:
 
     if st.button(":material/rocket_launch: Process queue 1", use_container_width=True, type="primary"):
 
-        overall_progress = st.empty()
-        pbars = MultiProgressBars()
+        # overall_progress = st.empty()
+        pbars = MultiProgressBars(container_label="Processing queue...",)
         
         pbars.add_pbar("detector", "Loading images...", "Detecting...", "Finished detection!", max_value=47)
 
@@ -423,8 +423,10 @@ else:
             selected_cls_modelID = deployment['selected_cls_modelID']
 
             # run the MegaDetector
-            overall_progress.write(f"Processing deployment: {idx} of {len(process_queue)} ...{selected_folder[-15:]}")
+            pbars.update_label(f"Processing deployment: {idx} of {len(process_queue)} ...{selected_folder[-15:]}")
+            # overall_progress.write(f"Processing deployment: {idx} of {len(process_queue)} ...{selected_folder[-15:]}")
             run_md(selected_folder, pbars)
+        # pbars.update_label("")
 
     modal = Modal(f"Processing queue...", key="process_queue",
                   show_close_button=False)

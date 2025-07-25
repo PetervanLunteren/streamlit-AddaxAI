@@ -3,7 +3,7 @@ import streamlit as st
 import sys
 import platform
 
-from ads_utils.common import *
+from utils.common import *
 
 
 

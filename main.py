@@ -10,7 +10,7 @@
 
 # cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
 
-from ads_utils import init_paths
+from utils import init_paths
 
 
 from appdirs import user_config_dir
@@ -26,10 +26,10 @@ from PIL import Image
 # AddaxAI_files = os.path.dirname(os.path.dirname(
 #     os.path.dirname(os.path.realpath(__file__))))
 
-from ads_utils.config import ADDAXAI_FILES
+from utils.config import ADDAXAI_FILES
 
 
-# from ads_utils import init_paths # import init_paths  # this will set the sys.path and PYTHONPATH variables
+# from utils import init_paths # import init_paths  # this will set the sys.path and PYTHONPATH variables
 
 # # insert dependencies to system variables
 # cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
@@ -155,8 +155,8 @@ st.markdown("""
 #     for k, v in env_vars.items():
 #         st.write(f"{k}: {v}")
 
-# from ads_utils.common import *
-from ads_utils.common import load_lang_txts, load_vars, update_vars
+# from utils.common import *
+from utils.common import load_lang_txts, load_vars, update_vars
 
 
 

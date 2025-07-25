@@ -1,11 +1,11 @@
 import streamlit as st
 import os
 import pandas as pd
-from ads_utils.common import print_widget_label
+from utils.common import print_widget_label
 from streamlit_tree_select import tree_select
-from ads_utils.data_verification import get_location_deployment_nested_dict
+from utils.data_verification import get_location_deployment_nested_dict
 import streamlit_antd_components as sac
-from ads_utils.depth_estimation_utils import debug_deployment_selector
+from utils.depth_estimation_utils import debug_deployment_selector
 
 st.markdown("*This is where the user can choose to do depth estimation with depth anything (https://github.com/DepthAnything/Depth-Anything-V2)*")
 

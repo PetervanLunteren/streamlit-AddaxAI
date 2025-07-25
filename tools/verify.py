@@ -1,8 +1,8 @@
-# from ads_utils import init_paths
+# from utils import init_paths
 
 import streamlit as st
 import os
-from ads_utils.common import print_widget_label
+from utils.common import print_widget_label
 import pandas as pd
 
 st.markdown("*This would be where the users can verify their predictions. Somthing where you first select which label and conf range you are interested in, and then verify that selection*")

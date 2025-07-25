@@ -1,9 +1,9 @@
 import streamlit as st
 import os
 import pandas as pd
-from ads_utils.common import print_widget_label
+from utils.common import print_widget_label
 from streamlit_tree_select import tree_select
-from ads_utils.data_verification import get_location_deployment_nested_dict
+from utils.data_verification import get_location_deployment_nested_dict
 
 # st.set_page_config(page_title="Tool 1", page_icon="🛠️")
 

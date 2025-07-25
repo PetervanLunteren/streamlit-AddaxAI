@@ -38,7 +38,7 @@ import tarfile
 # set global variables
 # AddaxAI_files = os.path.dirname(os.path.dirname(
 #     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from ads_utils.config import ADDAXAI_FILES
+from utils.config import ADDAXAI_FILES
 CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
 DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
 
@@ -52,8 +52,11 @@ with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
 
 
 class MultiProgressBars:
-    def __init__(self, expander_label="Progress Bars", expanded=True):
-        self.expander = st.expander(expander_label, expanded=expanded)
+    def __init__(self, container_label="Progress Bars"):
+        self.container = st.container(border=True)
+        self.label_placeholder = self.container.empty()
+        if container_label:
+            self.label_placeholder.subheader(container_label)
         self.bars = {}
         self.states = {}
         self.max_values = {}
@@ -63,8 +66,15 @@ class MultiProgressBars:
         self.statuses = {}
         self.label_divider = " \u00A0\u00A0\u00A0 | \u00A0\u00A0\u00A0 "
 
+    def update_label(self, new_label):
+        """Update the container label dynamically."""
+        if new_label:
+            self.label_placeholder.subheader(new_label)
+        else:
+            self.label_placeholder.empty()
+
     def add_pbar(self, pbar_id, pre_label, active_prefix, done_label, max_value=None):
-        container = self.expander.container()
+        container = self.container.container()
         self.states[pbar_id] = 0
         self.max_values[pbar_id] = max_value or 1  # temporary placeholder
         self.active_prefixes[pbar_id] = active_prefix
@@ -98,7 +108,7 @@ class MultiProgressBars:
 
     def add_status(self, status_id, pre_label="Waiting...", mid_label="Working...", post_label="Done!"):
         import streamlit_nested_layout
-        container = self.expander.container()
+        container = self.container.container()
         text_placeholder = container.empty()
         status_placeholder = container.empty()  # for the st.status()
 
@@ -218,8 +228,6 @@ class MultiProgressBars:
         eta_str = f":material/sports_score: {fmt_time((total - n) / rate)}" if rate and total > n else ""
         laps_str = f":material/laps: {int(n)} {unit} / {int(total)} {unit}"
         return self.label_divider + self.label_divider.join(filter(None, [percent_str, laps_str, rate_str, elapsed_str, eta_str]))
-
-
 # class MultiProgressBars:
 #     def __init__(self, expander_label="Progress Bars", expanded=True):
 #         self.expander = st.expander(expander_label, expanded=expanded)

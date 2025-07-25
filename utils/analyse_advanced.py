@@ -1,4 +1,4 @@
-from ads_utils import init_paths
+from utils import init_paths
 
 from streamlit_tree_select import tree_select
 import os
@@ -49,13 +49,13 @@ from streamlit_modal import Modal
 # VIDEO_EXTENSIONS = []
 # # from megadetector.utils.path_utils import IMG_EXTENSIONS
 # IMG_EXTENSIONS = []
-from ads_utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars
+from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars
 
 
 # set global variables
 # AddaxAI_files = os.path.dirname(os.path.dirname(
 #     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from ads_utils.config import *
+from utils.config import *
 # AddaxAI_files = os.path.join(
 #     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
 CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
@@ -1077,7 +1077,7 @@ def browse_directory_widget():
 
 def select_folder():
     result = subprocess.run([sys.executable, os.path.join(
-        ADDAXAI_FILES_ST, "ads_utils", "folder_selector.py")], capture_output=True, text=True)
+        ADDAXAI_FILES_ST, "utils", "folder_selector.py")], capture_output=True, text=True)
     folder_path = result.stdout.strip()
     if folder_path != "" and result.returncode == 0:
         return folder_path

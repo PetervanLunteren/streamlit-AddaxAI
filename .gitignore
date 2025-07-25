@@ -5,7 +5,6 @@ envs/*
 !envs/reqs/
 !envs/reqs/**
 
-
 # rest of the instructions (order matters!)
 **/.DS_Store
 **/__pycache__/

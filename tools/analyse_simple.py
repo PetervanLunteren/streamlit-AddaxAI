@@ -3,7 +3,7 @@ import streamlit as st
 
 # st.set_page_config(layout="wide")
 
-from ads_utils.common import *
+from utils.common import *
         
 # load language settings
 txts = load_lang_txts()
