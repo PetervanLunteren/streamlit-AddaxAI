@@ -15,9 +15,10 @@ from appdirs import user_config_dir
 # import string
 from tqdm import tqdm
 import subprocess
+import re
 # import math
 # import time as sleep_time
-from datetime import datetime #, time, timedelta
+from datetime import datetime  # , time, timedelta
 # from datetime import datetime
 import os
 # from pathlib import Path
@@ -37,21 +38,17 @@ import tarfile
 # set global variables
 # AddaxAI_files = os.path.dirname(os.path.dirname(
 #     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from ads_utils.config import AddaxAI_files
-CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
-DET_DIR = os.path.join(AddaxAI_files, "models", "det")
+from ads_utils.config import ADDAXAI_FILES
+CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
+DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
 
 # load camera IDs
 config_dir = user_config_dir("AddaxAI")
 map_file = os.path.join(config_dir, "map.json")
 
 # set versions
-with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
+with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
-
-
-
-
 
 
 class MultiProgressBars:
@@ -64,6 +61,7 @@ class MultiProgressBars:
         self.pre_labels = {}
         self.done_labels = {}
         self.statuses = {}
+        self.label_divider = " \u00A0\u00A0\u00A0 | \u00A0\u00A0\u00A0 "
 
     def add_pbar(self, pbar_id, pre_label, active_prefix, done_label, max_value=None):
         container = self.expander.container()
@@ -105,7 +103,8 @@ class MultiProgressBars:
         status_placeholder = container.empty()  # for the st.status()
 
         # Initial small gray text
-        text_placeholder.markdown(f"<span style='font-size: 0.9rem;'>{pre_label}</span>", unsafe_allow_html=True)
+        text_placeholder.markdown(
+            f"<span style='font-size: 0.9rem;'>{pre_label}</span>", unsafe_allow_html=True)
 
         self.statuses[status_id] = {
             "text": text_placeholder,
@@ -123,17 +122,81 @@ class MultiProgressBars:
         status_slot = self.statuses[status_id]["status"]
 
         if phase == "mid":
-            text.markdown(f"<span style='font-size: 0.9rem;'>{labels[1]}</span>", unsafe_allow_html=True)
+            text.markdown(
+                f"<span style='font-size: 0.9rem;'>{labels[1]}</span>", unsafe_allow_html=True)
             status = status_slot.status("Details", expanded=False)
             self.statuses[status_id]["status_obj"] = status
             return status
 
         elif phase == "post":
-            text.markdown(f"<span style='font-size: 0.9rem;'>{labels[2]}</span>", unsafe_allow_html=True)
+            text.markdown(
+                f"<span style='font-size: 0.9rem;'>{labels[2]}</span>", unsafe_allow_html=True)
             status_obj = self.statuses[status_id]["status_obj"]
             if status_obj:
                 status_obj.update(label="Details", state="complete")
 
+    # def update_from_tqdm_string(self, pbar_id, tqdm_line: str):
+    #     """
+    #     Parse a tqdm output string and update the corresponding Streamlit progress bar.
+    #     """
+    #     tqdm_pattern = r"(\d+)%\|.*\|\s*(\d+)/(\d+).*?\[(.*?)<.*?,\s*([\d.]+)\s*(\S+)?/s\]"
+    #     match = re.search(tqdm_pattern, tqdm_line)
+
+    #     if not match:
+    #         return  # Skip lines that do not match tqdm format
+
+    #     percent = int(match.group(1))
+    #     n = int(match.group(2))
+    #     total = int(match.group(3))
+    #     elapsed_str = match.group(4)
+    #     rate = float(match.group(5))
+    #     unit = match.group(6) or ""
+
+    #     self.set_max_value(pbar_id, total)
+    #     label = (f"{self.label_divider}"
+    #              f":material/clock_loader_40: {percent}%{self.label_divider}"
+    #              f":material/laps: {n} {unit} / {total} {unit}{self.label_divider}"
+    #              f":material/speed: {rate:.2f} {unit}/s"
+    #              f":material/timer: {elapsed_str}{self.label_divider}"
+    #              f":material/sports_score: {eta_str}"
+    #              )
+
+    #     self.update(pbar_id, n - self.states[pbar_id], text=label)
+        
+        
+        
+        
+    def update_from_tqdm_string(self, pbar_id, tqdm_line: str):
+        """
+        Parse a tqdm output string and update the corresponding Streamlit progress bar, including ETA.
+        """
+        tqdm_pattern = r"(\d+)%\|.*\|\s*(\d+)/(\d+).*?\[(.*?)<([^,]+),\s*([\d.]+)\s*(\S+)?/s\]"
+        match = re.search(tqdm_pattern, tqdm_line)
+
+        if not match:
+            return  # Skip lines that do not match tqdm format
+
+        percent = int(match.group(1))
+        n = int(match.group(2))
+        total = int(match.group(3))
+        elapsed_str = match.group(4).strip()
+        eta_str = match.group(5).strip()
+        rate = float(match.group(6))
+        unit = match.group(7) or ""
+
+        self.set_max_value(pbar_id, total)
+        self.states[pbar_id] = n  # Sync directly to avoid increment error
+
+        label = (
+            f"{self.label_divider}"
+            f":material/clock_loader_40: {percent}%{self.label_divider}"
+            f":material/laps: {n} {unit} / {total} {unit}{self.label_divider}"
+            f":material/speed: {rate:.2f} {unit}/s{self.label_divider}"
+            f":material/timer: {elapsed_str}{self.label_divider}"
+            f":material/sports_score: {eta_str}"
+        )
+
+        self.update(pbar_id, n - self.states[pbar_id], text=label)
 
     def generate_label_from_tqdm(self, pbar):
         fmt = pbar.format_dict
@@ -144,7 +207,8 @@ class MultiProgressBars:
         elapsed = fmt.get("elapsed")
 
         def fmt_time(s):
-            if s is None: return ""
+            if s is None:
+                return ""
             s = int(s)
             return f"{s // 60}:{s % 60:02}"
 
@@ -152,17 +216,8 @@ class MultiProgressBars:
         rate_str = f":material/speed: {rate:.1f} {unit}/s" if rate else ""
         elapsed_str = f":material/timer: {fmt_time(elapsed)}" if elapsed else ""
         eta_str = f":material/sports_score: {fmt_time((total - n) / rate)}" if rate and total > n else ""
-        label = f":material/laps: {int(n)} {unit} / {int(total)} {unit}"
-        label_divider = " \u00A0\u00A0\u00A0 | \u00A0\u00A0\u00A0 "
-        return label_divider +label_divider.join(filter(None, [percent_str, label, rate_str, elapsed_str, eta_str]))
-
-
-
-
-
-
-
-
+        laps_str = f":material/laps: {int(n)} {unit} / {int(total)} {unit}"
+        return self.label_divider + self.label_divider.join(filter(None, [percent_str, laps_str, rate_str, elapsed_str, eta_str]))
 
 
 # class MultiProgressBars:
@@ -216,7 +271,7 @@ class MultiProgressBars:
 #     def generate_label_from_tqdm(self, pbar):
 #         """Generate a status label from tqdm instance with percent, rate, elapsed, and ETA."""
 #         fmt = pbar.format_dict
-        
+
 #         # st.write(fmt)  # Debugging line to see the format dictionary
 
 #         n = fmt.get("n", "?")
@@ -258,8 +313,6 @@ class MultiProgressBars:
 #         components = [percent_str, label, rate_str, elapsed_str, eta_str]
 #         progress_divider = " \u00A0\u00A0\u00A0 | \u00A0\u00A0\u00A0 "
 #         return progress_divider + progress_divider.join(filter(None, components))
-
-
 
 
 # class MultiProgressBars:
@@ -308,8 +361,6 @@ class MultiProgressBars:
 #             raise ValueError(f"Progress bar with id '{pbar_id}' not found.")
 #         self.states[pbar_id] = 0
 #         self.bars[pbar_id].progress(0)
-
-
 
 
 class StepperBar:
@@ -412,8 +463,6 @@ class StepperBar:
 #     return step
 
 
-
-
 def default_converter(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
@@ -426,17 +475,20 @@ def clear_vars(section):
     Clear all variables in a specific section of the settings.
     """
     # settings, settings_file = load_map()
-    
+
     # TODO: this is messing with the queue. it is deleting the queue too...
     # it should clear only the temp vars in the section, so if we are back to st.session_state, ot should clear only the session state vars of the selected session.
-    
+
     # if not exist, create empty vars file
-    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
+                             "streamlit-AddaxAI", "vars", f"{section}.json")
     # if os.path.exists(vars_file): # temorarily disabled
     #     os.remove(vars_file)
 
+
 def replace_vars(section, new_vars):
-    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
+                             "streamlit-AddaxAI", "vars", f"{section}.json")
 
     # # Ensure the directory exists (optional, but safe)
     # os.makedirs(os.path.dirname(vars_file), exist_ok=True)
@@ -445,10 +497,12 @@ def replace_vars(section, new_vars):
     with open(vars_file, "w", encoding="utf-8") as file:
         json.dump(new_vars, file, indent=2, default=default_converter)
 
+
 def update_vars(section, updates):
     # settings, settings_file = load_map()
 
-    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
+                             "streamlit-AddaxAI", "vars", f"{section}.json")
     # /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/vars/general_settings.json
     if not os.path.exists(vars_file):
         with open(vars_file, "w", encoding="utf-8") as f:
@@ -457,7 +511,6 @@ def update_vars(section, updates):
     # read section vars
     with open(vars_file, "r", encoding="utf-8") as f:
         section_vars = json.load(f)
-        
 
     # update
     section_vars.update(updates)
@@ -465,6 +518,7 @@ def update_vars(section, updates):
     # Use `default=default_converter` to catch any lingering datetime objects
     with open(vars_file, "w") as file:
         json.dump(section_vars, file, indent=2, default=default_converter)
+
 
 def load_map():
     """Reads the data from the JSON file and returns it as a dictionary."""
@@ -485,22 +539,22 @@ def load_map():
 def load_vars(section):
 
     # if not exist, create empty vars file
-    vars_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"{section}.json")
+    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
+                             "streamlit-AddaxAI", "vars", f"{section}.json")
     if not os.path.exists(vars_file):
         with open(vars_file, "w", encoding="utf-8") as f:
             json.dump({}, f, indent=2)
-    
+
     # read section vars
     with open(vars_file, "r", encoding="utf-8") as f:
         section_vars = json.load(f)
-    
+
     return section_vars
     # return {var: section_vars.get(var, None) for var in requested_vars}.values()
 
 
-
 def load_lang_txts():
-    txts_fpath = os.path.join(AddaxAI_files, "AddaxAI",
+    txts_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI",
                               "streamlit-AddaxAI", "assets", "language", "lang.json")
     with open(txts_fpath, "r", encoding="utf-8") as file:
         txts = json.load(file)
@@ -543,10 +597,6 @@ def settings(txts, lang, mode):
             #     label_visibility="collapsed"
             # )
             st.text("")
-
-
-
-
 
 
 #########################
@@ -635,8 +685,6 @@ def requires_addaxai_update(required_version):
 
     # All parts are equal, consider versions equal
     return False
-
-
 
 
 def info_box(msg, icon=":material/info:"):

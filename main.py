@@ -1,5 +1,13 @@
 
 
+# TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
+# TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
+# TODO: RDE
+
+
+
+
+
 # cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
 
 from ads_utils import init_paths
@@ -18,7 +26,7 @@ from PIL import Image
 # AddaxAI_files = os.path.dirname(os.path.dirname(
 #     os.path.dirname(os.path.realpath(__file__))))
 
-from ads_utils.config import AddaxAI_files
+from ads_utils.config import ADDAXAI_FILES
 
 
 # from ads_utils import init_paths # import init_paths  # this will set the sys.path and PYTHONPATH variables
@@ -53,7 +61,7 @@ from ads_utils.config import AddaxAI_files
 # os.environ["PYTHONPATH"] = PYTHONPATH_separator.join(existing_paths)
 
 # make sure the config file is set
-os.environ["STREAMLIT_CONFIG"] = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
+os.environ["STREAMLIT_CONFIG"] = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
 
 
 
@@ -61,7 +69,7 @@ os.environ["STREAMLIT_CONFIG"] = os.path.join(AddaxAI_files, "AddaxAI", "streaml
 
 
 st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
-    AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), page_title="AddaxAI")
+    ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), page_title="AddaxAI")
 
 
 
@@ -199,7 +207,7 @@ if not os.path.exists(map_file):
     with open(map_file, "w") as f:
         json.dump(map, f, indent=2)
 
-general_settings_file = os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
+general_settings_file = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
 if not os.path.exists(general_settings_file):
 # if True:  # DEBUG
     # create a default settings file
@@ -231,7 +239,7 @@ folium.Marker([39.949610, -75.150282]).add_to(m)
 
 # save only the last 1000 lines of the log file
 # log_fpath = "/Users/peter/Desktop/streamlit_app/frontend/streamlit_log.txt"
-log_fpath = os.path.join(AddaxAI_files, "AddaxAI",
+log_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI",
                          "streamlit-AddaxAI", "assets", "logs", "log.txt")
 if not os.path.exists(log_fpath):
     # create an empty log file
@@ -264,7 +272,7 @@ except Exception as e:
 
 # page navigation
 # st.logo("/Users/peter/Desktop/streamlit_app/frontend/logo.png", size = "large")
-st.logo(os.path.join(AddaxAI_files, "AddaxAI",
+st.logo(os.path.join(ADDAXAI_FILES, "AddaxAI",
         "streamlit-AddaxAI", "assets", "images", "logo.png"), size="large")
 if mode == 0:  # simple mode
     analyse_sim_page = st.Page(

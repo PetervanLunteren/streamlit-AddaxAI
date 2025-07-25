@@ -9,11 +9,11 @@ AddaxAI_files = os.path.dirname(os.path.dirname(os.path.dirname(
 # insert dependencies to system variables
 cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
 paths_to_add = [
-    os.path.join(AddaxAI_files),
-    os.path.join(AddaxAI_files, "cameratraps"),
-    os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
-    os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
-    os.path.join(AddaxAI_files, "AddaxAI")
+    # os.path.join(AddaxAI_files),
+    # os.path.join(AddaxAI_files, "cameratraps"),
+    # os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
+    # os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
+    # os.path.join(AddaxAI_files, "AddaxAI")
 ]
 if cuda_toolkit_path:
     paths_to_add.append(os.path.join(cuda_toolkit_path, "bin"))

@@ -45,34 +45,102 @@ from streamlit_modal import Modal
 
 
 # local imports
-from megadetector.detection.video_utils import VIDEO_EXTENSIONS
-from megadetector.utils.path_utils import IMG_EXTENSIONS
+# from megadetector.detection.video_utils import VIDEO_EXTENSIONS
+# VIDEO_EXTENSIONS = []
+# # from megadetector.utils.path_utils import IMG_EXTENSIONS
+# IMG_EXTENSIONS = []
 from ads_utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars
 
 
 # set global variables
 # AddaxAI_files = os.path.dirname(os.path.dirname(
 #     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from ads_utils.config import AddaxAI_files, AddaxAI_streamlit_files
+from ads_utils.config import *
 # AddaxAI_files = os.path.join(
 #     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
-CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
-DET_DIR = os.path.join(AddaxAI_files, "models", "det")
+CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
+DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
 
 # load camera IDs
 config_dir = user_config_dir("AddaxAI")
 map_file = os.path.join(config_dir, "map.json")
 
 # set versions
-with open(os.path.join(AddaxAI_files, 'AddaxAI', 'version.txt'), 'r') as file:
+with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
 
 
 
+def install_env(
+    modal: Modal,
+    env_name: str,
+):
+    
+    # modal.close()
+    
+    info_box(
+        "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
+    )
+    
+    if st.button("Cancel", use_container_width=True):
+        st.warning("Installation cancelled. You can try again later.")
+        sleep_time.sleep(2)
+        modal.close()
+        return
 
 
-def run_env_installer(
+    command = (
+        f"{MICROMAMBA} create -p {ADDAXAI_FILES_ST}/envs/env-{env_name} python=3.11 -y && "
+        f"{MICROMAMBA} run -p {ADDAXAI_FILES_ST}/envs/env-{env_name} pip install -r {ADDAXAI_FILES_ST}/envs/reqs/env-{env_name}/macos/requirements.txt"
+    )
+    
+    
+    status_placeholder = st.empty()
+    
+    # st.write("Running MegaDetector...")
+    with st.spinner(f"Installing virtual environment '{env_name}'..."):
+        with st.expander("Show details", expanded=False):
+            with st.container(border=True, height=250):
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    shell=True,
+                    universal_newlines=True
+                )
+
+                output_placeholder = st.empty()
+                output_lines = "Booting up micromamba installation...\n\n"
+                output_placeholder.code(output_lines, language="bash")
+                for line in process.stdout:
+                    output_lines += line
+                    output_placeholder.code(output_lines, language="bash")
+
+                process.stdout.close()
+                process.wait()
+
+    # ✅ Show result message above
+    if process.returncode == 0:
+        status_placeholder.success("Environment installed successfully!")
+        sleep_time.sleep(2)
+        modal.close()
+    else:
+        status_placeholder.error(f"Installation failed with exit code {process.returncode}.")
+        if st.button("Close window", use_container_width=True):
+            modal.close()
+        
+        
+
+
+
+
+
+# this one is old (when I still thought I needed to download the env)
+# but i left it here since it clearly shows how to use the progress bars
+def DEMO_PBARS(
     modal: Modal,
     env_name: str,
 ):
@@ -92,6 +160,10 @@ def run_env_installer(
             sleep_time.sleep(2)
             modal.close()
             return
+
+
+
+
 
         # url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/{env_name}.tar.xz"
         url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-{env_name}.tar.xz"
@@ -1005,7 +1077,7 @@ def browse_directory_widget():
 
 def select_folder():
     result = subprocess.run([sys.executable, os.path.join(
-        AddaxAI_streamlit_files, "ads_utils", "folder_selector.py")], capture_output=True, text=True)
+        ADDAXAI_FILES_ST, "ads_utils", "folder_selector.py")], capture_output=True, text=True)
     folder_path = result.stdout.strip()
     if folder_path != "" and result.returncode == 0:
         return folder_path
@@ -1019,7 +1091,7 @@ def select_folder():
 
 def load_model_metadata():
     model_info_json = os.path.join(
-        AddaxAI_streamlit_files, "assets", "model_meta", "model_meta.json")
+        ADDAXAI_FILES_ST, "assets", "model_meta", "model_meta.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     return model_info
@@ -1148,7 +1220,7 @@ def load_all_model_info(type):
 
     # load
     model_info_json = os.path.join(
-        AddaxAI_streamlit_files, "model_info.json")
+        ADDAXAI_FILES_ST, "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
 
@@ -1613,7 +1685,7 @@ def load_model_info(model_name):
 def save_cls_classes(cls_model_key, slected_classes):
     # load
     model_info_json = os.path.join(
-        AddaxAI_streamlit_files, "model_info.json")
+        ADDAXAI_FILES_ST, "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
@@ -1625,7 +1697,7 @@ def save_cls_classes(cls_model_key, slected_classes):
 
 def load_taxon_mapping(cls_model_ID):
     taxon_mapping_csv = os.path.join(
-        AddaxAI_streamlit_files, "models", "cls", cls_model_ID, "taxon-mapping.csv")
+        ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "taxon-mapping.csv")
 
     taxon_mapping = []
     with open(taxon_mapping_csv, newline='', encoding='utf-8') as f:
@@ -1911,7 +1983,7 @@ def add_deployment_to_queue():
     
 def write_selected_species(selected_species, cls_model_ID):
     # Construct the path to the JSON file
-    json_path = os.path.join(AddaxAI_streamlit_files, "models", "cls", cls_model_ID, "variables.json")
+    json_path = os.path.join(ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "variables.json")
     
     # Load the existing JSON content
     with open(json_path, "r") as f:
