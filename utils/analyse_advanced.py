@@ -69,8 +69,141 @@ map_file = os.path.join(config_dir, "map.json")
 with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
+def run_process_queue(
+    modal: Modal,
+    process_queue: str,
+):
+    info_box(
+        "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
+        "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources."
+    )
+
+    _, cancel_col, _ = st.columns([1, 2, 1])
+
+    with cancel_col:
+        if st.button(":material/cancel: Cancel", use_container_width=True):
+            modal.close()
+
+    # overall_progress = st.empty()
+    pbars = MultiProgressBars(container_label="Processing queue...",)
+    
+    pbars.add_pbar("detector", "Loading images...", "Detecting...", "Finished detection!")# , max_value=47)
+    pbars.add_pbar("classifier", "Loading images...", "Classifying...", "Finished classification!")# , max_value=47)
+
+    for idx, deployment in enumerate(process_queue):
+        selected_folder = deployment['selected_folder']
+        selected_projectID = deployment['selected_projectID']
+        selected_locationID = deployment['selected_locationID']
+        selected_min_datetime = deployment['selected_min_datetime']
+        selected_det_modelID = deployment['selected_det_modelID']
+        selected_cls_modelID = deployment['selected_cls_modelID'] 
+
+        # run the MegaDetector
+        pbars.update_label(f"Processing deployment: :gray-background[{idx+1}] of :gray-background[{len(process_queue)}]")
+        run_md(selected_folder, pbars)
+
+        # run the classifier
+        if selected_cls_modelID:
+            pbars.update_label("Running classifier...")
+            run_cls(selected_folder, selected_cls_modelID, pbars)
+
+    modal.close()
+    
+def run_cls(deployment_folder, cls_modelID, pbars):
+    """
+    Run the classifier on the given deployment folder using the specified model ID.
+    """
+    # cls_model_file = os.path.join(CLS_DIR, f"{cls_modelID}.pt")
+    cls_model_fpath = "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/cls/SAH-DRY-ADS-v1/sub_saharan_drylands_v1.pt"
+    python_executable = f"{ADDAXAI_FILES_ST}/envs/env-pytorch/bin/python"
+    inference_script = "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/cls/model_types/addax-sdzwa-pt/classify_detections.py"
+    AddaxAI_files = ADDAXAI_FILES
+    cls_detec_thresh = 0.01
+    cls_class_thresh = 0.01
+    cls_animal_smooth = False
+    json_fpath = os.path.join(deployment_folder, "addaxai-deployment.json")
+    temp_frame_folder = "None"
+    cls_tax_fallback = False
+    cls_tax_levels_idx = 0
+
+    command_args = []
+    command_args.append(python_executable)
+    command_args.append(inference_script)
+    command_args.append(AddaxAI_files)
+    command_args.append(cls_model_fpath)
+    command_args.append(str(cls_detec_thresh))
+    command_args.append(str(cls_class_thresh))
+    command_args.append(str(cls_animal_smooth))
+    command_args.append(json_fpath)
+    command_args.append(temp_frame_folder)
+    command_args.append(str(cls_tax_fallback))
+    command_args.append(str(cls_tax_levels_idx))
+
+    # command = [
+    #     f"{ADDAXAI_FILES_ST}/envs/env-pytorch/bin/python",
+    #     "-m", "megadetector.classification.run_classifier_batch",
+    #     cls_model_file,
+    #     deployment_folder,
+    #     output_file
+    # ]
+
+    status_placeholder = st.empty()
+    process = subprocess.Popen(
+        command_args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        shell=False,
+        universal_newlines=True
+    )
+
+    for line in process.stdout:
+        line = line.strip()
+        st.code(line)
+        pbars.update_from_tqdm_string("classifier", line)
+
+    process.stdout.close()
+    process.wait()
+
+    if not process.returncode == 0:
+        status_placeholder.error(
+            f"Failed with exit code {process.returncode}.")
 
 
+def run_md(deployment_folder, pbars):
+
+    model_file = "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt"
+    output_file = os.path.join(deployment_folder, "addaxai-deployment.json")
+    command = [
+        f"{ADDAXAI_FILES_ST}/envs/env-megadetector/bin/python",
+        "-m", "megadetector.detection.run_detector_batch",
+        model_file,
+        deployment_folder,
+        output_file
+    ]
+
+    status_placeholder = st.empty()
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        shell=False,
+        universal_newlines=True
+    )
+
+    for line in process.stdout:
+        line = line.strip()
+        pbars.update_from_tqdm_string("detector", line)
+
+    process.stdout.close()
+    process.wait()
+
+    if not process.returncode == 0:
+        status_placeholder.error(
+            f"Failed with exit code {process.returncode}.")
 
 def install_env(
     modal: Modal,

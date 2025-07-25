@@ -34,7 +34,8 @@ from utils.analyse_advanced import (browse_directory_widget,
                                         species_selector_widget,
                                         load_taxon_mapping,
                                         add_deployment_to_queue,
-                                        install_env
+                                        install_env,
+                                        run_process_queue
                                         )
 
 
@@ -59,63 +60,17 @@ if modal_install_env.is_open():
     with modal_install_env.container():
         install_env(modal_install_env, st.session_state["required_env_name"])
 
+modal_process_queue = Modal(f"Processing queue...", key="process_queue",
+                show_close_button=False)
+if modal_process_queue.is_open():
+    with modal_process_queue.container():
+        run_process_queue(modal_process_queue, st.session_state["process_queue"])
+        # install_env(modal_install_env, st.session_state["required_env_name"])
 # if st.button("DEBUG - run MD", use_container_width=True):
 
 
-def run_md(deployment_folder, pbars):
-
-    model_file = "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt"
-    output_file = os.path.join(deployment_folder, "addaxai-deployment.json")
-    command = [
-        f"{ADDAXAI_FILES_ST}/envs/env-megadetector/bin/python",
-        "-m", "megadetector.detection.run_detector_batch",
-        model_file,
-        deployment_folder,
-        output_file
-    ]
 
 
-
-    
-
-    status_placeholder = st.empty()
-
-    # st.write("Running MegaDetector...")
-    # with st.spinner(f"Running MegaDetector..."):
-        # with st.expander("Show details", expanded=False):
-            # with st.container(border=True, height=250):
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        shell=False,
-        universal_newlines=True
-    )
-
-    # output_placeholder = st.empty()
-    # output_lines = "Booting up MegaDetector...\n\n"
-    # output_placeholder.code(output_lines, language="bash")
-    for line in process.stdout:
-        line = line.strip()
-        pbars.update_from_tqdm_string("detector", line)
-        # output_lines += line
-        # output_placeholder.code(output_lines, language="bash")
-
-    process.stdout.close()
-    process.wait()
-
-    # ✅ Show result message above
-    if process.returncode == 0:
-        status_placeholder.success("MD ran successfully!")
-        # sleep_time.sleep(2)
-        # modal.close()
-    else:
-        status_placeholder.error(
-            f"Failed with exit code {process.returncode}.")
-        # if st.button("Close window", use_container_width=True):
-        #     modal.close()
 
 
 # if st.button(":material/help: Help", use_container_width=True):
@@ -407,107 +362,7 @@ else:
                             st.write(
                                 f"**Animal detection model**: {deployment['selected_det_modelID']}")
 
-    if st.button(":material/rocket_launch: Process queue 1", use_container_width=True, type="primary"):
-
-        # overall_progress = st.empty()
-        pbars = MultiProgressBars(container_label="Processing queue...",)
-        
-        pbars.add_pbar("detector", "Loading images...", "Detecting...", "Finished detection!", max_value=47)
-
-        for idx, deployment in enumerate(process_queue):
-            selected_folder = deployment['selected_folder']
-            selected_projectID = deployment['selected_projectID']
-            selected_locationID = deployment['selected_locationID']
-            selected_min_datetime = deployment['selected_min_datetime']
-            selected_det_modelID = deployment['selected_det_modelID']
-            selected_cls_modelID = deployment['selected_cls_modelID']
-
-            # run the MegaDetector
-            pbars.update_label(f"Processing deployment: {idx} of {len(process_queue)} ...{selected_folder[-15:]}")
-            # overall_progress.write(f"Processing deployment: {idx} of {len(process_queue)} ...{selected_folder[-15:]}")
-            run_md(selected_folder, pbars)
-        # pbars.update_label("")
-
-    modal = Modal(f"Processing queue...", key="process_queue",
-                  show_close_button=False)
-    if st.button(":material/rocket_launch: Process queue 2", use_container_width=True, type="primary"):
-        modal.open()
-        st.write("RUN!")
-
-    if modal.is_open():
-        with modal.container():
-
-            info_box(
-                "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
-                "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources."
-            )
-
-            # st.progress(0, "Processing queue...")  # TODO: this should be a real progress bar
-            _, cancel_col, _ = st.columns([1, 2, 1])
-
-            with cancel_col:
-                if st.button(":material/cancel: Cancel", use_container_width=True):
-                    modal.close()
-
-            # Overall queue progress
-            st.write("Overall queue progress")
-            queue_pbar = st.progress(0, text="Initializing queue...")
-
-            # Deployment container with border
-            with st.expander(":material/visibility: Show details", expanded=False):
-                deployment_container = st.container(border=True)
-
-                # Create placeholders inside the container
-                deployment_title_placeholder = deployment_container.empty()
-                spinner1_placeholder = deployment_container.empty()
-                subtask1_pbar = deployment_container.progress(
-                    0, text="Subtask 1")
-                subtask2_pbar = deployment_container.progress(
-                    0, text="Subtask 2")
-                subtask3_pbar = deployment_container.progress(
-                    0, text="Subtask 3")
-                spinner2_placeholder = deployment_container.empty()
-
-                for idx, deployment in enumerate(process_queue):
-                    # Title
-                    deployment_title_placeholder.write(
-                        f":material/sd_card: Deployment {idx + 1}")
-
-                    # Reset all progress bars
-                    subtask1_pbar.progress(0, text="Starting deployment...")
-                    subtask2_pbar.progress(0, text="Preparing files")
-                    subtask3_pbar.progress(0, text="Uploading to server")
-
-                    # Spinner (e.g., initialization or file checks)
-                    with spinner1_placeholder.status("Initializing...", expanded=True):
-                        sleep_time.sleep(0.5)  # Simulate some setup work
-
-                    # Main deployment progress
-                    for i in range(100):
-                        sleep_time.sleep(0.001)
-                        subtask1_pbar.progress(
-                            i + 1, text=f"Deployment {idx + 1} ({i + 1}%)")
-
-                    # Subtask 1
-                    for i in range(100):
-                        sleep_time.sleep(0.001)
-                        subtask2_pbar.progress(
-                            i + 1, text=f"Preparing files ({i + 1}%)")
-
-                    # Subtask 2
-                    for i in range(100):
-                        sleep_time.sleep(0.001)
-                        subtask3_pbar.progress(
-                            i + 1, text=f"Uploading to server ({i + 1}%)")
-
-                    # Spinner (e.g., initialization or file checks)
-                    with spinner1_placeholder.status("Finalizing...", expanded=True):
-                        sleep_time.sleep(0.5)  # Simulate some setup work
-
-                    # Update overall queue progress
-                    queue_pbar.progress(int((idx + 1) / len(process_queue) * 100),
-                                        text=f"Completed {idx + 1} of {len(process_queue)} deployments")
-
-            # info_box("You're done!!!!! It took you X minutes, and you should know that the recognition files should not be altered, etc....")
-
-            modal.close()
+    if st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary"):
+        if "process_queue" not in st.session_state:
+            st.session_state["process_queue"] = process_queue
+        modal_process_queue.open()

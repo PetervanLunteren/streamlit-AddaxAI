@@ -12,7 +12,7 @@ paths_to_add = [
     # os.path.join(AddaxAI_files),
     # os.path.join(AddaxAI_files, "cameratraps"),
     # os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
-    # os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
+    os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
     # os.path.join(AddaxAI_files, "AddaxAI")
 ]
 if cuda_toolkit_path:

@@ -56,7 +56,7 @@ class MultiProgressBars:
         self.container = st.container(border=True)
         self.label_placeholder = self.container.empty()
         if container_label:
-            self.label_placeholder.subheader(container_label)
+            self.label_placeholder.markdown(container_label)
         self.bars = {}
         self.states = {}
         self.max_values = {}
@@ -69,7 +69,7 @@ class MultiProgressBars:
     def update_label(self, new_label):
         """Update the container label dynamically."""
         if new_label:
-            self.label_placeholder.subheader(new_label)
+            self.label_placeholder.markdown(new_label)
         else:
             self.label_placeholder.empty()
 
@@ -228,6 +228,10 @@ class MultiProgressBars:
         eta_str = f":material/sports_score: {fmt_time((total - n) / rate)}" if rate and total > n else ""
         laps_str = f":material/laps: {int(n)} {unit} / {int(total)} {unit}"
         return self.label_divider + self.label_divider.join(filter(None, [percent_str, laps_str, rate_str, elapsed_str, eta_str]))
+
+
+
+
 # class MultiProgressBars:
 #     def __init__(self, expander_label="Progress Bars", expanded=True):
 #         self.expander = st.expander(expander_label, expanded=expanded)
