@@ -35,8 +35,9 @@ import tarfile
 # from cameratraps.megadetector.utils.path_utils import IMG_EXTENSIONS
 
 # set global variables
-AddaxAI_files = os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+# AddaxAI_files = os.path.dirname(os.path.dirname(
+#     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+from ads_utils.config import AddaxAI_files
 CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
 DET_DIR = os.path.join(AddaxAI_files, "models", "det")
 
@@ -151,7 +152,7 @@ class MultiProgressBars:
         rate_str = f":material/speed: {rate:.1f} {unit}/s" if rate else ""
         elapsed_str = f":material/timer: {fmt_time(elapsed)}" if elapsed else ""
         eta_str = f":material/sports_score: {fmt_time((total - n) / rate)}" if rate and total > n else ""
-        label = f":material/laps: {n:.1f} {unit} / {total:.1f} {unit}"
+        label = f":material/laps: {int(n)} {unit} / {int(total)} {unit}"
         label_divider = " \u00A0\u00A0\u00A0 | \u00A0\u00A0\u00A0 "
         return label_divider +label_divider.join(filter(None, [percent_str, label, rate_str, elapsed_str, eta_str]))
 

@@ -10,6 +10,8 @@ from ads_utils import init_paths
 from streamlit_modal import Modal
 import streamlit.components.v1 as components
 
+from ads_utils.config import AddaxAI_files, AddaxAI_streamlit_files
+
 # todo: only read the vars files here, not in the ads_utils module
 # todo: make project select in the sidebar, all tools need a project no need to select it every time
 # todo: revert everything back to st.session state, no need to use vars files, only write the vars to file if added to the queue
@@ -35,6 +37,8 @@ from ads_utils.analyse_advanced import (browse_directory_widget,
                                         )
 
 
+# st.write(AddaxAI_files)
+
 # load files
 txts = load_lang_txts()
 general_settings_vars = load_vars(section="general_settings")
@@ -48,377 +52,47 @@ mode = general_settings_vars["mode"]
 
 
 
+# the modals need to be defined before they are used
+modal_install_env = Modal(f"Installing virtual environment", key="installing-env", show_close_button=False)
+if modal_install_env.is_open():
+    with modal_install_env.container():
+        run_env_installer(modal_install_env, st.session_state["required_env_name"])
 
+if st.button(":material/help: Help", use_container_width=True):
+    command = [
+        "/Applications/AddaxAI_files/envs/env-base/bin/python",
+        "/Applications/AddaxAI_files/cameratraps/megadetector/detection/run_detector_batch.py",
+        "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt",
+        "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001",
+        "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001/test_output.json"
+    ]
 
+    st.write("Running MegaDetector...")
+    with st.spinner("Processing..."):
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
 
+        output_placeholder = st.empty()
+        output_lines = ""
 
-# DEBUG
-modal_1 = Modal(f"Installing ENV", key="installing-env", show_close_button=False)
+        for line in process.stdout:
+            output_lines += line
+            output_placeholder.code(output_lines, language="bash")
 
-if st.button("Show installation modal", use_container_width=True):
-    modal_1.open()
+        process.stdout.close()
+        process.wait()
 
-if modal_1.is_open():
-    with modal_1.container():
-        # st.write("Ready to install.")
-        # st.write("This may take a few minutes. Do not refresh the page.")
+    st.success("Done!")
 
-        # if st.button("Run installer now", key="run-installer"):
-        run_env_installer(modal_1, "env-empty-debug")
-
-
-
-
-
-# if st.button("Download and extract1", use_container_width=True):
-#     modal_1.open()
-#     run_env_installer(modal_1, "env-empty-debug")
-
+# if st.button(":material/help: Help", use_container_width=True):
+#     os.system("/Applications/AddaxAI_files/envs/env-base/bin/python" "/Applications/AddaxAI_files/cameratraps/megadetector/detection/run_detector_batch.py" "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt" "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001" "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001/test_output.json")
     
-                    
-# if modal_1.is_open():
-#     with modal_1.container():
-        
-#         info_box(
-#             "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
-#             "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources."
-#         )
-
-#         url = "https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-empty-debug.tar.xz"
-#         local_filename = "envs/env-empty-debug.tar.xz"
-
-#         response = requests.get(url, stream=True)
-#         response.raise_for_status()
-#         total_size = int(response.headers.get('content-length', 0))
-
-#         # show progress bars
-#         pbars = MultiProgressBars("Installing virual environment")
-#         pbars.add_pbar("download", "Waiting to download...", "Downloading...", "Download complete!", max_value=total_size)
-#         pbars.add_pbar("extract", "Waiting to extract...", "Extracting...", "Extraction complete!", max_value=None)
-#         pbars.add_status("install", "Waiting to install...", "Installing...", "Installation complete!")
-
-#         # download progress bar
-#         block_size = 1024
-#         pbar = tqdm(total=total_size / (1024 * 1024), unit='MB', unit_scale=False, unit_divisor=1)
-#         with open(local_filename, 'wb') as f:
-#             for data in response.iter_content(block_size):
-#                 f.write(data)
-#                 mb = len(data) / (1024 * 1024)
-#                 pbar.update(mb)
-#                 label = pbars.generate_label_from_tqdm(pbar)
-#                 pbars.update("download", n=len(data), text=label)
-#         pbar.close()
-        
-#         # Extract progress bar
-#         with tarfile.open(local_filename, mode="r:xz") as tar:
-#             members = tar.getmembers()
-#             pbars.set_max_value("extract", len(members))  # ✅ This is clean and intuitive
-#             pbar = tqdm(total=len(members), unit="files", unit_scale=False)
-#             for member in members:
-#                 tar.extract(member, path="envs/")
-#                 pbar.update(1)
-#                 label = pbars.generate_label_from_tqdm(pbar)
-#                 pbars.update("extract", n=1, text=label)
-#             pbar.close()
-        
-#         # pip install requirements
-        
-        
-        
-#         # install_placeholder.write("")
-
-#         pip_cmd =                 [
-#                     "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python",
-#                     "-m", "pip", "install",
-#                     "-r", "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt"
-#                 ]
-        
-        
-#         # Trigger pip install
-
-#         status = pbars.update_status("install", phase="mid")
-
-#         with status:
-#             with st.container(border=True, height=300):
-#                 output_placeholder = st.empty()
-#                 live_output = "Booting up pip installation...\n\n"
-#                 output_placeholder.code(live_output)
-
-#                 process = subprocess.Popen(
-#                     pip_cmd,
-#                     stdout=subprocess.PIPE,
-#                     stderr=subprocess.STDOUT,
-#                     text=True,
-#                     bufsize=1
-#                 )
-
-#                 for line in process.stdout:
-#                     live_output += line
-#                     output_placeholder.code(live_output)
-
-#                 process.wait()
-
-#         pbars.update_status("install", phase="post")
-    
-    
-    
-#     modal_1.close()
-    
-    
-    
-    
-    
-    
-    
-    
-    # status = pbars.update_status("install", phase="mid")
-    
-    
-    # pip_cmd =                 [
-    #                 "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python",
-    #                 "-m", "pip", "install",
-    #                 "-r", "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt"
-    #             ]
-    
-    # with status:
-    #     with st.container(border=True, height=300):
-    #         output_placeholder = st.empty()
-    #         live_output = "Booting up pip installation...\n\n"
-    #         output_placeholder.code(live_output)
-
-    #         process = subprocess.Popen(
-    #             pip_cmd,
-    #             stdout=subprocess.PIPE,
-    #             stderr=subprocess.STDOUT,
-    #             text=True,
-    #             bufsize=1
-    #         )
-
-    #         for line in process.stdout:
-    #             live_output += line
-    #             output_placeholder.code(live_output)
-
-    #         process.wait()
-    #         pbars.update_status("install", phase="post")
-    
-    
-    
-
-    # with st.status("Installing required Python packages...", expanded=False) as status:
-    #     with st.container(border=True, height=300):
-    #         output_placeholder = st.empty()
-    #         live_output = "Booting up pip installation...\n\n"
-    #         output_placeholder.code(live_output)
-
-    #         process = subprocess.Popen(
-    #             [
-    #                 "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python",
-    #                 "-m", "pip", "install",
-    #                 "-r", "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt"
-    #             ],
-    #             stdout=subprocess.PIPE,
-    #             stderr=subprocess.STDOUT,
-    #             text=True,
-    #             bufsize=1  # Line-buffered
-    #         )
-
-    #         # Read pip output line by line and update display
-    #         for line in process.stdout:
-    #             live_output += line
-    #             output_placeholder.code(live_output)
-
-    #         return_code = process.wait()
-
-    #         if return_code == 0:
-    #             status.update(label="Packages installed successfully!", state="complete")
-    #         else:
-    #             status.update(label="Package installation failed", state="error")
-
-
-            
-    # os.system("/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-empty-debug/bin/python -m pip install -r /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/env-debug/macos/requirements.txt")
-    
-
-
-
-# import tarfile
-# import os
-
-    # # Open the archive
-    # with tarfile.open(local_filename, mode="r:xz") as tar:
-    #     members = tar.getmembers()
-    #     total_files = len(members)
-
-    #     # Reset tqdm and Streamlit progress bar for extraction
-    #     pbar = tqdm(total=total_files, unit="file", unit_scale=False)
-
-    #     for i, member in enumerate(members):
-    #         tar.extract(member, path="envs/")  # extract to a directory
-    #         pbar.update(1)
-
-    #         label = pbars.generate_label_from_tqdm(pbar)
-    #         pbars.update("extract", n=1, text=label)
-    #         sleep_time.sleep(0.1)  # Simulate some processing time
-            
-    #         # st.write(label)
-
-    #     pbar.close()
-
-
-    # pbar = tqdm(total=100)
-    # for _ in range(100):
-    #     sleep_time.sleep(0.2)
-    #     pbar.update(1)
-    #     label = pbars.generate_label_from_tqdm(pbar)
-    #     pbars.update("extract", n=1, text=label)
-
-    # pbar.close()
-    # pbars.set_description("download", "Done!")
-    # pbars.set_description("extract", "Done!")
-
-
-
-
-
-
-
-
-
-
-
-
-
-import os
-import tarfile
-import urllib.request
-
-def download_with_progress(url, filename):
-    def reporthook(block_num, block_size, total_size):
-        if total_size > 0:
-            downloaded = block_num * block_size
-            percent = downloaded / total_size * 100
-            if percent > 100:
-                percent = 100
-            st.write(f"Downloading: {int(percent)}%")
-    
-    urllib.request.urlretrieve(url, filename, reporthook=reporthook)
-    st.write(f"Downloaded to {filename}")
-
-if st.button("Download and extract env-empty-debug.tar.xz", use_container_width=True):
-
-    # URL of the .tar.xz file
-    url = "https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-empty-debug.tar.xz"
-
-    # Destination to extract the archive
-    extract_to = "/Applications/AddaxAI_files/envs" 
-
-    # Temporary filename to store the downloaded archive
-    download_path = "/Applications/AddaxAI_files/envs/env-empty-debug.tar.xz"
-
-    with st.expander("Downloading data...", expanded=True):
-        progress_bar = st.progress(0)
-        progress_text = st.empty()
-
-        def reporthook(block_num, block_size, total_size):
-            if total_size > 0:
-                downloaded = block_num * block_size
-                percent = downloaded / total_size
-                if percent > 1:
-                    percent = 1
-                progress_bar.progress(percent)
-                progress_text.text(f"Downloading... {percent*100:.2f}%")
-
-        urllib.request.urlretrieve(url, download_path, reporthook=reporthook)
-
-        progress_text.text("Download complete!")
-
-    # with st.status("Downloading data...", expanded=True) as status:
-    #     # Create a placeholder for substep progress
-    #     progress_line = st.empty()
-
-    #     def reporthook(block_num, block_size, total_size):
-    #         if total_size > 0:
-    #             downloaded = block_num * block_size
-    #             percent = downloaded / total_size * 100
-    #             if percent > 100:
-    #                 percent = 100
-    #             # Update just the progress line (substep)
-    #             progress_line.text(f"Downloading... {percent:.2f}%")
-
-    #     st.write("Preparing to download...")
-    #     # time.sleep(1)
-
-    #     urllib.request.urlretrieve(url, download_path, reporthook=reporthook)
-
-    #     progress_line.text("Download complete!")
-    #     status.update(label="Download complete!", state="complete", expanded=False)
-
-    # with st.status("Starting download...", expanded=True) as status:
-
-    #     def reporthook(block_num, block_size, total_size):
-    #         if total_size > 0:
-    #             downloaded = block_num * block_size
-    #             percent = downloaded / total_size * 100
-    #             if percent > 100:
-    #                 percent = 100
-    #             # Update the status label with percentage
-    #             status.update(label=f"Downloading... {percent:.2f}%")
-
-    #     st.write("Searching for data...")
-    #     # time.sleep(2)
-    #     st.write("Found URL.")
-    #     # time.sleep(1)
-    #     st.write("Downloading data...")
-    #     # time.sleep(1)
-
-    #     urllib.request.urlretrieve(url, download_path, reporthook=reporthook)
-
-    #     status.update(label="Download complete!", state="complete", expanded=False)
-
-
-
-    # with st.status("Downloading data..."):
-
-
-
-
-    #     # Step 1: Download the file
-    #     st.write("Downloading archive...")
-    #     download_with_progress(url, download_path)
-    #     st.write(f"Downloaded to {download_path}")
-
-    #     # Step 2: Extract the .tar.xz archive
-    #     st.write(f"Extracting to {extract_to}...")
-    #     os.makedirs(extract_to, exist_ok=True)
-    #     with tarfile.open(download_path, "r:xz") as tar:
-    #         tar.extractall(path=extract_to)
-        
-    #     # Step 3: Clean up the downloaded archive
-    #     os.remove(download_path)
-    #     st.write(f"Removed downloaded archive: {download_path}")
-
-    #     st.write("Done.")
-
-
-
-
-
-
-
-
-# DEBUG
-
-
-
-
-
-
-
-
-
-
-
-
 
 st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
 
@@ -544,6 +218,8 @@ with st.container(border=True):
 
     elif step == 2:
         st.write("MODEL STUFF!")
+        
+        needs_installing = False
 
         # # load model metadata
         # model_meta = load_model_metadata()
@@ -553,6 +229,17 @@ with st.container(border=True):
             print_widget_label("Species identification model",
                             help_text="Here you can select the model of your choosing.")
             selected_cls_modelID = cls_model_selector_widget(model_meta)
+            
+            if selected_cls_modelID:
+                req_env = model_meta['cls'][selected_cls_modelID]["env"]
+                # if not os.path.exists(f"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/{req_env}"):
+                if not os.path.exists(os.path.join(AddaxAI_streamlit_files, "envs", f"env-{req_env}")):
+                    needs_installing = True
+                    st.warning(f"The selected classification model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
+
+                    if st.button(f"Install {req_env}", use_container_width=False):
+                        st.session_state["required_env_name"] = req_env
+                        modal_install_env.open()
         # st.write("")
 
         # select detection model
@@ -561,8 +248,15 @@ with st.container(border=True):
             print_widget_label("Animal detection model",
                             help_text="The species identification model you selected above requires a detection model to locate the animals in the images. Here you can select the model of your choosing.")
             selected_det_modelID = det_model_selector_widget(model_meta)
-        # st.write("")
-
+            if selected_det_modelID:
+                req_env = model_meta['det'][selected_det_modelID]["env"]
+                if not os.path.exists(os.path.join(AddaxAI_streamlit_files, "envs", f"env-{req_env}")):
+                    needs_installing = True
+                    st.warning(f"The selected detection model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
+                    if st.button(f"Install {req_env}", use_container_width=False):
+                        st.session_state["required_env_name"] = req_env
+                        modal_install_env.open()
+                        
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
 
@@ -573,13 +267,17 @@ with st.container(border=True):
                 st.rerun()
 
         with col_btn_next:
-            if st.button(":material/arrow_forward: Next", use_container_width=True):
-
-                update_vars(section="analyse_advanced",
-                            updates={"step": 3,  # 0 indexed
-                                    "selected_cls_modelID": selected_cls_modelID,
-                                    "selected_det_modelID": selected_det_modelID})
-                st.rerun()
+            if not needs_installing:
+                if st.button(":material/arrow_forward: Next", use_container_width=True):
+                    update_vars(section="analyse_advanced",
+                                updates={"step": 3,  # 0 indexed
+                                        "selected_cls_modelID": selected_cls_modelID,
+                                        "selected_det_modelID": selected_det_modelID})
+                    st.rerun()
+            else:
+                st.button(":material/arrow_forward: Next",
+                        use_container_width=True, disabled=True,
+                        key="model_next_button_dummy", help="You need to install the required virtual environment for the selected models before proceeding. ")
 
     elif step == 3:
 
@@ -680,6 +378,16 @@ else:
                             st.write(f"**Species identification model**: {deployment['selected_cls_modelID']}")
                             st.write(f"**Animal detection model**: {deployment['selected_det_modelID']}")
                         
+                     
+# "/Applications/AddaxAI_files/envs/env-base/bin/python" "-m" "megadetector.detection.run_detector_batch" "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt" "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001" "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001/test_output.json"         
+                     
+                     
+    # if st.button(":material/rocket_launch: Process queue DEBUG", use_container_width=True, type="primary"):  
+    #     st.write("Processing queue...")
+        
+    #     "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-megadetector/bin/python" "-m" "megadetector.detection.run_detector_batch" "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt" "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001" "/Users/peter/Downloads/example-projects-small/project_Kenya/location_001/deployment_001/test_output.json"
+
+    #      "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/env-megadetector/bin/python" "-m" "pip" "install" "megadetector"
                         
     
     modal = Modal(f"Processing queue...", key="process_queue", show_close_button=False)
@@ -764,25 +472,4 @@ else:
             
             modal.close()
                         
-                            
-# if processing_bool:
-#     st.warning("The queue is currently being processed. Please wait until the processing is finished before adding new deployments to the queue.")
-#     # st.progress(0, "Processing queue...")  # TODO: this should be a real progress bar
-    
-#     progress_bar = st.progress(0)
-#     # st.markdown("<br>" * 1000, unsafe_allow_html=True) # hacky tacky clear the screen
 
-#     for i in range(100):
-#         sleep_time.sleep(0.03)  # adjust speed
-#         progress_bar.progress(i + 1)
-
-#     # st.success("Done!")
-#     update_vars(section="analyse_advanced", updates={"processing": False})
-#     st.rerun()  # this should rerun the page to show the updated state
-    
-#     # st.stop()           
-    
-    
-
-
-            

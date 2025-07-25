@@ -15,8 +15,10 @@ import json
 import folium
 from PIL import Image
 
-AddaxAI_files = os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.realpath(__file__))))
+# AddaxAI_files = os.path.dirname(os.path.dirname(
+#     os.path.dirname(os.path.realpath(__file__))))
+
+from ads_utils.config import AddaxAI_files
 
 
 # from ads_utils import init_paths # import init_paths  # this will set the sys.path and PYTHONPATH variables

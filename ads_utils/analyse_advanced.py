@@ -51,10 +51,11 @@ from ads_utils.common import load_vars, update_vars, replace_vars, info_box, loa
 
 
 # set global variables
-AddaxAI_files = os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-AddaxAI_files_debug = os.path.join(
-    AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
+# AddaxAI_files = os.path.dirname(os.path.dirname(
+#     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+from ads_utils.config import AddaxAI_files, AddaxAI_streamlit_files
+# AddaxAI_files = os.path.join(
+#     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
 CLS_DIR = os.path.join(AddaxAI_files, "models", "cls")
 DET_DIR = os.path.join(AddaxAI_files, "models", "det")
 
@@ -92,8 +93,9 @@ def run_env_installer(
             modal.close()
             return
 
-        url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/{env_name}.tar.xz"
-        local_filename = f"envs/{env_name}.tar.xz"
+        # url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/{env_name}.tar.xz"
+        url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-{env_name}.tar.xz"
+        local_filename = f"envs/env-{env_name}.tar.xz"
 
         response = requests.get(url, stream=True)
         response.raise_for_status()
@@ -103,7 +105,7 @@ def run_env_installer(
         pbars = MultiProgressBars("Installing virual environment")
         pbars.add_pbar("download", "Waiting to download...", "Downloading...", "Download complete!", max_value=total_size)
         pbars.add_pbar("extract", "Waiting to extract...", "Extracting...", "Extraction complete!", max_value=None)
-        pbars.add_status("install", "Waiting to install...", "Installing...", "Installation complete!")
+        # pbars.add_status("install", "Waiting to install...", "Installing...", "Installation complete!")
 
         # download progress bar
         block_size = 1024
@@ -128,45 +130,46 @@ def run_env_installer(
                 label = pbars.generate_label_from_tqdm(pbar)
                 pbars.update("extract", n=1, text=label)
             pbar.close()
+        os.remove(local_filename)
         
         # pip install requirements
         
         
         
-        # install_placeholder.write("")
+        # # install_placeholder.write("")
 
-        pip_cmd =                 [
-                    f"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/{env_name}/bin/python",
-                    "-m", "pip", "install",
-                    "-r", f"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/reqs/{env_name}/macos/requirements.txt"
-                ]
+        # pip_cmd =                 [
+        #     os.path.join(AddaxAI_streamlit_files, "envs", f"env-{env_name}", "bin", "python"),
+        #             "-m", "pip", "install", "-r",
+        #             os.path.join(AddaxAI_streamlit_files, "envs", "reqs", f"env-{env_name}", "macos", "requirements.txt")
+        #         ]
         
         
-        # Trigger pip install
+        # # Trigger pip install
 
-        status = pbars.update_status("install", phase="mid")
+        # status = pbars.update_status("install", phase="mid")
 
-        with status:
-            with st.container(border=True, height=300):
-                output_placeholder = st.empty()
-                live_output = "Booting up pip installation...\n\n"
-                output_placeholder.code(live_output)
+        # with status:
+        #     with st.container(border=True, height=300):
+        #         output_placeholder = st.empty()
+        #         live_output = "Booting up pip installation...\n\n"
+        #         output_placeholder.code(live_output)
 
-                process = subprocess.Popen(
-                    pip_cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1
-                )
+        #         process = subprocess.Popen(
+        #             pip_cmd,
+        #             stdout=subprocess.PIPE,
+        #             stderr=subprocess.STDOUT,
+        #             text=True,
+        #             bufsize=1
+        #         )
 
-                for line in process.stdout:
-                    live_output += line
-                    output_placeholder.code(live_output)
+        #         for line in process.stdout:
+        #             live_output += line
+        #             output_placeholder.code(live_output)
 
-                process.wait()
+        #         process.wait()
 
-        pbars.update_status("install", phase="post")
+        # pbars.update_status("install", phase="post")
         
         modal.close()
     
@@ -1002,7 +1005,7 @@ def browse_directory_widget():
 
 def select_folder():
     result = subprocess.run([sys.executable, os.path.join(
-        AddaxAI_files_debug, "ads_utils", "folder_selector.py")], capture_output=True, text=True)
+        AddaxAI_streamlit_files, "ads_utils", "folder_selector.py")], capture_output=True, text=True)
     folder_path = result.stdout.strip()
     if folder_path != "" and result.returncode == 0:
         return folder_path
@@ -1016,7 +1019,7 @@ def select_folder():
 
 def load_model_metadata():
     model_info_json = os.path.join(
-        AddaxAI_files_debug, "assets", "model_meta", "model_meta.json")
+        AddaxAI_streamlit_files, "assets", "model_meta", "model_meta.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     return model_info
@@ -1145,7 +1148,7 @@ def load_all_model_info(type):
 
     # load
     model_info_json = os.path.join(
-        AddaxAI_files_debug, "model_info.json")
+        AddaxAI_streamlit_files, "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
 
@@ -1610,7 +1613,7 @@ def load_model_info(model_name):
 def save_cls_classes(cls_model_key, slected_classes):
     # load
     model_info_json = os.path.join(
-        AddaxAI_files_debug, "model_info.json")
+        AddaxAI_streamlit_files, "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
@@ -1622,7 +1625,7 @@ def save_cls_classes(cls_model_key, slected_classes):
 
 def load_taxon_mapping(cls_model_ID):
     taxon_mapping_csv = os.path.join(
-        AddaxAI_files_debug, "models", "cls", cls_model_ID, "taxon-mapping.csv")
+        AddaxAI_streamlit_files, "models", "cls", cls_model_ID, "taxon-mapping.csv")
 
     taxon_mapping = []
     with open(taxon_mapping_csv, newline='', encoding='utf-8') as f:
@@ -1908,7 +1911,7 @@ def add_deployment_to_queue():
     
 def write_selected_species(selected_species, cls_model_ID):
     # Construct the path to the JSON file
-    json_path = os.path.join(AddaxAI_files_debug, "models", "cls", cls_model_ID, "variables.json")
+    json_path = os.path.join(AddaxAI_streamlit_files, "models", "cls", cls_model_ID, "variables.json")
     
     # Load the existing JSON content
     with open(json_path, "r") as f:

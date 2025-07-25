@@ -1797,6 +1797,7 @@
         "MD5A": {
             "friendly_name": "MegaDetector 5a",
             "emoji": "🐅",
+            "env": "megadetector",
             "model_fname": "md_v5a.0.0.pt",
             "description": "MegaDetector is an object detection model that identifies animals, people, and vehicles in camera trap images (which also makes it useful for eliminating blank images). This model is trained on several hundred thousand bounding boxes from a variety of ecosystems. The animals located by this model with be further identified by the species recognition models.",
             "developer": "Dan Morris",
@@ -1820,6 +1821,7 @@
         "MD5B": {
             "friendly_name": "MegaDetector 5b",
             "emoji": "🦘",
+            "env": "megadetector",
             "model_fname": "md_v5b.0.0.pt",
             "description": "MegaDetector 5b differs from 5a only in its training data and is also an object detection model that identifies animals, people, and vehicles in camera trap images (which also makes it useful for eliminating blank images). This model is trained on several hundred thousand bounding boxes from a variety of ecosystems. The animals located by this model with be further identified by the species recognition models.",
             "developer": "Dan Morris",
