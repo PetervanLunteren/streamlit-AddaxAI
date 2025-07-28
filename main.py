@@ -1,14 +1,35 @@
 
 
+
+# WAAR WAS IK? ik was bezig met die cls inference, maar wilde nu de json eerst laten schrijven naar de cache dir. Alleen als alles geslaagd is, dan pas de json naar de deployment folder schrijven. en dan pas de deployment bij aan de map toevoegen.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 # TODO: RDE
 
-
+# todo: put all golabl variables in st.sessionstate, like model_meta, txts, vars, map, etc.
+# todo: make function that checks the model_meta online and adds the variables.json file to the model folder if it does not exist
 
 
 
 # cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
+
+
+
 
 from utils import init_paths
 
@@ -27,6 +48,30 @@ from PIL import Image
 #     os.path.dirname(os.path.realpath(__file__))))
 
 from utils.config import ADDAXAI_FILES
+
+
+
+# import sys
+# import os
+
+# # Ensure the log directory exists
+# os.makedirs('assets/logs', exist_ok=True)
+
+# # Redirect all print statements to your log file
+# sys.stdout = open('assets/logs/log.txt', 'a')
+# sys.stderr = sys.stdout  # Also redirect errors
+
+# # Now any print() statement anywhere will go to your log file
+# print("This will go to log file")
+
+
+
+# Force all output to be unbuffered and go to stdout
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr = sys.stdout  # Redirect stderr to stdout too
+
+# # Test print
+# print("=== APP STARTING - This should appear in log ===")
 
 
 # from utils import init_paths # import init_paths  # this will set the sys.path and PYTHONPATH variables
@@ -209,6 +254,10 @@ if not os.path.exists(map_file):
 
 general_settings_file = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
 if not os.path.exists(general_settings_file):
+    
+    # make directory if it does not exist
+    os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
+    
 # if True:  # DEBUG
     # create a default settings file
     general_settings = {

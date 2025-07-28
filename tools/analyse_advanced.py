@@ -19,6 +19,8 @@ from utils.config import *
 
 # todo: do the working, selected_lat, selected_lon, selected_cls_modelID, selected_det_modelID.
 # todo: also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
+# todo: download the models too if needed
+
 
 # import local modules
 from utils.common import load_lang_txts, load_vars, StepperBar, print_widget_label, update_vars, clear_vars, info_box, MultiProgressBars
@@ -35,7 +37,8 @@ from utils.analyse_advanced import (browse_directory_widget,
                                         load_taxon_mapping,
                                         add_deployment_to_queue,
                                         install_env,
-                                        run_process_queue
+                                        run_process_queue,
+                                        download_model
                                         )
 
 
@@ -52,6 +55,7 @@ step = analyse_advanced_vars.get("step", 0)
 lang = general_settings_vars["lang"]
 mode = general_settings_vars["mode"]
 
+st.write(f"TEMP_DIR: {TEMP_DIR}")
 
 # the modals need to be defined before they are used
 modal_install_env = Modal(f"Installing virtual environment",
@@ -60,16 +64,22 @@ if modal_install_env.is_open():
     with modal_install_env.container():
         install_env(modal_install_env, st.session_state["required_env_name"])
 
+# modal for processing queue
 modal_process_queue = Modal(f"Processing queue...", key="process_queue",
                 show_close_button=False)
 if modal_process_queue.is_open():
     with modal_process_queue.container():
         run_process_queue(modal_process_queue, st.session_state["process_queue"])
-        # install_env(modal_install_env, st.session_state["required_env_name"])
-# if st.button("DEBUG - run MD", use_container_width=True):
 
-
-
+# modal for downloading models
+modal_download_model = Modal(f"Downloading model...", key="download_model",
+                show_close_button=False)
+if modal_download_model.is_open():
+                 
+    
+    with modal_download_model.container():
+        download_model(modal_download_model, st.session_state["download_modelID"], model_meta)
+        
 
 
 
@@ -216,16 +226,27 @@ with st.container(border=True):
             selected_cls_modelID = cls_model_selector_widget(model_meta)
 
             if selected_cls_modelID and selected_cls_modelID != "NONE":
+                
+                # download the env if needed
                 req_env = model_meta['cls'][selected_cls_modelID]["env"]
-                # if not os.path.exists(f"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/envs/{req_env}"):
                 if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{req_env}")):
                     needs_installing = True
                     st.warning(
                         f"The selected classification model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-
                     if st.button(f"Install {req_env}", use_container_width=False):
                         st.session_state["required_env_name"] = req_env
                         modal_install_env.open()
+                        
+                # download the model if needed
+                model_fname = model_meta['cls'][selected_cls_modelID]["model_fname"]
+                friendly_model_name = model_meta['cls'][selected_cls_modelID]["friendly_name"]
+                if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "models", "cls", selected_cls_modelID, model_fname)):
+                    needs_installing = True
+                    st.warning(
+                        f"The selectedclassification model __{friendly_model_name}__ still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
+                    if st.button(f"Download model", use_container_width=False, key="download_cls_model_button"):
+                        st.session_state["download_modelID"] = selected_cls_modelID
+                        modal_download_model.open()
         # st.write("")
 
         # select detection model
@@ -235,14 +256,28 @@ with st.container(border=True):
                                    help_text="The species identification model you selected above requires a detection model to locate the animals in the images. Here you can select the model of your choosing.")
                 selected_det_modelID = det_model_selector_widget(model_meta)
                 if selected_det_modelID:
+                    
+                    # install the env if needed
                     req_env = model_meta['det'][selected_det_modelID]["env"]
                     if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{req_env}")):
                         needs_installing = True
                         st.warning(
                             f"The selected detection model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-                        if st.button(f"Install {req_env}", use_container_width=False):
+                        if st.button(f"Install virtual environment *{req_env}*", use_container_width=False):
                             st.session_state["required_env_name"] = req_env
                             modal_install_env.open()
+                    
+                    # download the model if needed
+                    model_fname = model_meta['det'][selected_det_modelID]["model_fname"]
+                    friendly_model_name = model_meta['det'][selected_det_modelID]["friendly_name"]
+                    if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "models", "det", selected_det_modelID, model_fname)):
+                        needs_installing = True
+                        st.warning(
+                            f"The selected detection model {friendly_model_name} still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
+                        if st.button(f"Download model", use_container_width=False, key = "download_det_model_button"):
+                            st.session_state["download_modelID"] = selected_det_modelID
+                            modal_download_model.open()
+                    
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -263,10 +298,14 @@ with st.container(border=True):
                                              "selected_cls_modelID": selected_cls_modelID,
                                              "selected_det_modelID": selected_det_modelID})
                         st.rerun()
+                else:
+                    st.button(":material/arrow_forward: Next",
+                            use_container_width=True, disabled=True,
+                            key="model_next_button_dummy", help="You need to install the required virtual environment for the selected models before proceeding. ")
             else:
                 st.button(":material/arrow_forward: Next",
-                          use_container_width=True, disabled=True,
-                          key="model_next_button_dummy", help="You need to install the required virtual environment for the selected models before proceeding. ")
+                        use_container_width=True, disabled=True,
+                        key="model_next_button_dummy", help="You need to select both a species identification model and an animal detection model before proceeding.")
 
     elif step == 3:
 

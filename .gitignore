@@ -11,4 +11,4 @@ envs/*
 pyproject.toml
 vars/*
 models/*
-assets/logs/*
+assets/logs/log.txt

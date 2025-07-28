@@ -202,15 +202,20 @@ def pad_crop(box_size):
 ############### MODEL GENERIC ###############
 #############################################
 # run main function
-import cls.cls_inference as ea
-ea.classify_MD_json(json_path = json_path,
-                    GPU_availability = GPU_availability,
-                    cls_detec_thresh = cls_detec_thresh,
-                    cls_class_thresh = cls_class_thresh,
-                    smooth_bool = smooth_bool,
-                    crop_function = get_crop,
-                    inference_function = get_classification,
-                    temp_frame_folder = temp_frame_folder,
-                    cls_model_fpath = cls_model_fpath,
-                    cls_tax_fallback = cls_tax_fallback,
-                    cls_tax_levels_idx = cls_tax_levels_idx)
+import classification.cls_inference as ea
+# ea.classify_MD_json(json_path = json_path,
+#                     GPU_availability = GPU_availability,
+#                     cls_detec_thresh = cls_detec_thresh,
+#                     cls_class_thresh = cls_class_thresh,
+#                     smooth_bool = smooth_bool,
+#                     crop_function = get_crop,
+#                     inference_function = get_classification,
+#                     temp_frame_folder = temp_frame_folder,
+#                     cls_model_fpath = cls_model_fpath,
+#                     cls_tax_fallback = cls_tax_fallback,
+#                     cls_tax_levels_idx = cls_tax_levels_idx)
+
+ea.create_raw_classifications(json_path= json_path,
+                               GPU_availability= GPU_availability,
+                               crop_function=get_crop,
+                               inference_function=get_classification,)

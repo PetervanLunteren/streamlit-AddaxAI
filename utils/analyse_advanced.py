@@ -50,6 +50,7 @@ from streamlit_modal import Modal
 # # from megadetector.utils.path_utils import IMG_EXTENSIONS
 # IMG_EXTENSIONS = []
 from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars
+from utils.download import download_urls
 
 
 # set global variables
@@ -75,7 +76,7 @@ def run_process_queue(
 ):
     info_box(
         "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
-        "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources."
+        "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources. It may take a minute to boot up the processing, so please be patient."
     )
 
     _, cancel_col, _ = st.columns([1, 2, 1])
@@ -87,8 +88,16 @@ def run_process_queue(
     # overall_progress = st.empty()
     pbars = MultiProgressBars(container_label="Processing queue...",)
     
-    pbars.add_pbar("detector", "Loading images...", "Detecting...", "Finished detection!")# , max_value=47)
-    pbars.add_pbar("classifier", "Loading images...", "Classifying...", "Finished classification!")# , max_value=47)
+    pbars.add_pbar(pbar_id="detector",
+                   wait_label="Waiting...",
+                   pre_label="Starting up...",
+                   active_prefix="Detecting...",
+                   done_label="Finished detection!")
+    pbars.add_pbar(pbar_id="classifier",
+                   wait_label="Waiting for detection to finish...",
+                   pre_label="Starting up...",
+                   active_prefix="Classifying...",
+                   done_label="Finished classification!")
 
     for idx, deployment in enumerate(process_queue):
         selected_folder = deployment['selected_folder']
@@ -106,6 +115,8 @@ def run_process_queue(
         if selected_cls_modelID:
             pbars.update_label("Running classifier...")
             run_cls(selected_folder, selected_cls_modelID, pbars)
+            
+        
 
     modal.close()
     
@@ -114,9 +125,13 @@ def run_cls(deployment_folder, cls_modelID, pbars):
     Run the classifier on the given deployment folder using the specified model ID.
     """
     # cls_model_file = os.path.join(CLS_DIR, f"{cls_modelID}.pt")
-    cls_model_fpath = "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/cls/SAH-DRY-ADS-v1/sub_saharan_drylands_v1.pt"
-    python_executable = f"{ADDAXAI_FILES_ST}/envs/env-pytorch/bin/python"
-    inference_script = "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/cls/model_types/addax-sdzwa-pt/classify_detections.py"
+    
+    model_meta = load_model_metadata() # this should be taken from st session state
+    model_info = model_meta['cls'][cls_modelID]
+    
+    cls_model_fpath = os.path.join(ADDAXAI_FILES_ST, "models", "cls", cls_modelID, model_info["model_fname"])
+    python_executable = f"{ADDAXAI_FILES_ST}/envs/env-{model_info['env']}/bin/python"
+    inference_script = os.path.join(ADDAXAI_FILES_ST, "classification", "model_types", model_info["type"], "classify_detections.py")
     AddaxAI_files = ADDAXAI_FILES
     cls_detec_thresh = 0.01
     cls_class_thresh = 0.01
@@ -125,6 +140,11 @@ def run_cls(deployment_folder, cls_modelID, pbars):
     temp_frame_folder = "None"
     cls_tax_fallback = False
     cls_tax_levels_idx = 0
+    
+    
+    # FileNotFoundError: [Errno 2] No such file or directory: '/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/cls/SAH-DRY-ADS-v1/variables.json'
+
+
 
     command_args = []
     command_args.append(python_executable)
@@ -177,7 +197,7 @@ def run_md(deployment_folder, pbars):
     output_file = os.path.join(deployment_folder, "addaxai-deployment.json")
     command = [
         f"{ADDAXAI_FILES_ST}/envs/env-megadetector/bin/python",
-        "-m", "megadetector.detection.run_detector_batch",
+        "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data", 
         model_file,
         deployment_folder,
         output_file
@@ -204,6 +224,91 @@ def run_md(deployment_folder, pbars):
     if not process.returncode == 0:
         status_placeholder.error(
             f"Failed with exit code {process.returncode}.")
+
+
+
+def download_model(
+    modal: Modal,
+    download_modelID: str,
+    model_meta: dict,
+    # pabrs: MultiProgressBars,
+):
+    
+    # modal.close()
+    
+    info_box(
+        "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
+    )
+    
+    # button_placeholder = st.empty()
+    
+    if st.button("Cancel", use_container_width=True):
+        modal.close()
+        return
+
+    # check if it is an detection or classification model
+    if download_modelID in model_meta['det']:
+        download_model_info = model_meta['det'][download_modelID]
+        download_model_type = "det"
+    elif download_modelID in model_meta['cls']:
+        download_model_info = model_meta['cls'][download_modelID]
+        download_model_type = "cls"
+
+    # Define the download URL and local path
+    download_urls_list = download_model_info["download_info"]
+    download_model_total_size = download_model_info["total_download_size"]
+    
+    
+    # st.write(download_urls)
+    
+    download_dir = os.path.join(ADDAXAI_FILES_ST, "models", download_model_type, download_modelID)
+    
+    
+    status_placeholder = st.empty()
+    
+    
+    # Initialize your UI progress bars
+    ui_pbars = MultiProgressBars("Download Progress")
+    ui_pbars.add_pbar("download", "Preparing download...", "Downloading...", "Download complete!")
+    
+    # Start download with UI updates
+    downloaded_files = download_urls(
+        download_urls_list, 
+        download_dir=download_dir, 
+        ui_pbars=ui_pbars, 
+        pbar_id="download",
+        total_size=download_model_total_size,
+    )
+    
+    # Save model metadata to JSON
+    variables_path = os.path.join(download_dir, "variables.json")
+    # try:
+    with open(variables_path, "w") as f:
+        json.dump(download_model_info, f, indent=4)
+        # st.success("Model metadata saved successfully.")
+    # except Exception as e:
+    #     st.error(f"Failed to save model metadata: {e}")
+    
+    
+    
+    
+    
+    
+
+    
+    # downloaded_files = download_urls(download_info, download_dir=download_dir, ui_pbars=pbars)
+    
+    # st.write(f"Successfully downloaded {len(downloaded_files)} files for model '{download_model_info['friendly_name']}' ({download_modelID})")
+    # sleep_time.sleep(10)
+    # modal.close()
+
+    # ✅ Show result message above
+    if len(downloaded_files) == len(download_urls_list):
+        # status_placeholder.success(f"Succesfully downloaded {len(downloaded_files)} of {len(download_urls_list)} files!")
+        # sleep_time.sleep(2)
+        modal.close()
+    else:
+        status_placeholder.error(f"Download failed! Only {len(downloaded_files)} of {len(download_urls_list)} files were downloaded.")
 
 def install_env(
     modal: Modal,
