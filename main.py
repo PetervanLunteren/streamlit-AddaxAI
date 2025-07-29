@@ -1,22 +1,15 @@
 
-
-
-# WAAR WAS IK? ik was bezig met die cls inference, maar wilde nu de json eerst laten schrijven naar de cache dir. Alleen als alles geslaagd is, dan pas de json naar de deployment folder schrijven. en dan pas de deployment bij aan de map toevoegen.
-
-
-
-
-
-
+# imidiate todo's
+# TODO: make the project in the sidebar
+# TODO: rerun everything and make sure to follow strict guilines for storing variables
+    # session state in a separate sub dict for tool for temporary variables that only last the session, e.g., session_state["tool_name"]["var_name"]
+    # vars/<tool_name_abbreviation>.json for variables that are saved to disk and can be loaded later. That way it lasts between sessions.
+    # map.json for the map of the project, this is a global variable that is used to store the locations of the cameras and other project related information. This is stored in the user config directory. This remains alive over different versions of the app.
 
 
 
 
-
-
-
-
-
+# for later
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 # TODO: RDE
@@ -41,9 +34,9 @@ import sys
 import os
 import platform
 import json
-import folium
 from utils.analyse_advanced import load_known_projects
 from utils.common import print_widget_label
+import folium
 from PIL import Image
 
 # AddaxAI_files = os.path.dirname(os.path.dirname(
@@ -243,7 +236,7 @@ os.makedirs(config_dir, exist_ok=True)
 # these will remain constant over different versions of the app
 # so think of language settings, mode settings, etc.
 # locations per camera, paths to deployments, etc.
-map_file = os.path.join(config_dir, "map.json")
+map_file = os.path.join(config_dir, "map.json") 
 if not os.path.exists(map_file):
 
     # start with a clean slate
@@ -265,10 +258,35 @@ if not os.path.exists(general_settings_file):
     general_settings = {
         "lang": "en",
         "mode": 1,  # 0: simple mode, 1: advanced mode
+        "selected_projectID": None
     }
     with open(general_settings_file, "w") as f:
         json.dump(general_settings, f, indent=2)
 
+
+# make a project selector in the sidebar
+
+
+
+# # check what is already known and selected
+# projects, selected_projectID = load_known_projects()
+
+# # if first project, show only button and no dropdown
+# if not projects == {}:
+    
+#     options = list(projects.keys())
+#     selected_index = options.index(
+#         selected_projectID) if selected_projectID in options else 0
+
+#     # overwrite selected_projectID if user has selected a different project
+#     print_widget_label("Project", help_text="Select a project to work with. If you don't have a project yet, you can create one in the settings.", sidebar=True)
+#     selected_projectID = st.sidebar.selectbox(
+#         "Project",
+#         options=options,
+#         index=selected_index,
+#         label_visibility="collapsed"
+#     )
+# # else:
 
 # DEBUG
 # st.write(load_known_locations())
@@ -379,7 +397,7 @@ mode_selected = st.sidebar.segmented_control(
 
 def on_project_change():
     # save_global_vars({"selected_projectID": st.session_state["selected_projectID"]})
-    update_vars("analyse_advanced", {
+    update_vars("general_settings", {
         "selected_projectID": st.session_state["project_selection_sidebar"]
     })
     # st.rerun()

@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 import tarfile
 import requests
-from tqdm import tqdm
+from tqdm import tqdm 
 import subprocess
 import time as sleep_time
 from utils import init_paths
@@ -29,7 +29,7 @@ from utils.analyse_advanced import (browse_directory_widget,
                                         project_selector_widget,
                                         datetime_selector_widget,
                                         location_selector_widget,
-                                        add_deployment,
+                                        # add_deployment,
                                         cls_model_selector_widget,
                                         load_model_metadata,
                                         det_model_selector_widget,
@@ -232,9 +232,11 @@ with st.container(border=True):
 
                         update_vars(section="analyse_advanced",
                                     updates={"step": 2,  # 0 indexed
-                                             "selected_projectID": selected_projectID,
                                              "selected_locationID": selected_locationID,
                                              "selected_min_datetime": selected_min_datetime})
+                        # Update general_settings with the selected_projectID
+                        update_vars(section="general_settings",
+                                    updates={"selected_projectID": selected_projectID})
                         # add_deployment(
                         #     selected_min_datetime=selected_min_datetime)
                         st.rerun()

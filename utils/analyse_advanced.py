@@ -524,6 +524,29 @@ def DEMO_PBARS(
 
 
 
+# def project_selector_widget_sidebar():
+    
+#     # check what is already known and selected
+#     projects, selected_projectID = load_known_projects()
+
+#     # if first project, show only button and no dropdown
+#     if projects == {}:
+#         return
+
+#     options = list(projects.keys())
+#     selected_index = options.index(
+#         selected_projectID) if selected_projectID in options else 0
+
+#     # overwrite selected_projectID if user has selected a different project
+#     selected_projectID = st.sidebar.selectbox(
+#         "Existing projects",
+#         options=options,
+#         index=selected_index,
+#         label_visibility="collapsed"
+#     )
+
+#     # return
+#     return selected_projectID
 
 
 
@@ -561,12 +584,12 @@ def project_selector_widget():
 
         # adjust the selected project
         # map, _ = load_map()
-        analyse_advanced_vars = load_vars(section="analyse_advanced")
-        previous_projectID = analyse_advanced_vars.get(
+        general_settings_vars = load_vars(section="general_settings")
+        previous_projectID = general_settings_vars.get(
             "selected_projectID", None)
         if previous_projectID != selected_projectID:
-            # analyse_advanced_vars["selected_projectID"] = selected_projectID
-            update_vars("analyse_advanced", {
+            # general_settings_vars["selected_projectID"] = selected_projectID
+            update_vars("general_settings", {
                 "selected_projectID": selected_projectID
             })
             # with open(map_file, "w") as file:
@@ -773,7 +796,7 @@ def datetime_selector_widget():
 
     with col4:
         selected_second = st.selectbox(
-            "Second", options=second_options, index=second_options.index(default_second))
+            "Second", options=second_options, index=second_options.index(default_second)) 
 
     if exif_min_datetime:
         info_box(
@@ -802,9 +825,9 @@ def datetime_selector_widget():
 
 def load_known_projects():
     map, _ = load_map()
-    analyse_advanced_vars = load_vars(section="analyse_advanced")
+    general_settings_vars = load_vars(section="general_settings")
     projects = map["projects"]
-    selected_projectID = analyse_advanced_vars.get(
+    selected_projectID = general_settings_vars.get(
         "selected_projectID")
     return projects, selected_projectID
 
@@ -812,7 +835,8 @@ def load_known_projects():
 def load_known_locations():
     map, _ = load_map()
     analyse_advanced_vars = load_vars(section="analyse_advanced")
-    selected_projectID = analyse_advanced_vars.get(
+    general_settings_vars = load_vars(section="general_settings")
+    selected_projectID = general_settings_vars.get(
         "selected_projectID")
     project = map["projects"][selected_projectID]
     selected_locationID = analyse_advanced_vars.get(
@@ -824,7 +848,8 @@ def load_known_locations():
 def load_known_deployments():
     settings, _ = load_map()
     analyse_advanced_vars = load_vars(section="analyse_advanced")
-    selected_projectID = analyse_advanced_vars.get(
+    general_settings_vars = load_vars(section="general_settings")
+    selected_projectID = general_settings_vars.get(
         "selected_projectID")
     project = settings["projects"][selected_projectID]
     selected_locationID = analyse_advanced_vars.get(
@@ -863,9 +888,10 @@ def add_deployment(selected_min_datetime):
 
     map, _ = load_map()
     analyse_advanced_vars = load_vars(section="analyse_advanced")
+    general_settings_vars = load_vars(section="general_settings")
     selected_folder = analyse_advanced_vars.get(
         "selected_folder")
-    selected_projectID = analyse_advanced_vars.get(
+    selected_projectID = general_settings_vars.get(
         "selected_projectID")
     project = map["projects"][selected_projectID]
     selected_locationID = analyse_advanced_vars.get(
@@ -927,7 +953,8 @@ def add_location(location_id, lat, lon):
 
     settings, _ = load_map()
     analyse_advanced_vars = load_vars(section="analyse_advanced")
-    selected_projectID = analyse_advanced_vars.get(
+    general_settings_vars = load_vars(section="general_settings")
+    selected_projectID = general_settings_vars.get(
         "selected_projectID")
     project = settings["projects"][selected_projectID]
     locations = project["locations"]
@@ -993,9 +1020,11 @@ def add_project(projectID, comments):
     }
 
     map["projects"] = projects  # add project
-    # update selected project
+    # update selected project in general_settings and reset other selections in analyse_advanced
+    update_vars("general_settings", {
+        "selected_projectID": projectID
+    })
     update_vars("analyse_advanced", {
-        "selected_projectID": projectID,
         "selected_locationID": None,  # reset location selection
         "selected_deploymentID": None,  # reset deployment selection
     })
@@ -2208,13 +2237,14 @@ def add_deployment_to_queue():
     # todo: this all needs to be st.session_state based, 
     
     analyse_advanced_vars = load_vars(section="analyse_advanced")
+    general_settings_vars = load_vars(section="general_settings")
     process_queue = analyse_advanced_vars.get("process_queue", [])
     # previous_process_queue = analyse_advanced_vars.get("process_queue", [])
     # process_queue = analyse_advanced_vars.get("process_queue", []).copy() # copy to avoid mutating the original list in session state
 
     
     selected_folder = analyse_advanced_vars["selected_folder"]
-    selected_projectID = analyse_advanced_vars["selected_projectID"]
+    selected_projectID = general_settings_vars["selected_projectID"]
     selected_locationID = analyse_advanced_vars["selected_locationID"]
     # selected_lat = analyse_advanced_vars["selected_lat"]
     # selected_lng = analyse_advanced_vars["selected_lng"]

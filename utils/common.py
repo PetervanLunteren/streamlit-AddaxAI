@@ -842,7 +842,6 @@ def print_widget_label(label_text, icon=None, help_text=None, sidebar=False):
         st.markdown(f"{line}**{label_text}**", help=help_text)
 
 
-
 def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
     # Extract option labels and captions from the dictionary
     options = [v["option"] for v in option_caption_dict.values()]
