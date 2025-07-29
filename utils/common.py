@@ -15,9 +15,12 @@ from appdirs import user_config_dir
 # import string
 from tqdm import tqdm
 import subprocess
+import string
+
 import re
 # import math
 # import time as sleep_time
+import random
 from datetime import datetime  # , time, timedelta
 # from datetime import datetime
 import os
@@ -50,6 +53,110 @@ map_file = os.path.join(config_dir, "map.json")
 with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
+def random_animal_adjective():
+    
+    # 5-letter animals
+    animals = [
+        "addax", "aguti", "ammon", "ariel", "bison", "bitch", "bobac", 
+        "bobak", "bongo", "brock", "bruin", "burro", "camel", "canis", 
+        "chimp", "chiru", "civet", "coati", "coney", "coypu", "crone", 
+        "cuddy", "daman", "dhole", "dingo", "dogie", "drill", "eland", 
+        "equus", "felis", "filly", "fitch", "fossa", "gayal", "genet", 
+        "goral", "grice", "gryce", "hinny", "hippo", "horse", "hutia", 
+        "hyena", "hyrax", "indri", "izard", "jocko", "kaama", "kiang", 
+        "koala", "kulan", "kyloe", "lemur", "liger", "llama", "loris", 
+        "magot", "manis", "manul", "mhorr", "moose", "morse", "mouse", 
+        "nagor", "nyala", "okapi", "orang", "oribi", "otary", "otter", 
+        "ounce", "panda", "pekan", "phoca", "pongo", "potto", "puppy", 
+        "ratel", "rhino", "royal", "sable", "saiga", "sajou", "sasin", 
+        "serow", "sheep", "shoat", "shote", "shrew", "skunk", "sloth", 
+        "sorel", "spade", "spado", "steer", "stirk", "stoat", "swine", 
+        "tabby", "takin", "tapir", "tatou", "tiger", "tigon", "urial", 
+        "urson", "vison", "vixen", "whale", "whelp", "yapok", "zebra"
+    ]
+    
+    # 5-letter adjectives  
+    adjectives = [
+        "quick", "brave", "smart", "swift", "alert", "sharp", "quiet",
+        "fresh", "happy", "light", "clean", "clear", "close", "sappy", 
+        "dense", "fancy", "giant", "green", "heavy", "tough", "vivid", 
+        "young", "sound", "sleek", "proud", "noble", "loyal", "fleet", 
+        "agile", "shiny", "furry", "scaly", "rough", "daffy", "dicey",
+        "solid", "fluid", "misty", "foggy", "sunny", "windy", "proof", 
+        "sandy", "rocky", "muddy", "snowy", "leafy", "woody", "sarky",
+        "mossy", "sweet", "spicy", "salty", "tangy", "crisp", "poppy",
+        "alive", "lucky", "cheap", "false", "rapid", "fifth", "awful",
+        "plain", "still", "round", "silly", "above", "blind", "dirty",
+        "sixth", "loose", "level", "outer", "gross", "acute", "valid",
+        "tight", "exact", "sheer", "naked", "spare", "nasty", "crazy",
+        "magic", "upset", "super", "steep", "harsh", "naval", "vague",
+        "faint", "rigid", "stiff", "eager", "fatal", "rival", "blank",
+        "cruel", "crude", "solar", "toxic", "awake", "tenth", "novel",
+        "weird", "civic", "noisy", "ninth", "alien", "handy", "tense",
+        "grave", "bleak", "comic", "ample", "prone", "petty", "naive",
+        "vocal", "dusty", "penal", "polar", "risky", "weary", "olive",
+        "stark", "audio", "overt", "frank", "sober", "frail", "basal",
+        "moist", "split", "adult", "focal", "merry", "privy", "undue",
+        "fatty", "renal", "brisk", "utter", "motor", "fiery", "plump",
+        "jolly", "shaky", "blunt", "tidal", "bland", "cubic", "pagan",
+        "witty", "micro", "stern", "curly", "blond", "hairy", "stale",
+        "viral", "dizzy", "hardy", "token", "tasty", "unfit", "stout",
+        "pious", "fetal", "messy", "rusty", "heady", "hefty", "bogus",
+        "bulky", "stray", "hasty", "stony", "roast", "dodgy", "regal",
+        "molar", "eerie", "inert", "tacit", "queer", "milky", "macho",
+        "timid", "alike", "scant", "lofty", "shady", "nasal", "amber",
+        "lunar", "flash", "erect", "needy", "adept", "silky", "rainy",
+        "baggy", "murky", "lowly", "cross", "aloof", "lousy", "manic",
+        "slack", "scary", "tawny", "tonal", "moody", "humid", "lucid",
+        "beige", "smoky", "slick", "ileal", "husky", "gaunt", "fussy",
+        "juicy", "sonic", "ionic", "fuzzy", "modal", "mauve", "ducal",
+        "inept", "lumpy", "lurid", "spiky", "awash", "burly", "soggy",
+        "lyric", "freak", "ruddy", "bumpy", "gaudy", "banal", "obese",
+        "grimy", "slimy", "khaki", "brash", "squat", "nutty", "plush",
+        "axial", "dingy", "hilly", "canny", "bushy", "macro", "soapy",
+        "batty", "after", "funky", "musty", "jumbo", "seedy", "taboo",
+        "gruff", "manly", "jaded", "livid", "tacky", "bonny", "hazel",
+        "sooty", "colic", "cocky", "lithe", "acrid", "bossy", "fishy",
+        "comfy", "feral", "lilac", "rowdy", "wacky", "crass", "fizzy",
+        "weedy", "giddy", "loath", "tatty", "aural", "unlit", "godly",
+        "algal", "roomy", "peaty", "kinky", "saucy", "cream", "puffy",
+        "dusky", "surly", "pushy", "brawn", "barmy", "jerky", "flush",
+        "sulky", "wispy", "runny", "trite", "afoot", "nosey", "mucky",
+        "spiny", "loony", "horny", "tepid", "meaty", "dotty", "lanky",
+        "leaky", "gutsy", "itchy", "ashen", "rabid", "elite", "balmy",
+        "bawdy", "randy", "suave", "waste", "boggy", "dowdy", "pithy",
+        "dumpy", "mushy", "tipsy", "lusty", "jumpy", "showy", "askew",
+        "nervy", "inane", "epoxy", "snide", "leggy", "zonal", "nifty",
+        "areal", "perky", "beefy", "tinny", "prize", "butch", "corny",
+        "cagey", "natal", "droll", "beady", "skint", "hunky", "downy",
+        "crack", "soppy", "buxom", "ochre", "folic", "hoary", "gusty",
+        "oleic", "potty", "avian", "retro", "fetid", "flaky", "nippy",
+        "wonky", "teeny", "yummy", "swell", "ritzy", "tubby", "jazzy",
+        "gooey", "brill", "glial", "jokey", "boozy", "reedy", "stoic",
+        "aglow", "musky", "nodal", "wordy", "natty", "velar", "hyper",
+        "silty", "podgy", "tardy", "ziggy", "mousy", "chewy", "elven",
+        "ratty", "loopy", "pygmy", "wimpy", "model", "chill", "peaky",
+        "goofy", "warty", "bendy", "filmy", "jammy", "bandy", "waxen",
+        "lytic", "dicky", "tarty", "dishy", "bitty", "venal", "dippy",
+        "pudgy", "muggy", "cushy", "corky", "yucky", "pasty", "humic",
+        "footy", "muzzy", "ducky", "gawky", "mangy", "elect", "weeny",
+        "quasi", "picky", "ropey", "boney", "sassy", "plumb", "weepy",
+        "mealy", "vagal", "sable", "dopey", "rangy", "bluey", "class",
+        "seely", "porky", "vapid", "chary", "curvy", "horsy", "tubal",
+        "punky", "ovoid", "tonic", "blase", "nitty", "zippy", "gummy",
+        "afire", "beaky", "beery", "busty", "holey", "gauze", "huggy",
+        "gassy", "faddy", "phony", "pupal", "kooky", "ludic", "caped",
+        "unwed", "leery", "wormy", "ferny", "minty", "girly", "yogic",
+        "pukka", "foamy", "fusty", "rogue", "seamy", "huffy", "passe"
+    ]
+    
+    # Randomly select one from each list
+    animal = random.choice(animals)
+    adjective = random.choice(adjectives)
+    
+    # Combine them (you can switch order if preferred) plus a random suffix of letters and numbers in captial letters
+    suffix = ''.join([random.choice(string.ascii_uppercase), str(random.randint(0, 9)), random.choice(string.ascii_uppercase)])
+    return f"{adjective}-{animal}-{suffix}"
 
 class MultiProgressBars:
     def __init__(self, container_label="Progress Bars"):

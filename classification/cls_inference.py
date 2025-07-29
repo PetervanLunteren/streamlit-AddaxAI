@@ -23,7 +23,7 @@ from megadetector.data_management import read_exif
 # from megadetector.data_management import cct_json_utils
 # from megadetector.data_management.read_exif import parse_exif_datetime_string
 
-
+ 
 from utils.config import *
 
 
@@ -165,6 +165,7 @@ def create_raw_classifications(json_path,
     # Write updated data back to JSON file with formatting
     with open(json_path, "w") as json_file:
         json.dump(data, json_file, indent=1)
+        
 
 # # MAIN FUNCTION different workflow for videos than for images
 # def classify_MD_json(json_path,

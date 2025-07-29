@@ -56,33 +56,35 @@ lang = general_settings_vars["lang"]
 mode = general_settings_vars["mode"]
 
 st.write(f"TEMP_DIR: {TEMP_DIR}")
+st.write(f"CONFIG_DIR: {CONFIG_DIR}")
 
-from utils.hf_downloader import HuggingFaceRepoDownloader
-if st.button("DEBUG: download repo HF"):
+# # from utils.hf_downloader import HuggingFaceRepoDownloader
+# if st.button("DEBUG: download repo HF"):
+#     generate_wildlife_id()
     
-    # Initialize your UI progress bars
-    ui_pbars = MultiProgressBars("Download Progress")
-    ui_pbars.add_pbar("download", "Preparing download...", "Downloading...", "Download complete!")
+#     # Initialize your UI progress bars
+#     ui_pbars = MultiProgressBars("Download Progress")
+#     ui_pbars.add_pbar("download", "Preparing download...", "Downloading...", "Download complete!")
     
-    """Test the downloader with the specified repository."""
-    downloader = HuggingFaceRepoDownloader()
+
+#     downloader = HuggingFaceRepoDownloader()
     
-    # Test with the provided URL
-    test_repo = "https://huggingface.co/Addax-Data-Science/SAH-DRY-ADS-v1/tree/main"
+#     # Test with the provided URL
+#     test_repo = "https://huggingface.co/Addax-Data-Science/SAH-DRY-ADS-v1/tree/main"
     
-    model_ID = "SAH-DRY-ADS-v1"
+#     model_ID = "MD5B-0-0"
     
-    success = downloader.download_repo(
-        model_ID=model_ID,
-        local_dir=os.path.join(ADDAXAI_FILES_ST, "models", "cls", model_ID),
-        ui_pbars=ui_pbars,
-        pbar_id="download"
-    )
+#     success = downloader.download_repo(
+#         model_ID=model_ID,
+#         local_dir=os.path.join(ADDAXAI_FILES_ST, "models", "det", model_ID),
+#         ui_pbars=ui_pbars,
+#         pbar_id="download"
+#     )
     
-    if success:
-        print("🎉 Test completed successfully!")
-    else:
-        print("😞 Test completed with some failures.")
+#     if success:
+#         print("🎉 Test completed successfully!")
+#     else:
+#         print("😞 Test completed with some failures.")
     
     
     
@@ -233,8 +235,8 @@ with st.container(border=True):
                                              "selected_projectID": selected_projectID,
                                              "selected_locationID": selected_locationID,
                                              "selected_min_datetime": selected_min_datetime})
-                        add_deployment(
-                            selected_min_datetime=selected_min_datetime)
+                        # add_deployment(
+                        #     selected_min_datetime=selected_min_datetime)
                         st.rerun()
                 else:
                     st.button(":material/arrow_forward: Next",

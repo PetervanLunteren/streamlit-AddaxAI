@@ -22,6 +22,8 @@ from datetime import datetime, time  # , timedelta
 # from datetime import datetime
 import os
 from pathlib import Path
+from utils.hf_downloader import HuggingFaceRepoDownloader
+
 from datetime import datetime
 import tarfile
 import requests
@@ -49,8 +51,8 @@ from streamlit_modal import Modal
 # VIDEO_EXTENSIONS = []
 # # from megadetector.utils.path_utils import IMG_EXTENSIONS
 # IMG_EXTENSIONS = []
-from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars
-from utils.download import download_urls
+from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars, random_animal_adjective
+# from utils.download import download_urls
 
 
 # set global variables
@@ -99,28 +101,89 @@ def run_process_queue(
                    active_prefix="Classifying...",
                    done_label="Finished classification!")
 
-    for idx, deployment in enumerate(process_queue):
+    # calculate the total number of deployments to process
+    process_queue = load_vars(section="analyse_advanced").get("process_queue", [])
+    total_deployment_idx = len(process_queue)
+    current_deployment_idx = 1
+
+    while True:
+        
+        # update the queue from file
+        process_queue = load_vars(section="analyse_advanced").get("process_queue", [])
+        
+        # run it on the first element
+        if not process_queue:
+            st.success("All deployments have been processed!")
+            break
+        
+        deployment = process_queue[0]
+            
+        
+        
+        
+
+        # for idx, deployment in enumerate(process_queue):
         selected_folder = deployment['selected_folder']
         selected_projectID = deployment['selected_projectID']
         selected_locationID = deployment['selected_locationID']
         selected_min_datetime = deployment['selected_min_datetime']
         selected_det_modelID = deployment['selected_det_modelID']
         selected_cls_modelID = deployment['selected_cls_modelID'] 
+        
+        temp_json_path = os.path.join(selected_folder, "addaxai-deployment-temp.json")
+        perm_json_path = os.path.join(selected_folder, "addaxai-deployment.json")
 
         # run the MegaDetector
-        pbars.update_label(f"Processing deployment: :gray-background[{idx+1}] of :gray-background[{len(process_queue)}]")
-        run_md(selected_folder, pbars)
+        pbars.update_label(f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
+        
+        model_meta = load_model_metadata()  # TODO: this should be taken from st session state
+        
+        run_md(selected_det_modelID, model_meta["det"][selected_det_modelID], selected_folder, temp_json_path, pbars)
 
         # run the classifier
         if selected_cls_modelID:
             pbars.update_label("Running classifier...")
-            run_cls(selected_folder, selected_cls_modelID, pbars)
+            run_cls(selected_folder, selected_cls_modelID, temp_json_path, pbars)
+        
+        # if all processes are done, update the map file
+        with st.status("Finalizing..."):
+            # if the cls was succesful, the results JSON should be located at the TEMP_DIR, "addaxai-deployment-temp.json"
+            # temp_json_path = os.path.join(TEMP_DIR, "addaxai-deployment-temp.json")
+            # perm_json_path = os.path.join(selected_folder, "addaxai-deployment.json")
             
+            if os.path.exists(temp_json_path):
+                
+                # first add the deployment info to the map file
+                map, map_file = load_map()
+                deployment_id = f"dep-{random_animal_adjective()}"
+                deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get("deployments", {})
+                deployments[deployment_id] = {
+                    "folder": selected_folder,
+                    "min_datetime": selected_min_datetime,
+                    "det_modelID": selected_det_modelID,
+                    "cls_modelID": selected_cls_modelID
+                }
+                
+                # write the updated map to the map file
+                map["projects"][selected_projectID]["locations"][selected_locationID]["deployments"] = deployments
+                
+                with open(map_file, "w") as file:
+                    json.dump(map, file, indent=2)
+                
+                
+                # once that is done, move the deployment info to the deployment folder
+                os.rename(temp_json_path, perm_json_path)
+                
+                # # once that is done, remove the deployment from the process queue, so that it resumes the next deployment if something happens 
+                replace_vars(section="analyse_advanced", new_vars = {"process_queue": process_queue[1:]})
+                current_deployment_idx += 1
+                
+           
         
 
     modal.close()
     
-def run_cls(deployment_folder, cls_modelID, pbars):
+def run_cls(deployment_folder, cls_modelID, json_fpath, pbars):
     """
     Run the classifier on the given deployment folder using the specified model ID.
     """
@@ -136,7 +199,7 @@ def run_cls(deployment_folder, cls_modelID, pbars):
     cls_detec_thresh = 0.01
     cls_class_thresh = 0.01
     cls_animal_smooth = False
-    json_fpath = os.path.join(deployment_folder, "addaxai-deployment.json")
+    # json_fpath = os.path.join(deployment_folder, "addaxai-deployment.json")
     temp_frame_folder = "None"
     cls_tax_fallback = False
     cls_tax_levels_idx = 0
@@ -180,21 +243,23 @@ def run_cls(deployment_folder, cls_modelID, pbars):
 
     for line in process.stdout:
         line = line.strip()
+        print(line)
         st.code(line)
         pbars.update_from_tqdm_string("classifier", line)
 
     process.stdout.close()
     process.wait()
 
-    if not process.returncode == 0:
+    if not process.returncode == 0: 
         status_placeholder.error(
             f"Failed with exit code {process.returncode}.")
+        
 
 
-def run_md(deployment_folder, pbars):
 
-    model_file = "/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt"
-    output_file = os.path.join(deployment_folder, "addaxai-deployment.json")
+def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
+
+    model_file = os.path.join(ADDAXAI_FILES_ST, "models", "det", det_modelID, model_meta["model_fname"]) #"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt"
     command = [
         f"{ADDAXAI_FILES_ST}/envs/env-megadetector/bin/python",
         "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data", 
@@ -216,6 +281,7 @@ def run_md(deployment_folder, pbars):
 
     for line in process.stdout:
         line = line.strip()
+        print(line)
         pbars.update_from_tqdm_string("detector", line)
 
     process.stdout.close()
@@ -253,64 +319,32 @@ def download_model(
     elif download_modelID in model_meta['cls']:
         download_model_info = model_meta['cls'][download_modelID]
         download_model_type = "cls"
-
-    # Define the download URL and local path
-    download_urls_list = download_model_info["download_info"]
-    download_model_total_size = download_model_info["total_download_size"]
-    
-    
-    # st.write(download_urls)
     
     download_dir = os.path.join(ADDAXAI_FILES_ST, "models", download_model_type, download_modelID)
-    
-    
     status_placeholder = st.empty()
     
-    
     # Initialize your UI progress bars
-    ui_pbars = MultiProgressBars("Download Progress")
+    ui_pbars = MultiProgressBars("Progress")
     ui_pbars.add_pbar("download", "Preparing download...", "Downloading...", "Download complete!")
     
-    # Start download with UI updates
-    downloaded_files = download_urls(
-        download_urls_list, 
-        download_dir=download_dir, 
-        ui_pbars=ui_pbars, 
-        pbar_id="download",
-        total_size=download_model_total_size,
+    downloader = HuggingFaceRepoDownloader()
+    success = downloader.download_repo(
+        model_ID=download_modelID,
+        local_dir=download_dir,
+        ui_pbars=ui_pbars,
+        pbar_id="download"
     )
-    
-    
     
     # Save model metadata to JSON TODO dit moet via een andere functie die bij opening dat gaat checken
     variables_path = os.path.join(download_dir, "variables.json")
-    # try:
     with open(variables_path, "w") as f:
         json.dump(download_model_info, f, indent=4)
-        # st.success("Model metadata saved successfully.")
-    # except Exception as e:
-    #     st.error(f"Failed to save model metadata: {e}")
-    
-    
-    
-    
-    
-    
 
-    
-    # downloaded_files = download_urls(download_info, download_dir=download_dir, ui_pbars=pbars)
-    
-    # st.write(f"Successfully downloaded {len(downloaded_files)} files for model '{download_model_info['friendly_name']}' ({download_modelID})")
-    # sleep_time.sleep(10)
-    # modal.close()
-
-    # ✅ Show result message above
-    if len(downloaded_files) == len(download_urls_list):
-        # status_placeholder.success(f"Succesfully downloaded {len(downloaded_files)} of {len(download_urls_list)} files!")
-        # sleep_time.sleep(2)
+    # Show result message above
+    if success:
         modal.close()
     else:
-        status_placeholder.error(f"Download failed! Only {len(downloaded_files)} of {len(download_urls_list)} files were downloaded.")
+        status_placeholder.error(f"Download failed! Please try again later.")
 
 def install_env(
     modal: Modal,
@@ -801,7 +835,6 @@ def load_known_deployments():
         "selected_deploymentID")
     return deployments, selected_deploymentID
 
-
 def generate_deployment_id():
 
     # Create a consistent 5-char hash from the datetime and some randomness
@@ -809,6 +842,8 @@ def generate_deployment_id():
         string.ascii_uppercase + string.digits, k=5))
     rand_str_2 = ''.join(random.choices(
         string.ascii_uppercase + string.digits, k=5))
+
+
 
     # Combine into deployment ID
     return f"dep-{rand_str_1}-{rand_str_2}"
@@ -862,13 +897,13 @@ def add_deployment(selected_min_datetime):
     selected_max_datetime = exif_max_datetime + diff_min_datetime
 
     # generate a unique deployment ID
-    deployment_id = generate_deployment_id()
+    deployment_id = f"dep-{random_animal_adjective()}"
 
     update_vars("analyse_advanced", {
         "selected_deploymentID": deployment_id,
     })
 
-    # Add new deployment
+    # Add new deployment # TODO: i want to have this information at the end, right? When the deploymeny is processed?
     deployments[deployment_id] = {
         "deploymentStart": datetime.isoformat(selected_min_datetime),
         # this is not ctually selected, but calculated from the exif metadata
@@ -1369,7 +1404,7 @@ def det_model_selector_widget(model_meta):
         selected_display_name = st.selectbox(
             "Select a model for detection",
             options=display_names,
-            index=display_names.index(previously_selected_display_name),
+            index=display_names.index(previously_selected_display_name) if previously_selected_display_name != None else 0,
             label_visibility="collapsed"
         )
 

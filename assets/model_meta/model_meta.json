@@ -770,7 +770,7 @@
             "var_tax_fallback": true,
             "min_version": "6.16"
         },
-        "EUR-DF-v1.3": {
+        "EUR-DF-v1-3": {
             "friendly_name": "Europe (Deepfaune v1.3)",
             "emoji": "\ud83c\uddea\ud83c\uddfa",
             "model_fname": "deepfaune-vit_large_patch14_dinov2.lvd142m.v3.pt",
@@ -1058,7 +1058,7 @@
             "var_smooth_cls_animal": false,
             "min_version": "4.4"
         },
-        "EUR-DF-v1.2": {
+        "EUR-DF-v1-2": {
             "friendly_name": "Europe (Deepfaune v1.2)",
             "emoji": "\ud83c\uddea\ud83c\uddfa",
             "model_fname": "deepfaune-vit_large_patch14_dinov2.lvd142m.v2.pt",
@@ -1147,7 +1147,7 @@
             "var_smooth_cls_animal": false,
             "min_version": "5.19"
         },
-        "EUR-DF-v1.1": {
+        "EUR-DF-v1-1": {
             "friendly_name": "Europe (Deepfaune v1.1)",
             "emoji": "\ud83c\uddea\ud83c\uddfa",
             "model_fname": "deepfaune-vit_large_patch14_dinov2.lvd142m.pt",
@@ -1794,7 +1794,7 @@
         }
     },
     "det": {
-        "MD5A": {
+        "MD5A-0-0": {
             "friendly_name": "MegaDetector 5a",
             "emoji": "🐅",
             "env": "megadetector",
@@ -1818,7 +1818,7 @@
             ],
             "min_version": "4.4"
         },
-        "MD5B": {
+        "MD5B-0-0": {
             "friendly_name": "MegaDetector 5b",
             "emoji": "🦘",
             "env": "megadetector",
