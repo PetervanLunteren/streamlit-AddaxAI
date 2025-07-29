@@ -43,34 +43,6 @@ class HuggingFaceRepoDownloader:
         self.pbar = None
         self.lock = threading.Lock()
     
-    # def parse_repo_url(self, repo_url_or_id):
-    #     """
-    #     Parse repository URL or ID to extract repo_id and revision.
-        
-    #     Args:
-    #         repo_url_or_id (str): Repository URL or repo_id
-            
-    #     Returns:
-    #         tuple: (repo_id, revision)
-    #     """
-    #     if repo_url_or_id.startswith('https://huggingface.co/'):
-    #         # Parse URL like https://huggingface.co/Addax-Data-Science/SAH-DRY-ADS-v1/tree/main
-    #         parts = repo_url_or_id.replace('https://huggingface.co/', '').split('/')
-    #         if len(parts) >= 2:
-    #             repo_id = f"{parts[0]}/{parts[1]}"
-    #             revision = "main"  # default
-                
-    #             # Check if specific branch/revision is specified
-    #             if len(parts) > 3 and parts[2] == 'tree':
-    #                 revision = parts[3]
-                
-    #             return repo_id, revision
-    #     else:
-    #         # Assume it's a repo_id like "Addax-Data-Science/SAH-DRY-ADS-v1"
-    #         return repo_url_or_id, "main"
-        
-    #     raise ValueError(f"Could not parse repository URL or ID: {repo_url_or_id}")
-    
     def get_repo_info(self, repo_id, revision="main"):
         """
         Get repository information including total size and file list.
@@ -133,13 +105,12 @@ class HuggingFaceRepoDownloader:
         except Exception as e:
             raise RuntimeError(f"Error fetching repository info: {e}")
     
-    def update_progress(self, bytes_downloaded, ui_pbars, pbar_id):
-        """Update the progress bar thread-safely."""
+    def update_progress(self, bytes_downloaded):
+        """Update the progress bar thread-safely (no UI updates from threads)."""
         with self.lock:
             self.downloaded_bytes += bytes_downloaded
             if self.pbar:
                 self.pbar.update(bytes_downloaded)
-                ui_pbars.update_from_tqdm_object(pbar_id, self.pbar)
     
     def measure_download_speed(self, start_time, bytes_downloaded):
         """Measure and record download speed for adaptive scaling."""
@@ -177,7 +148,7 @@ class HuggingFaceRepoDownloader:
             
             self.last_adjustment_time = current_time
     
-    def download_file(self, file_info, local_dir, ui_pbars, pbar_id):
+    def download_file(self, file_info, local_dir):
         """
         Download a single file with progress tracking.
         
@@ -199,7 +170,7 @@ class HuggingFaceRepoDownloader:
         if os.path.exists(local_file_path):
             existing_size = os.path.getsize(local_file_path)
             if existing_size == file_size:
-                self.update_progress(file_size, ui_pbars, pbar_id)
+                self.update_progress(file_size)
                 return True
         
         start_time = time.time()
@@ -215,7 +186,7 @@ class HuggingFaceRepoDownloader:
                             f.write(chunk)
                             chunk_size = len(chunk)
                             downloaded += chunk_size
-                            self.update_progress(chunk_size, ui_pbars, pbar_id)
+                            self.update_progress(chunk_size)
             
             self.measure_download_speed(start_time, downloaded)
             return True
@@ -257,12 +228,17 @@ class HuggingFaceRepoDownloader:
             repo_local_dir = local_dir
             os.makedirs(repo_local_dir, exist_ok=True)
             
-            # Initialize progress bar
+            # Initialize progress bar (no unit_scale, keep raw bytes)
             self.pbar = tqdm(
                 total=total_size,
                 unit='B',
-                unit_scale=True,
+                unit_scale=False,
             )
+            
+            # Initialize UI progress bar
+            if ui_pbars and pbar_id:
+                ui_pbars.set_max_value(pbar_id, total_size)
+                ui_pbars.start_pbar(pbar_id)
             
             # Download files with thread pool
             successful_downloads = 0
@@ -271,29 +247,51 @@ class HuggingFaceRepoDownloader:
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 # Submit all download tasks
                 future_to_file = {
-                    executor.submit(self.download_file, file_info, repo_local_dir, ui_pbars, pbar_id): file_info
+                    executor.submit(self.download_file, file_info, repo_local_dir): file_info
                     for file_info in files_info
                 }
                 
-                # Process completed downloads
-                for future in as_completed(future_to_file):
-                    file_info = future_to_file[future]
+                # Process completed downloads with frequent UI updates
+                while future_to_file:
+                    # Check for completed downloads (with timeout)
+                    completed_futures = []
+                    for future in list(future_to_file.keys()):
+                        try:
+                            # Check if future is done without blocking
+                            if future.done():
+                                completed_futures.append(future)
+                        except:
+                            pass
                     
-                    try:
-                        success = future.result()
-                        if success:
-                            successful_downloads += 1
-                        else:
+                    # Process any completed futures
+                    for future in completed_futures:
+                        file_info = future_to_file.pop(future)
+                        try:
+                            success = future.result()
+                            if success:
+                                successful_downloads += 1
+                            else:
+                                failed_downloads += 1
+                        except Exception as e:
+                            print(f"❌ Unexpected error downloading {file_info['path']}: {e}")
                             failed_downloads += 1
-                    except Exception as e:
-                        print(f"❌ Unexpected error downloading {file_info['path']}: {e}")
-                        failed_downloads += 1
+                    
+                    # Update UI progress bar from main thread
+                    if ui_pbars and pbar_id and self.pbar:
+                        ui_pbars.update_from_tqdm_object(pbar_id, self.pbar)
                     
                     # Periodically adjust workers based on performance
                     self.adjust_workers()
+                    
+                    # Short sleep to prevent busy waiting
+                    time.sleep(0.1)
             
             # Close progress bar
             self.pbar.close()
+            
+            # Final UI update to show completion
+            if ui_pbars and pbar_id and self.pbar:
+                ui_pbars.update_from_tqdm_object(pbar_id, self.pbar)
             
             # Summary
             print(f"\n✅ Download completed!")
@@ -307,5 +305,8 @@ class HuggingFaceRepoDownloader:
         except Exception as e:
             if self.pbar:
                 self.pbar.close()
+            # Final UI update even on failure
+            if ui_pbars and pbar_id and self.pbar:
+                ui_pbars.update_from_tqdm_object(pbar_id, self.pbar)
             print(f"💥 Download failed: {e}")
             return False

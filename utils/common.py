@@ -208,6 +208,7 @@ class MultiProgressBars:
         rate = fmt.get("rate")
         unit = fmt.get("unit", "B")
         elapsed = fmt.get("elapsed")
+        
 
         def fmt_time(s):
             if s is None:
@@ -217,7 +218,9 @@ class MultiProgressBars:
         
         def fmt_bytes(bytes_val, suffix="B"):
             """Format bytes into human readable format"""
-            if bytes_val < 1024:
+            if bytes_val is None or bytes_val == 0:
+                return f"0 {suffix}"
+            elif bytes_val < 1024:
                 return f"{bytes_val:.0f} {suffix}"
             elif bytes_val < 1024**2:
                 return f"{bytes_val/1024:.1f} K{suffix}"
@@ -242,7 +245,8 @@ class MultiProgressBars:
             n_formatted = fmt_bytes(n)
             total_formatted = fmt_bytes(total)
             laps_str = f":material/laps: {n_formatted} / {total_formatted}"
-            rate_str = f":material/speed: {fmt_bytes(rate, 'B/s')}" if rate else ""
+            rate_formatted = fmt_bytes(rate, 'B/s') if rate else ""
+            rate_str = f":material/speed: {rate_formatted}" if rate else ""
         else:
             # For other units (files, items, animals, etc.), show as-is
             laps_str = f":material/laps: {int(n)} {unit} / {int(total)} {unit}"
