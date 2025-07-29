@@ -280,7 +280,9 @@ def download_model(
         total_size=download_model_total_size,
     )
     
-    # Save model metadata to JSON
+    
+    
+    # Save model metadata to JSON TODO dit moet via een andere functie die bij opening dat gaat checken
     variables_path = os.path.join(download_dir, "variables.json")
     # try:
     with open(variables_path, "w") as f:

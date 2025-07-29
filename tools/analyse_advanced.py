@@ -57,6 +57,37 @@ mode = general_settings_vars["mode"]
 
 st.write(f"TEMP_DIR: {TEMP_DIR}")
 
+from utils.hf_downloader import HuggingFaceRepoDownloader
+if st.button("DEBUG: download repo HF"):
+    
+    # Initialize your UI progress bars
+    ui_pbars = MultiProgressBars("Download Progress")
+    ui_pbars.add_pbar("download", "Preparing download...", "Downloading...", "Download complete!")
+    
+    """Test the downloader with the specified repository."""
+    downloader = HuggingFaceRepoDownloader()
+    
+    # Test with the provided URL
+    test_repo = "https://huggingface.co/Addax-Data-Science/SAH-DRY-ADS-v1/tree/main"
+    
+    model_ID = "SAH-DRY-ADS-v1"
+    
+    success = downloader.download_repo(
+        model_ID=model_ID,
+        local_dir=os.path.join(ADDAXAI_FILES_ST, "models", "cls", model_ID),
+        ui_pbars=ui_pbars,
+        pbar_id="download"
+    )
+    
+    if success:
+        print("🎉 Test completed successfully!")
+    else:
+        print("😞 Test completed with some failures.")
+    
+    
+    
+
+
 # the modals need to be defined before they are used
 modal_install_env = Modal(f"Installing virtual environment",
                           key="installing-env", show_close_button=False)
