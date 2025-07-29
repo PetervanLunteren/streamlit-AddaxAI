@@ -42,6 +42,8 @@ import os
 import platform
 import json
 import folium
+from utils.analyse_advanced import load_known_projects
+from utils.common import print_widget_label
 from PIL import Image
 
 # AddaxAI_files = os.path.dirname(os.path.dirname(
@@ -362,14 +364,45 @@ def on_mode_change():
     })
 
 
+print_widget_label("Mode", help_text="help text", sidebar=True)
 mode_selected = st.sidebar.segmented_control(
     "Mode",
     options=mode_options.keys(),
     format_func=mode_options.get,
     selection_mode="single",
-    label_visibility="visible",
+    label_visibility="collapsed",
     help=txts["mode_explanation_txt"][lang],
     key="mode_selection",
     on_change=on_mode_change,
-    default=mode
-)
+    default=mode)
+
+
+def on_project_change():
+    # save_global_vars({"selected_projectID": st.session_state["selected_projectID"]})
+    update_vars("analyse_advanced", {
+        "selected_projectID": st.session_state["project_selection_sidebar"]
+    })
+    # st.rerun()
+
+if st.session_state["mode_selection"] == 1:  # advanced mode
+
+    # check what is already known and selected
+    projects, selected_projectID = load_known_projects()
+
+    # if first project, show only button and no dropdown
+    if not projects == {}:
+        
+        options = list(projects.keys())
+        selected_index = options.index(
+            selected_projectID) if selected_projectID in options else 0
+
+        # overwrite selected_projectID if user has selected a different project
+        print_widget_label("Project", help_text="The project selected here is the one that all tools will work with. If you have a new project, you can add it at + add deployment when you want to process the first batch data.", sidebar=True)
+        selected_projectID = st.sidebar.selectbox(
+            "Project",
+            options=options,
+            index=selected_index,
+            label_visibility="collapsed",
+            key="project_selection_sidebar",
+            on_change=on_project_change
+        )

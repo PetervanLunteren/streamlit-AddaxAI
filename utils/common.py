@@ -830,12 +830,17 @@ def multiselect_checkboxes(classes, preselected):
     return selected_species
 
 
-def print_widget_label(label_text, icon=None, help_text=None):
+def print_widget_label(label_text, icon=None, help_text=None, sidebar=False):
     if icon:
         line = f":material/{icon}: &nbsp; "
     else:
         line = ""
-    st.markdown(f"{line}**{label_text}**", help=help_text)
+        
+    if sidebar:
+        st.sidebar.markdown(f"<small>{line}<b>{label_text}</b></small>", unsafe_allow_html=True, help=help_text)
+    else:
+        st.markdown(f"{line}**{label_text}**", help=help_text)
+
 
 
 def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
