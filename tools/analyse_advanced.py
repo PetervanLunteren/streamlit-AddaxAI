@@ -23,7 +23,9 @@ from utils.config import *
 
 
 # import local modules
-from utils.common import load_lang_txts, load_vars, StepperBar, print_widget_label, update_vars, clear_vars, info_box, MultiProgressBars
+from utils.common import (load_lang_txts, load_vars, StepperBar, print_widget_label, 
+                         update_vars, clear_vars, info_box, MultiProgressBars,
+                         init_session_state, get_session_var, set_session_var, update_session_vars)
 from utils.analyse_advanced import (browse_directory_widget,
                                         check_folder_metadata,
                                         project_selector_widget,
@@ -50,13 +52,18 @@ general_settings_vars = load_vars(section="general_settings")
 analyse_advanced_vars = load_vars(section="analyse_advanced")
 model_meta = load_model_metadata()
 
+# init session state for this tool
+init_session_state("analyse_advanced")
+
 # init vars
-step = analyse_advanced_vars.get("step", 0)
+step = get_session_var("analyse_advanced", "step", 0)
 lang = general_settings_vars["lang"]
 mode = general_settings_vars["mode"]
 
 st.write(f"TEMP_DIR: {TEMP_DIR}")
 st.write(f"CONFIG_DIR: {CONFIG_DIR}")
+
+st.write(st.session_state)
 
 # # from utils.hf_downloader import HuggingFaceRepoDownloader
 # if st.button("DEBUG: download repo HF"):
@@ -95,23 +102,23 @@ modal_install_env = Modal(f"Installing virtual environment",
                           key="installing-env", show_close_button=False)
 if modal_install_env.is_open():
     with modal_install_env.container():
-        install_env(modal_install_env, st.session_state["required_env_name"])
+        install_env(modal_install_env, get_session_var("analyse_advanced", "required_env_name"))
 
 # modal for processing queue
 modal_process_queue = Modal(f"Processing queue...", key="process_queue",
                 show_close_button=False)
 if modal_process_queue.is_open():
     with modal_process_queue.container():
-        run_process_queue(modal_process_queue, st.session_state["process_queue"])
+        # Process queue should always be loaded from persistent storage
+        process_queue = analyse_advanced_vars.get("process_queue", [])
+        run_process_queue(modal_process_queue, process_queue)
 
 # modal for downloading models
 modal_download_model = Modal(f"Downloading model...", key="download_model",
                 show_close_button=False)
 if modal_download_model.is_open():
-                 
-    
     with modal_download_model.container():
-        download_model(modal_download_model, st.session_state["download_modelID"], model_meta)
+        download_model(modal_download_model, get_session_var("analyse_advanced", "download_modelID"), model_meta)
         
 
 
@@ -182,8 +189,9 @@ with st.container(border=True):
         with col_btn_next:
             if selected_folder and os.path.isdir(selected_folder):
                 if st.button(":material/arrow_forward: Next", use_container_width=True):
-                    update_vars(section="analyse_advanced",
-                                updates={"step": 1})  # 0 indexed
+                    # Store selected folder temporarily and advance step
+                    set_session_var("analyse_advanced", "selected_folder", selected_folder)
+                    set_session_var("analyse_advanced", "step", 1)
                     st.rerun()
             else:
                 st.button(":material/arrow_forward: Next",
@@ -221,24 +229,24 @@ with st.container(border=True):
         # the previous button is always enabled
         with col_btn_prev:
             if st.button(":material/replay: Start over", use_container_width=True):
-                # this is messing with the queue. it is deleting the queue too...
-                clear_vars(section="analyse_advanced")
+                # Clear only temporary session state, preserve persistent queue
+                clear_vars("analyse_advanced")
                 st.rerun()
 
         if selected_projectID and selected_locationID and selected_min_datetime:
             with col_btn_next:
                 if selected_min_datetime:
                     if st.button(":material/arrow_forward: Next", use_container_width=True):
-
-                        update_vars(section="analyse_advanced",
-                                    updates={"step": 2,  # 0 indexed
-                                             "selected_locationID": selected_locationID,
-                                             "selected_min_datetime": selected_min_datetime})
-                        # Update general_settings with the selected_projectID
+                        # Store selections temporarily and advance step
+                        update_session_vars("analyse_advanced", {
+                            "step": 2,
+                            "selected_projectID": selected_projectID,
+                            "selected_locationID": selected_locationID,
+                            "selected_min_datetime": selected_min_datetime
+                        })
+                        # Update persistent general settings with committed projectID
                         update_vars(section="general_settings",
                                     updates={"selected_projectID": selected_projectID})
-                        # add_deployment(
-                        #     selected_min_datetime=selected_min_datetime)
                         st.rerun()
                 else:
                     st.button(":material/arrow_forward: Next",
@@ -269,7 +277,7 @@ with st.container(border=True):
                     st.warning(
                         f"The selected classification model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
                     if st.button(f"Install {req_env}", use_container_width=False):
-                        st.session_state["required_env_name"] = req_env
+                        set_session_var("analyse_advanced", "required_env_name", req_env)
                         modal_install_env.open()
                         
                 # download the model if needed
@@ -280,7 +288,7 @@ with st.container(border=True):
                     st.warning(
                         f"The selectedclassification model __{friendly_model_name}__ still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
                     if st.button(f"Download model", use_container_width=False, key="download_cls_model_button"):
-                        st.session_state["download_modelID"] = selected_cls_modelID
+                        set_session_var("analyse_advanced", "download_modelID", selected_cls_modelID)
                         modal_download_model.open()
         # st.write("")
 
@@ -299,7 +307,7 @@ with st.container(border=True):
                         st.warning(
                             f"The selected detection model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
                         if st.button(f"Install virtual environment *{req_env}*", use_container_width=False):
-                            st.session_state["required_env_name"] = req_env
+                            set_session_var("analyse_advanced", "required_env_name", req_env)
                             modal_install_env.open()
                     
                     # download the model if needed
@@ -310,7 +318,7 @@ with st.container(border=True):
                         st.warning(
                             f"The selected detection model {friendly_model_name} still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
                         if st.button(f"Download model", use_container_width=False, key = "download_det_model_button"):
-                            st.session_state["download_modelID"] = selected_det_modelID
+                            set_session_var("analyse_advanced", "download_modelID", selected_det_modelID)
                             modal_download_model.open()
                     
 
@@ -328,10 +336,12 @@ with st.container(border=True):
                     (selected_cls_modelID == "NONE" and selected_det_modelID):
                 if not needs_installing:
                     if st.button(":material/arrow_forward: Next", use_container_width=True):
-                        update_vars(section="analyse_advanced",
-                                    updates={"step": 3,  # 0 indexed
-                                             "selected_cls_modelID": selected_cls_modelID,
-                                             "selected_det_modelID": selected_det_modelID})
+                        # Store model selections temporarily and advance step
+                        update_session_vars("analyse_advanced", {
+                            "step": 3,
+                            "selected_cls_modelID": selected_cls_modelID,
+                            "selected_det_modelID": selected_det_modelID
+                        })
                         st.rerun()
                 else:
                     st.button(":material/arrow_forward: Next",
@@ -346,7 +356,7 @@ with st.container(border=True):
 
         st.write("Species Selection!")
 
-        selected_cls_modelID = analyse_advanced_vars["selected_cls_modelID"]
+        selected_cls_modelID = get_session_var("analyse_advanced", "selected_cls_modelID")
         taxon_mapping = load_taxon_mapping(selected_cls_modelID)
         # st.write(taxon_mapping)
         with st.container(border=True):
@@ -362,18 +372,17 @@ with st.container(border=True):
         # the previous button is always enabled
         with col_btn_prev:
             if st.button(":material/replay: Start over", use_container_width=True):
-                clear_vars(section="analyse_advanced")
+                clear_vars("analyse_advanced") 
                 st.rerun()
 
         with col_btn_next:
             if st.button(":material/playlist_add: Add to queue", use_container_width=True, type="primary"):
-                update_vars(section="analyse_advanced",
-                            updates={"step": 0})  # 0 indexed
+                # Store selected species temporarily, then commit all to queue
+                set_session_var("analyse_advanced", "selected_species", selected_species)
+                # Reset step to beginning
+                set_session_var("analyse_advanced", "step", 0)
+                # Add deployment to persistent queue
                 add_deployment_to_queue()
-
-                # write_selected_species(selected_species = selected_species,
-                #                        cls_model_ID = analyse_advanced_vars["selected_cls_modelID"])
-
                 st.rerun()
 
 
@@ -437,6 +446,5 @@ else:
                                 f"**Animal detection model**: {deployment['selected_det_modelID']}")
 
     if st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary"):
-        if "process_queue" not in st.session_state:
-            st.session_state["process_queue"] = process_queue
+        # Process queue is always persistent, no need to copy to session state
         modal_process_queue.open()

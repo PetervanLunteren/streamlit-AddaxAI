@@ -1,236 +1,56 @@
 
-# imidiate todo's
-# TODO: make the project in the sidebar
-# TODO: rerun everything and make sure to follow strict guilines for storing variables
-    # session state in a separate sub dict for tool for temporary variables that only last the session, e.g., session_state["tool_name"]["var_name"]
-    # vars/<tool_name_abbreviation>.json for variables that are saved to disk and can be loaded later. That way it lasts between sessions.
-    # map.json for the map of the project, this is a global variable that is used to store the locations of the cameras and other project related information. This is stored in the user config directory. This remains alive over different versions of the app.
-
-
-
-
 # for later
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 # TODO: RDE
-
 # todo: put all golabl variables in st.sessionstate, like model_meta, txts, vars, map, etc.
 # todo: make function that checks the model_meta online and adds the variables.json file to the model folder if it does not exist
 
 
-
+# CLI to run it
 # cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
 
 
-
-
-from utils import init_paths
-
-
+# packages
 from appdirs import user_config_dir
-
 import streamlit as st
 import sys
 import os
-import platform
 import json
 from utils.analyse_advanced import load_known_projects
 from utils.common import print_widget_label
 import folium
-from PIL import Image
-
-# AddaxAI_files = os.path.dirname(os.path.dirname(
-#     os.path.dirname(os.path.realpath(__file__))))
 
 from utils.config import ADDAXAI_FILES
-
-
-
-# import sys
-# import os
-
-# # Ensure the log directory exists
-# os.makedirs('assets/logs', exist_ok=True)
-
-# # Redirect all print statements to your log file
-# sys.stdout = open('assets/logs/log.txt', 'a')
-# sys.stderr = sys.stdout  # Also redirect errors
-
-# # Now any print() statement anywhere will go to your log file
-# print("This will go to log file")
-
-
+from utils.common import load_lang_txts, load_vars, update_vars
 
 # Force all output to be unbuffered and go to stdout
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr = sys.stdout  # Redirect stderr to stdout too
 
-# # Test print
-# print("=== APP STARTING - This should appear in log ===")
-
-
-# from utils import init_paths # import init_paths  # this will set the sys.path and PYTHONPATH variables
-
-# # insert dependencies to system variables
-# cuda_toolkit_path = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
-# paths_to_add = [
-#     os.path.join(AddaxAI_files),
-#     os.path.join(AddaxAI_files, "cameratraps"),
-#     os.path.join(AddaxAI_files, "cameratraps", "megadetector"),
-#     os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
-#     os.path.join(AddaxAI_files, "AddaxAI")
-# ]
-# if cuda_toolkit_path:
-#     paths_to_add.append(os.path.join(cuda_toolkit_path, "bin"))
-# for path in paths_to_add:
-#     if path not in sys.path:
-#         sys.path.insert(0, path)
-
-# # Update PYTHONPATH env var without duplicates
-# PYTHONPATH_separator = ":" if platform.system() != "Windows" else ";"
-# existing_paths = os.environ.get("PYTHONPATH", "").split(PYTHONPATH_separator)
-
-# # Remove empty strings, duplicates, and keep order
-# existing_paths = [p for i, p in enumerate(
-#     existing_paths) if p and p not in existing_paths[:i]]
-
-# for path in paths_to_add:
-#     if path not in existing_paths:
-#         existing_paths.append(path)
-
-# os.environ["PYTHONPATH"] = PYTHONPATH_separator.join(existing_paths)
-
 # make sure the config file is set
 os.environ["STREAMLIT_CONFIG"] = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
-
-
-
-
-
 
 st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
     ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), page_title="AddaxAI")
 
+# Load custom CSS from external file
+with open(os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "css", "styles.css"), "r") as f:
+    css_content = f.read()
 
-
-
-
-
-
-
-# st.write(f"AddaxAI files: {AddaxAI_files}")
-
-# get rid of the Streamlit menu
-st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}  /* Hides the menu */
-        .stDeployButton {display: none;}  /* Hides the deploy button */
-        footer {visibility: hidden;}  /* Hides the footer */
-        #stDecoration {display: none;}  /* Hides the Streamlit decoration */
-    </style>
-""", unsafe_allow_html=True)
-
-st.markdown(
-    """
-    <style>
-        /* Reduce space above widgets */
-        .block-container {
-            padding-top: 15px !important;  /* Adjust as needed */
-        }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# Inject custom CSS
-# to adjust the width of the popover container
-st.markdown("""
-    <style>
-        /* Target the popover container */
-        [data-testid="stPopoverBody"] {
-            width: 800px !important;  /* Adjust the width as needed */
-            max-width: 90vw;          /* Optional: prevent overflow on small screens */
-        }
-    </style>
-""", unsafe_allow_html=True)
+st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
 # Inject Material Icons for the header stepper bar
 st.markdown("""
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 """, unsafe_allow_html=True)
 
-# find addaxAI files folder path
-# find folder of script
-
-
-# paths = [
-#     AddaxAI_files,
-#     os.path.join(AddaxAI_files, "AddaxAI", "streamlit-AddaxAI"),
-# ]
-
-# # Add paths to sys.path
-# for path in paths:
-#     if path not in sys.path:
-#         sys.path.append(path)
-
-# # Ensure all paths are in PYTHONPATH while keeping existing ones
-# existing_pythonpath = os.environ.get("PYTHONPATH", "").strip(
-#     ":").split(":")  # Strip leading/trailing `:`
-# # Preserve order and remove duplicates
-# updated_pythonpath = list(dict.fromkeys(paths + existing_pythonpath))
-
-# # Set PYTHONPATH
-# os.environ["PYTHONPATH"] = ":".join(updated_pythonpath)
-
-
-# with st.expander("sys.path", expanded=True):
-#     st.write("Current sys.path:")
-#     for p in sys.path:
-#         st.write(p)
-
-# with st.expander("Environment Variables", expanded=True):
-#     st.write("Current environment variables:")
-#     env_vars = {k: v for k, v in os.environ.items() if k.startswith("PYTHON") or k.startswith("CUDA") or k.startswith("PATH") or k.startswith("STREAMLIT")}
-#     for k, v in env_vars.items():
-#         st.write(f"{k}: {v}")
-
-# from utils.common import *
-from utils.common import load_lang_txts, load_vars, update_vars
-
-
-
-# Custom CSS to style the button in the header
-st.markdown(
-    """
-    <style>
-    .header-button {
-        position: absolute;
-        top: 16px;
-        right: 20px;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# # Create the header with a button
-# col1, col2 = st.columns([0.8, 0.2])  # Adjust column ratio to position the button
-
-# with col1:
-#     st.title("My Streamlit App")  # Header title
-
-# with col2:
-#     if st.button("Click Me", key="header_button"):
-#         st.write("Button clicked!")  # Action when button is clicked
-
-
-# make a settings file
-# this should actually be done during initual setup but for now, here is OK.
 
 config_dir = user_config_dir("AddaxAI")
 os.makedirs(config_dir, exist_ok=True)
+
+# TODO: put the config_dir in session state 
+
 
 # this is where the overall settings are stored
 # these will remain constant over different versions of the app
@@ -253,7 +73,6 @@ if not os.path.exists(general_settings_file):
     # make directory if it does not exist
     os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
     
-# if True:  # DEBUG
     # create a default settings file
     general_settings = {
         "lang": "en",
@@ -264,47 +83,27 @@ if not os.path.exists(general_settings_file):
         json.dump(general_settings, f, indent=2)
 
 
-# make a project selector in the sidebar
-
-
-
-# # check what is already known and selected
-# projects, selected_projectID = load_known_projects()
-
-# # if first project, show only button and no dropdown
-# if not projects == {}:
-    
-#     options = list(projects.keys())
-#     selected_index = options.index(
-#         selected_projectID) if selected_projectID in options else 0
-
-#     # overwrite selected_projectID if user has selected a different project
-#     print_widget_label("Project", help_text="Select a project to work with. If you don't have a project yet, you can create one in the settings.", sidebar=True)
-#     selected_projectID = st.sidebar.selectbox(
-#         "Project",
-#         options=options,
-#         index=selected_index,
-#         label_visibility="collapsed"
-#     )
-# # else:
-
-# DEBUG
-# st.write(load_known_locations())
-
-
-# load language settings
-txts = load_lang_txts()
-# vars = load_project_vars()
-# map, _ = load_map()
 
 general_settings_vars = load_vars(section = "general_settings")
 lang = general_settings_vars["lang"]
 mode = general_settings_vars["mode"]
 
+# Load language texts into session state on startup only
+if not st.session_state.get("txts"):
+    full_txts = load_lang_txts()
+    # Store only the current language's texts in flattened structure
+    st.session_state["txts"] = {key: value[lang] for key, value in full_txts.items()}
+
+# Use session state texts
+txts = st.session_state["txts"]
+
 # render a dummy map with a marker so that the rest of the markers this session will be rendered
 m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)
 folium.Marker([39.949610, -75.150282]).add_to(m)
 
+# Initialize shared session state for cross-tool temporary variables
+if "shared" not in st.session_state:
+    st.session_state["shared"] = {}
 
 # save only the last 1000 lines of the log file
 # log_fpath = "/Users/peter/Desktop/streamlit_app/frontend/streamlit_log.txt"
@@ -318,12 +117,12 @@ if not os.path.exists(log_fpath):
         file.write("This is the log file for the AddaxAI Streamlit app.\n")
         file.write("It will contain the last 1000 lines of the log.\n")
         file.write("========================================\n\n")  
-# with open(log_fpath, "r", encoding="utf-8") as file:
-#     log = file.readlines()
-#     if len(log) > 1000:
-#         log = log[-1000:]
-# with open(log_fpath, "w", encoding="utf-8") as file:
-#     file.writelines(log)
+with open(log_fpath, "r", encoding="utf-8") as file:
+    log = file.readlines()
+    if len(log) > 1000:
+        log = log[-1000:]
+with open(log_fpath, "w", encoding="utf-8") as file:
+    file.writelines(log)
 try:  # DEBUG there seems to be a problem with the permissions here
     with open(log_fpath, "r", encoding="utf-8") as file:
         log = file.readlines()
@@ -345,11 +144,11 @@ st.logo(os.path.join(ADDAXAI_FILES, "AddaxAI",
         "streamlit-AddaxAI", "assets", "images", "logo.png"), size="large")
 if mode == 0:  # simple mode
     analyse_sim_page = st.Page(
-        os.path.join("tools", "analyse_simple.py"), title=txts["analyse_txt"][lang], icon=":material/rocket_launch:")
+        os.path.join("tools", "analyse_simple.py"), title=txts["analyse_txt"], icon=":material/rocket_launch:")
     pg = st.navigation([analyse_sim_page])
 elif mode == 1:  # advanced mode
     analyse_adv_page = st.Page(
-        os.path.join("tools", "analyse_advanced.py"), title=txts["analyse_txt"][lang], icon=":material/add:")
+        os.path.join("tools", "analyse_advanced.py"), title=txts["analyse_txt"], icon=":material/add:")
     repeat_detection_elimination_page = st.Page(
         os.path.join("tools", "repeat_detection_elimination.py"), title="Repeat detection elimination", icon=":material/reset_image:")
     verify_page = st.Page(
@@ -359,11 +158,11 @@ elif mode == 1:  # advanced mode
     explore_page = st.Page(
         os.path.join("tools", "explore.py"), title="Explore results", icon=":material/bar_chart_4_bars:")
     postprocess_page = st.Page(
-        os.path.join("tools", "postprocess.py"), title=txts["postprocess_txt"][lang], icon=":material/stylus_note:")
+        os.path.join("tools", "postprocess.py"), title=txts["postprocess_txt"], icon=":material/stylus_note:")
     camera_management_page = st.Page(
         os.path.join("tools", "camera_management.py"), title="Metadata management", icon=":material/photo_camera:")
     settings_page = st.Page(
-        os.path.join("tools", "settings.py"), title=txts["settings_txt"][lang], icon=":material/settings:")
+        os.path.join("tools", "settings.py"), title=txts["settings_txt"], icon=":material/settings:")
     pg = st.navigation([analyse_adv_page, repeat_detection_elimination_page, verify_page,
                        depth_estimation_page, explore_page, postprocess_page, camera_management_page, settings_page])
 pg.run()
@@ -376,33 +175,39 @@ mode_options = {
 
 
 def on_mode_change():
-    # save_global_vars({"mode": st.session_state["mode_selection"]})
-    update_vars("general_settings", {
-        "mode": st.session_state["mode_selection"]
-    })
+    # Only update persistent storage, no session state needed
+    if "mode_selection" in st.session_state:
+        mode_selection = st.session_state["mode_selection"]
+        update_vars("general_settings", {
+            "mode": mode_selection
+        })
 
 
 print_widget_label("Mode", help_text="help text", sidebar=True)
+# Use persistent value directly
 mode_selected = st.sidebar.segmented_control(
     "Mode",
     options=mode_options.keys(),
     format_func=mode_options.get,
     selection_mode="single",
     label_visibility="collapsed",
-    help=txts["mode_explanation_txt"][lang],
+    help=txts["mode_explanation_txt"],
     key="mode_selection",
     on_change=on_mode_change,
     default=mode)
 
+# No session state cleanup needed - only persistent storage used
+
 
 def on_project_change():
-    # save_global_vars({"selected_projectID": st.session_state["selected_projectID"]})
-    update_vars("general_settings", {
-        "selected_projectID": st.session_state["project_selection_sidebar"]
-    })
-    # st.rerun()
+    # Only update persistent storage, no session state needed
+    if "project_selection_sidebar" in st.session_state:
+        project_selection = st.session_state["project_selection_sidebar"]
+        update_vars("general_settings", {
+            "selected_projectID": project_selection
+        })
 
-if st.session_state["mode_selection"] == 1:  # advanced mode
+if mode == 1:  # advanced mode
 
     # check what is already known and selected
     projects, selected_projectID = load_known_projects()
@@ -411,8 +216,8 @@ if st.session_state["mode_selection"] == 1:  # advanced mode
     if not projects == {}:
         
         options = list(projects.keys())
-        selected_index = options.index(
-            selected_projectID) if selected_projectID in options else 0
+        # Use persistent value directly
+        selected_index = options.index(selected_projectID) if selected_projectID in options else 0
 
         # overwrite selected_projectID if user has selected a different project
         print_widget_label("Project", help_text="The project selected here is the one that all tools will work with. If you have a new project, you can add it at + add deployment when you want to process the first batch data.", sidebar=True)
@@ -424,3 +229,5 @@ if st.session_state["mode_selection"] == 1:  # advanced mode
             key="project_selection_sidebar",
             on_change=on_project_change
         )
+        
+        # No session state cleanup needed - only persistent storage used

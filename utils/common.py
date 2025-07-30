@@ -668,18 +668,43 @@ def default_converter(obj):
 
 def clear_vars(section):
     """
-    Clear all variables in a specific section of the settings.
+    Clear only temporary variables in session state for a specific section.
+    This preserves persistent variables like process_queue.
     """
-    # settings, settings_file = load_map()
+    if section in st.session_state:
+        st.session_state[section] = {}
 
-    # TODO: this is messing with the queue. it is deleting the queue too...
-    # it should clear only the temp vars in the section, so if we are back to st.session_state, ot should clear only the session state vars of the selected session.
 
-    # if not exist, create empty vars file
-    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
-                             "streamlit-AddaxAI", "vars", f"{section}.json")
-    # if os.path.exists(vars_file): # temorarily disabled
-    #     os.remove(vars_file)
+def init_session_state(section):
+    """
+    Initialize session state for a specific section if it doesn't exist.
+    """
+    if section not in st.session_state:
+        st.session_state[section] = {}
+
+
+def get_session_var(section, var_name, default=None):
+    """
+    Get a variable from session state for a specific section.
+    """
+    init_session_state(section)
+    return st.session_state[section].get(var_name, default)
+
+
+def set_session_var(section, var_name, value):
+    """
+    Set a variable in session state for a specific section.
+    """
+    init_session_state(section)
+    st.session_state[section][var_name] = value
+
+
+def update_session_vars(section, updates):
+    """
+    Update multiple variables in session state for a specific section.
+    """
+    init_session_state(section)
+    st.session_state[section].update(updates)
 
 
 def replace_vars(section, new_vars):

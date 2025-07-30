@@ -51,7 +51,7 @@ from streamlit_modal import Modal
 # VIDEO_EXTENSIONS = []
 # # from megadetector.utils.path_utils import IMG_EXTENSIONS
 # IMG_EXTENSIONS = []
-from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars, random_animal_adjective
+from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars, random_animal_adjective, get_session_var, set_session_var, update_session_vars
 # from utils.download import download_urls
 
 
@@ -596,20 +596,19 @@ def project_selector_widget():
             #     json.dump(map, file, indent=2)
             st.rerun()
 
+        # Store current project selection in session state for deployment workflow
+        set_session_var("analyse_advanced", "selected_projectID", selected_projectID)
+        
         # return
         return selected_projectID
 
 
 def location_selector_widget():
 
-    # load settings
-    # coords_found_in_exif, exif_lat, exif_lng = load_vars(section="analyse_advanced",  # SESSION
-    #                                                       requested_vars=["coords_found_in_exif", "exif_lat", "exif_lng"])
-
-    vars = load_vars(section="analyse_advanced")
-    coords_found_in_exif = vars.get("coords_found_in_exif", False)
-    exif_lat = vars.get("exif_lat", 0.0)
-    exif_lng = vars.get("exif_lng", 0.0)
+    # load settings from session state instead of persistent storage
+    coords_found_in_exif = get_session_var("analyse_advanced", "coords_found_in_exif", False)
+    exif_lat = get_session_var("analyse_advanced", "exif_lat", 0.0)
+    exif_lng = get_session_var("analyse_advanced", "exif_lng", 0.0)
 
     # check what is already known and selected
     locations, location = load_known_locations()
@@ -663,6 +662,9 @@ def location_selector_widget():
                 index=selected_index,
                 label_visibility="collapsed"
             )
+            
+            # Store selection in session state
+            set_session_var("analyse_advanced", "selected_locationID", location)
 
         # popover to add a new location
         with col2:
@@ -745,9 +747,10 @@ def match_locations(known_point, locations, max_distance_meters=50):
 
 def datetime_selector_widget():
 
-    # init vars
-    vars = load_vars(section="analyse_advanced")
-    exif_min_datetime_str = vars.get("exif_min_datetime", None)
+    # init vars from session state instead of persistent storage
+    exif_min_datetime_str = get_session_var("analyse_advanced", "exif_min_datetime", None)
+    
+    # Convert ISO string back to datetime object if present
     exif_min_datetime = (
         datetime.fromisoformat(exif_min_datetime_str)
         if exif_min_datetime_str is not None
@@ -817,6 +820,9 @@ def datetime_selector_widget():
         )
         selected_datetime = datetime.combine(selected_date, selected_time)
         # st.write("Selected datetime:", selected_datetime)
+        
+        # Store selection in session state
+        set_session_var("analyse_advanced", "selected_min_datetime", selected_datetime.isoformat())
 
         # deployment will only be added once the user has pressed the "ANALYSE" button
 
@@ -834,30 +840,27 @@ def load_known_projects():
 
 def load_known_locations():
     map, _ = load_map()
-    analyse_advanced_vars = load_vars(section="analyse_advanced")
     general_settings_vars = load_vars(section="general_settings")
-    selected_projectID = general_settings_vars.get(
-        "selected_projectID")
+    selected_projectID = general_settings_vars.get("selected_projectID")
     project = map["projects"][selected_projectID]
-    selected_locationID = analyse_advanced_vars.get(
-        "selected_locationID")
+    
+    # Get selected location from session state instead of persistent storage
+    selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
     locations = project["locations"]
     return locations, selected_locationID
 
 
 def load_known_deployments():
     settings, _ = load_map()
-    analyse_advanced_vars = load_vars(section="analyse_advanced")
     general_settings_vars = load_vars(section="general_settings")
-    selected_projectID = general_settings_vars.get(
-        "selected_projectID")
+    selected_projectID = general_settings_vars.get("selected_projectID")
     project = settings["projects"][selected_projectID]
-    selected_locationID = analyse_advanced_vars.get(
-        "selected_locationID")
+    
+    # Get selections from session state instead of persistent storage
+    selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
     location = project["locations"][selected_locationID]
     deployments = location["deployments"]
-    selected_deploymentID = analyse_advanced_vars.get(
-        "selected_deploymentID")
+    selected_deploymentID = get_session_var("analyse_advanced", "selected_deploymentID")
     return deployments, selected_deploymentID
 
 def generate_deployment_id():
@@ -925,9 +928,8 @@ def add_deployment(selected_min_datetime):
     # generate a unique deployment ID
     deployment_id = f"dep-{random_animal_adjective()}"
 
-    update_vars("analyse_advanced", {
-        "selected_deploymentID": deployment_id,
-    })
+    # Store deployment selection in session state instead of persistent vars
+    set_session_var("analyse_advanced", "selected_deploymentID", deployment_id)
 
     # Add new deployment # TODO: i want to have this information at the end, right? When the deploymeny is processed?
     deployments[deployment_id] = {
@@ -972,10 +974,8 @@ def add_location(location_id, lat, lon):
         "deployments": {},
     }
 
-    # add the selected location ID to the vars
-    update_vars("analyse_advanced", {
-        "selected_locationID": location_id,
-    })
+    # add the selected location ID to session state instead of persistent vars
+    set_session_var("analyse_advanced", "selected_locationID", location_id)
     # analyse_advanced_vars = load_vars(section="analyse_advanced")
     # analyse_advanced_vars["selected_locationID"] = location_id
 
@@ -1024,7 +1024,8 @@ def add_project(projectID, comments):
     update_vars("general_settings", {
         "selected_projectID": projectID
     })
-    update_vars("analyse_advanced", {
+    # Reset session state selections when new project is added
+    update_session_vars("analyse_advanced", {
         "selected_locationID": None,  # reset location selection
         "selected_deploymentID": None,  # reset deployment selection
     })
@@ -1099,14 +1100,13 @@ def add_new_location_popover(txt):
                         help="Define a new location",
                         use_container_width=True):
 
-            # init vars
-            vars = load_vars(section="analyse_advanced")
-            selected_lat = vars.get("selected_lat", None)
-            selected_lng = vars.get("selected_lng", None)
-            exif_set = vars.get("exif_set", False)
-            coords_found_in_exif = vars.get("coords_found_in_exif", False)
-            exif_lat = vars.get("exif_lat", None)
-            exif_lng = vars.get("exif_lng", None)
+            # init vars from session state instead of persistent storage
+            selected_lat = get_session_var("analyse_advanced", "selected_lat", None)
+            selected_lng = get_session_var("analyse_advanced", "selected_lng", None)
+            exif_set = get_session_var("analyse_advanced", "exif_set", False)
+            coords_found_in_exif = get_session_var("analyse_advanced", "coords_found_in_exif", False)
+            exif_lat = get_session_var("analyse_advanced", "exif_lat", None)
+            exif_lng = get_session_var("analyse_advanced", "exif_lng", None)
 
             # # init session state vars
             # if "selected_lat" not in st.session_state:
@@ -1123,10 +1123,8 @@ def add_new_location_popover(txt):
                 info_box(
                     f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}).")
                 if not exif_set:
-                    # selected_lat = exif_lat
-                    # selected_lng = exif_lng
-                    # exif_set = True
-                    update_vars("analyse_advanced", {
+                    # Update session state instead of persistent storage
+                    update_session_vars("analyse_advanced", {
                         "selected_lat": exif_lat,
                         "selected_lng": exif_lng,
                         "exif_set": True,
@@ -1239,7 +1237,8 @@ def add_new_location_popover(txt):
                 #     tooltip="Selected location",
                 #     icon=fl.Icon(icon="camera", prefix="fa", color="green")
                 # ).add_to(m)
-                update_vars("analyse_advanced", {
+                # Update session state instead of persistent storage  
+                update_session_vars("analyse_advanced", {
                     "selected_lat": selected_lat,
                     "selected_lng": selected_lng,
                 })
@@ -1316,7 +1315,7 @@ def add_new_location_popover(txt):
                     new_location_id = None
 
                     # reset session state variables before reloading
-                    update_vars("analyse_advanced", {
+                    update_session_vars("analyse_advanced", {
                         "coords_found_in_exif": False,
                         "exif_set": False,
                         "exif_lat": None,
@@ -1329,19 +1328,23 @@ def add_new_location_popover(txt):
 
 
 def browse_directory_widget():
-
-    analyse_advanced_vars = load_vars(section="analyse_advanced")
-    selected_folder = analyse_advanced_vars.get("selected_folder")
+    # Get selected folder from session state instead of persistent storage
+    selected_folder = get_session_var("analyse_advanced", "selected_folder")
+    
+    # st.write(st.session_state)
 
     col1, col2 = st.columns([1, 3])#, vertical_alignment="center")
     with col1:
         if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
             selected_folder = select_folder()
-            # update_vars("selected_folder", selected_folder)
-            # save_global_vars({"selected_folder": selected_folder})
-            clear_vars(section="analyse_advanced")
-            update_vars(section="analyse_advanced",
-                        updates={"selected_folder": selected_folder})
+            # Only update session state if a folder was actually selected
+            if selected_folder:
+                # Clear session state and set new folder selection
+                clear_vars(section="analyse_advanced")
+                set_session_var("analyse_advanced", "selected_folder", selected_folder)
+                # st.success(f"Selected folder: {selected_folder}")
+            else:
+                st.error("No folder selected or dialog was cancelled.")
 
             # # reset session state variables
             # st.session_state.clear()
@@ -1438,6 +1441,9 @@ def det_model_selector_widget(model_meta):
         )
 
         selected_modelID = modelID_lookup[selected_display_name]
+        
+        # Store selection in session state
+        set_session_var("analyse_advanced", "selected_det_modelID", selected_modelID)
 
     with col2:
         show_cls_model_info_popover(det_model_meta[selected_modelID])
@@ -1487,6 +1493,9 @@ def cls_model_selector_widget(model_meta):
         )
 
         selected_modelID = modelID_lookup[selected_display_name]
+        
+        # Store selection in session state
+        set_session_var("analyse_advanced", "selected_cls_modelID", selected_modelID)
 
     with col2:
         if selected_modelID != "NONE":
@@ -1663,12 +1672,8 @@ def get_file_gps(file_path):
 
 def check_folder_metadata():
     with st.spinner("Checking data..."):
-        # settings, _ = load_map()
-        # selected_folder = Path(settings["selected_folder"])
-        # selected_folder = Path(
-        #     settings["vars"]["analyse_advanced"]["selected_folder"])
-        analyse_advanced_vars = load_vars(section="analyse_advanced")
-        selected_folder = Path(analyse_advanced_vars.get("selected_folder"))
+        # Get selected folder from session state instead of persistent storage
+        selected_folder = Path(get_session_var("analyse_advanced", "selected_folder"))
 
         datetimes = []
         gps_coords = []
@@ -1762,15 +1767,15 @@ def check_folder_metadata():
         # min_datetime_found = min_datetime
         # max_datetime_found = max_datetime
 
-        # SESSION
-        update_vars(section="analyse_advanced",
-                    updates={
-                        "coords_found_in_exif": coords_found_in_exif,
-                        "exif_lat": exif_lat,
-                        "exif_lng": exif_lng,
-                        "exif_min_datetime": exif_min_datetime,
-                        "exif_max_datetime": exif_max_datetime,
-                    })
+        # Store EXIF metadata in session state instead of persistent vars
+        # Convert datetime objects to ISO strings for consistency
+        update_session_vars("analyse_advanced", {
+            "coords_found_in_exif": coords_found_in_exif,
+            "exif_lat": exif_lat,
+            "exif_lng": exif_lng,
+            "exif_min_datetime": exif_min_datetime.isoformat() if exif_min_datetime else None,
+            "exif_max_datetime": exif_max_datetime.isoformat() if exif_max_datetime else None,
+        })
 
         # write results to the app
         info_txt = f"Found {len(image_files)} images and {len(video_files)} videos in the selected folder."
@@ -2234,40 +2239,29 @@ selected_species = ["cow", "dog", "cat"]
 
 def add_deployment_to_queue():
     
-    # todo: this all needs to be st.session_state based, 
-    
+    # Load persistent queue from file
     analyse_advanced_vars = load_vars(section="analyse_advanced")
     general_settings_vars = load_vars(section="general_settings")
     process_queue = analyse_advanced_vars.get("process_queue", [])
-    # previous_process_queue = analyse_advanced_vars.get("process_queue", [])
-    # process_queue = analyse_advanced_vars.get("process_queue", []).copy() # copy to avoid mutating the original list in session state
-
     
-    selected_folder = analyse_advanced_vars["selected_folder"]
-    selected_projectID = general_settings_vars["selected_projectID"]
-    selected_locationID = analyse_advanced_vars["selected_locationID"]
-    # selected_lat = analyse_advanced_vars["selected_lat"]
-    # selected_lng = analyse_advanced_vars["selected_lng"]
-    selected_min_datetime = analyse_advanced_vars["selected_min_datetime"]
-    # selected_deploymentID = analyse_advanced_vars["selected_deploymentID"]
-    selected_det_modelID = analyse_advanced_vars["selected_det_modelID"]
-    selected_cls_modelID = analyse_advanced_vars["selected_cls_modelID"]
-    # deployment_start_file = analyse_advanced_vars["deployment_start_file"]
-    # deployment_start_datetime = analyse_advanced_vars["deployment_start_datetime"]
+    # Get temporary selections from session state (they become persistent when added to queue)
+    selected_folder = get_session_var("analyse_advanced", "selected_folder")
+    selected_projectID = get_session_var("analyse_advanced", "selected_projectID")
+    selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
+    selected_min_datetime = get_session_var("analyse_advanced", "selected_min_datetime")
+    selected_det_modelID = get_session_var("analyse_advanced", "selected_det_modelID")
+    selected_cls_modelID = get_session_var("analyse_advanced", "selected_cls_modelID")
+    selected_species = get_session_var("analyse_advanced", "selected_species")
     
     # Create a new deployment entry
     new_deployment = {
         "selected_folder": selected_folder,
         "selected_projectID": selected_projectID,
         "selected_locationID": selected_locationID,
-        # "selected_lat": selected_lat,
-        # "selected_lng": selected_lng,
         "selected_min_datetime": selected_min_datetime,
-        # "selected_deploymentID": selected_deploymentID,
         "selected_det_modelID": selected_det_modelID,
         "selected_cls_modelID": selected_cls_modelID,
-        # "deployment_start_file": deployment_start_file,
-        # "deployment_start_datetime": deployment_start_datetime
+        "selected_species": selected_species
     }
     
     # Add the new deployment to the queue
@@ -2282,6 +2276,9 @@ def add_deployment_to_queue():
 
     # write back to the vars file
     replace_vars(section="analyse_advanced", new_vars = {"process_queue": process_queue})
+    
+    # Clear session state selections after successful queue addition  
+    clear_vars("analyse_advanced")
     
     # return
     
@@ -2323,13 +2320,10 @@ def species_selector_widget(taxon_mapping):
 
     # st.write(nodes)
 
-    # Initialize state
-    if "selected_nodes" not in st.session_state:
-        st.session_state.selected_nodes = []
-    if "expanded_nodes" not in st.session_state:
-        st.session_state.expanded_nodes = []
-    if "last_selected" not in st.session_state:
-        st.session_state.last_selected = {}
+    # Initialize state in structured session state
+    selected_nodes = get_session_var("analyse_advanced", "selected_nodes", [])
+    expanded_nodes = get_session_var("analyse_advanced", "expanded_nodes", [])
+    last_selected = get_session_var("analyse_advanced", "last_selected", {})
 
 
 
@@ -2344,20 +2338,22 @@ def species_selector_widget(taxon_mapping):
             butn_col1, butn_col2 = st.columns([1, 1])
             with butn_col1:
                 if st.button(":material/select_check_box: Select all", key="expand_all_button", use_container_width=True):
-                    # st.session_state.selected_nodes = [node["value"] for node in nodes]
-                    st.session_state.selected_nodes = get_all_leaf_values(nodes)
+                    # Select all leaf nodes and update structured session state
+                    selected_nodes = get_all_leaf_values(nodes)
+                    set_session_var("analyse_advanced", "selected_nodes", selected_nodes)
                     # st.rerun()  # Force rerun to update the tree
             with butn_col2:
                 if st.button(":material/check_box_outline_blank: Select none", key="collapse_all_button", use_container_width=True):
-                    st.session_state.selected_nodes = []
+                    # Clear selection and update structured session state
+                    set_session_var("analyse_advanced", "selected_nodes", [])
                     # st.rerun()
                     
             with st.container(border=True):
                 selected = tree_select(
                     nodes,
                     check_model="leaf",
-                    checked=st.session_state.selected_nodes,
-                    expanded=st.session_state.expanded_nodes,
+                    checked=selected_nodes,
+                    expanded=expanded_nodes,
                     show_expand_all=True,
                     half_check_color="#086164",
                     check_color="#086164",
@@ -2368,13 +2364,16 @@ def species_selector_widget(taxon_mapping):
         if selected is not None:
             new_checked = selected.get("checked", [])
             new_expanded = selected.get("expanded", [])
-            last_checked = st.session_state.last_selected.get("checked", [])
-            last_expanded = st.session_state.last_selected.get("expanded", [])
+            last_checked = last_selected.get("checked", [])
+            last_expanded = last_selected.get("expanded", [])
 
             if new_checked != last_checked or new_expanded != last_expanded:
-                st.session_state.selected_nodes = new_checked
-                st.session_state.expanded_nodes = new_expanded
-                st.session_state.last_selected = selected
+                # Update structured session state
+                update_session_vars("analyse_advanced", {
+                    "selected_nodes": new_checked,
+                    "expanded_nodes": new_expanded,
+                    "last_selected": selected
+                })
                 st.rerun()  # Force rerun
 
     # Count leaf nodes
@@ -2389,7 +2388,9 @@ def species_selector_widget(taxon_mapping):
 
     with col2:
         leaf_count = count_leaf_nodes(nodes)
-        text = f"You have selected <code style='color:#086164; font-family:monospace;'>{len(st.session_state.selected_nodes)}</code> of <code style='color:#086164; font-family:monospace;'>{leaf_count}</code> classes. "
+        # Get current selected nodes from session state
+        current_selected = get_session_var("analyse_advanced", "selected_nodes", [])
+        text = f"You have selected <code style='color:#086164; font-family:monospace;'>{len(current_selected)}</code> of <code style='color:#086164; font-family:monospace;'>{leaf_count}</code> classes. "
         st.markdown(
             f"""
                 <div style="background-color: #f0f2f6; padding: 7px; border-radius: 8px;">
@@ -2399,8 +2400,12 @@ def species_selector_widget(taxon_mapping):
             unsafe_allow_html=True
         )
     
-    return st.session_state.selected_nodes
-    # st.write("Selected nodes:", st.session_state.selected_nodes)
+    # Store selection in the proper session state structure for deployment workflow
+    current_selected = get_session_var("analyse_advanced", "selected_nodes", [])
+    set_session_var("analyse_advanced", "selected_species", current_selected)
+    
+    return current_selected
+    # st.write("Selected nodes:", current_selected)
 
 
 # def species_selector_widget(taxon_mapping):

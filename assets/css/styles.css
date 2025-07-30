@@ -1,0 +1,23 @@
+/* Hide Streamlit menu and decorations */
+#MainMenu {visibility: hidden;}
+.stDeployButton {display: none;}
+footer {visibility: hidden;}
+#stDecoration {display: none;}
+
+/* Reduce space above widgets */
+.block-container {
+    padding-top: 25px !important;
+}
+
+/* Target the popover container */
+[data-testid="stPopoverBody"] {
+    width: 800px !important;
+    max-width: 90vw;
+}
+
+/* Custom CSS to style the button in the header */
+.header-button {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+}
