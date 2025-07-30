@@ -60,10 +60,14 @@ step = get_session_var("analyse_advanced", "step", 0)
 lang = general_settings_vars["lang"]
 mode = general_settings_vars["mode"]
 
-st.write(f"TEMP_DIR: {TEMP_DIR}")
-st.write(f"CONFIG_DIR: {CONFIG_DIR}")
+# get from st.session_state
+ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
+ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
 
-st.write(st.session_state)
+# st.write(f"TEMP_DIR: {TEMP_DIR}")
+# st.write(f"CONFIG_DIR: {CONFIG_DIR}")
+
+# st.write(st.session_state)
 
 # # from utils.hf_downloader import HuggingFaceRepoDownloader
 # if st.button("DEBUG: download repo HF"):

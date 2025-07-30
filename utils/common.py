@@ -41,16 +41,28 @@ import tarfile
 # set global variables
 # AddaxAI_files = os.path.dirname(os.path.dirname(
 #     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-from utils.config import ADDAXAI_FILES
+# from utils.config import ADDAXAI_FILES
+
+ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
+
+
+
 CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
 DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
 
 # load camera IDs
-config_dir = user_config_dir("AddaxAI")
-map_file = os.path.join(config_dir, "map.json")
+
+CONFIG_DIR = st.session_state["shared"]["CONFIG_DIR"]
+# MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
+MAP_FILE_PATH = st.session_state["shared"]["MAP_FILE_PATH"]
+ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
 
 # set versions
-with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
+with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'version.txt'), 'r') as file:
+    
+    
+    # /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/assets/version.txt
+    
     current_AA_version = file.read().strip()
 
 def random_animal_adjective():
@@ -746,15 +758,15 @@ def load_map():
 
     # Load full settings or initialize
     try:
-        if os.path.exists(map_file):
-            with open(map_file, "r", encoding="utf-8") as f:
+        if os.path.exists(MAP_FILE_PATH):
+            with open(MAP_FILE_PATH, "r", encoding="utf-8") as f:
                 settings = json.load(f)
         else:
             settings = {}
     except (json.JSONDecodeError, IOError):
         settings = {}
 
-    return settings, map_file
+    return settings, MAP_FILE_PATH
 
 
 def load_vars(section):

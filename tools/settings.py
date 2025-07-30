@@ -28,12 +28,12 @@ lang_selected = st.selectbox(
 
 
 # import settings file
-map, map_file = load_map()
+map, MAP_FILE_PATH = load_map()
 
-st.write("map_file:", map_file)
+st.write("map_file:", MAP_FILE_PATH)
 if st.button("Open map.json"):
     if platform.system() == "Darwin":  # macOS
-        os.system(f'open "{map_file}"')
+        os.system(f'open "{MAP_FILE_PATH}"')
     else:
         st.warning("This action is only supported on macOS.")
 with st.expander("Current settings", expanded=False):

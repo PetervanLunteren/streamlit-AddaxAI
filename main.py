@@ -1,10 +1,19 @@
 
+
+# WAARWAS IK? ik was bezig om de main.py beter te maken, zodat niet altijd alles weer opnieuw hoeft te gaan bij iedere rerun. Er zitten vast nog wel bugs in. Dus beter even testen.
+# als dat allemaal werkt, dan ga ik dit script opschonen, dan gewoon van het begin af naar het eind werken van de AI pipeline en alles klaar maken, dus taxon-mappings, env-requiremetns, etc.
+# Goed bijhouden de TODO's en de issues, zodat ik niet vergeet wat ik nog moet doen.
+
+
+
+
 # for later
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 # TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 # TODO: RDE
 # todo: put all golabl variables in st.sessionstate, like model_meta, txts, vars, map, etc.
 # todo: make function that checks the model_meta online and adds the variables.json file to the model folder if it does not exist
+# TODO: this must be offline, but I can only do that at the end when I know which icons I'm using.
 
 
 # CLI to run it
@@ -12,21 +21,36 @@
 
 
 # packages
-from appdirs import user_config_dir
+
 import streamlit as st
 import sys
 import os
+import time
 import json
-from utils.analyse_advanced import load_known_projects
-from utils.common import print_widget_label
+import platform
+from appdirs import user_config_dir, user_cache_dir
 import folium
 
-from utils.config import ADDAXAI_FILES
-from utils.common import load_lang_txts, load_vars, update_vars
+
+
 
 # Force all output to be unbuffered and go to stdout
 sys.stdout.reconfigure(line_buffering=True)
 sys.stderr = sys.stdout  # Redirect stderr to stdout too
+
+
+# ADDAXAI_FILES = st.session_state["shared"].get("ADDAXAI_FILES", os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
+
+if "shared" in st.session_state and "ADDAXAI_FILES" in st.session_state["shared"]:
+    # If the shared state already has ADDAXAI_FILES, use it
+    ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
+else:
+    # If not, set it to the default value
+    ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+
+# if "ADDAXAI_FILES" not in st.session_state["shared"]:
+
+# ADDAXAI_FILES = st.session_state.get("shared").get("ADDAXAI_FILES", ADDAXAI_FILES)
 
 # make sure the config file is set
 os.environ["STREAMLIT_CONFIG"] = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
@@ -34,10 +58,224 @@ os.environ["STREAMLIT_CONFIG"] = os.path.join(ADDAXAI_FILES, "AddaxAI", "streaml
 st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
     ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), page_title="AddaxAI")
 
+
+# from utils.config import ADDAXAI_FILES
+
+
+
+
+
+
+st.write(st.session_state)
+
+
+# init shared session state
+# Initialize shared session state for cross-tool temporary variables
+STARTUP_APP = False
+if "shared" not in st.session_state:
+    
+    STARTUP_APP = True    
+    
+    
+    CONFIG_DIR = user_config_dir("AddaxAI")
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    
+    TEMP_DIR = os.path.join(user_cache_dir("AddaxAI"), "temp")
+    os.makedirs(TEMP_DIR, exist_ok=True)
+
+    # Initialize shared session state for cross-tool temporary variables
+    if "shared" not in st.session_state:
+        st.session_state["shared"] = {}
+    
+    def get_os_name():
+        system = platform.system()
+        if system == "Windows":
+            return "windows"
+        elif system == "Linux":
+            return "linux"
+        elif system == "Darwin":
+            return "macos"
+
+    OS_NAME = get_os_name()
+    
+    # ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+    ADDAXAI_FILES_ST = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI") # this is only temporary, will be removed later
+    MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", OS_NAME, "micromamba")
+    VIDEO_EXTENSIONS = ('.mp4','.avi','.mpeg','.mpg','.mov','.mkv')
+    IMG_EXTENSIONS = ('.jpg', '.jpeg', '.gif', '.png', '.tif', '.tiff', '.bmp')
+    MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
+    
+    
+    def log_function(msg):
+        with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'logs', 'log.txt'), 'a') as f:
+            f.write(f"{msg}\n")
+        print(msg)
+    
+    
+    st.session_state["shared"] = {
+        "CONFIG_DIR": CONFIG_DIR,
+        "TEMP_DIR": TEMP_DIR,
+        "OS_NAME": OS_NAME,
+        "ADDAXAI_FILES": ADDAXAI_FILES,
+        "ADDAXAI_FILES_ST": ADDAXAI_FILES_ST,
+        "MICROMAMBA": MICROMAMBA,
+        "VIDEO_EXTENSIONS": VIDEO_EXTENSIONS,
+        "IMG_EXTENSIONS": IMG_EXTENSIONS,
+        "log": log_function,
+        "MAP_FILE_PATH": MAP_FILE_PATH
+    }
+
+else:
+    STARTUP_APP = False
+    CONFIG_DIR = st.session_state["shared"]["CONFIG_DIR"]
+    TEMP_DIR = st.session_state["shared"]["TEMP_DIR"]
+    OS_NAME = st.session_state["shared"]["OS_NAME"]
+    ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
+    ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
+    MICROMAMBA = st.session_state["shared"]["MICROMAMBA"]
+    VIDEO_EXTENSIONS = st.session_state["shared"]["VIDEO_EXTENSIONS"]
+    IMG_EXTENSIONS = st.session_state["shared"]["IMG_EXTENSIONS"]
+    MAP_FILE_PATH = st.session_state["shared"]["MAP_FILE_PATH"]
+
+
+
+
+
+
+
+from utils.common import load_lang_txts, load_vars, update_vars
+from utils.analyse_advanced import load_known_projects, load_model_metadata
+from utils.common import print_widget_label
+
+general_settings_vars = load_vars(section = "general_settings")
+lang = general_settings_vars["lang"]
+mode = general_settings_vars["mode"]
+
+# only do this when the app starts up, not on every rerun
+if STARTUP_APP:
+    
+    
+    # import platform
+    # from appdirs import user_config_dir, user_cache_dir
+    
+    status_placeholder = st.empty()
+    status_placeholder.status("Loading AddaxAI Streamlit app...")
+    time.sleep(2)
+    
+    # remove the status placeholder
+    status_placeholder.empty()
+    
+
+
+
+
+
+
+
+    # CONFIG_DIR = user_config_dir("AddaxAI")
+    # os.makedirs(CONFIG_DIR, exist_ok=True)
+    
+    # TEMP_DIR = os.path.join(user_cache_dir("AddaxAI"), "temp")
+    # os.makedirs(TEMP_DIR, exist_ok=True)
+
+    # # Initialize shared session state for cross-tool temporary variables
+    # if "shared" not in st.session_state:
+    #     st.session_state["shared"] = {}
+    
+    # def get_os_name():
+    #     system = platform.system()
+    #     if system == "Windows":
+    #         return "windows"
+    #     elif system == "Linux":
+    #         return "linux"
+    #     elif system == "Darwin":
+    #         return "macos"
+
+    # OS_NAME = get_os_name()
+    
+    # ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+    # ADDAXAI_FILES_ST = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI") # this is only temporary, will be removed later
+    # MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", OS_NAME, "micromamba")
+    # VIDEO_EXTENSIONS = ('.mp4','.avi','.mpeg','.mpg','.mov','.mkv')
+    # IMG_EXTENSIONS = ('.jpg', '.jpeg', '.gif', '.png', '.tif', '.tiff', '.bmp')
+    # MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
+    
+    
+    # def log_function(msg):
+    #     with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'logs', 'log.txt'), 'a') as f:
+    #         f.write(f"{msg}\n")
+    #     print(msg)
+    
+    
+    # # populate the shared session state with some default values
+    # st.session_state["shared"]["CONFIG_DIR"] = CONFIG_DIR
+    # st.session_state["shared"]["TEMP_DIR"] = TEMP_DIR
+    # st.session_state["shared"]["OS_NAME"] = OS_NAME
+    # st.session_state["shared"]["ADDAXAI_FILES"] = ADDAXAI_FILES
+    # st.session_state["shared"]["ADDAXAI_FILES_ST"] = ADDAXAI_FILES_ST
+    # st.session_state["shared"]["MICROMAMBA"] = MICROMAMBA
+    # st.session_state["shared"]["VIDEO_EXTENSIONS"] = VIDEO_EXTENSIONS
+    # st.session_state["shared"]["IMG_EXTENSIONS"] = IMG_EXTENSIONS
+    # st.session_state["shared"]["log"] = log_function
+    # st.session_state["shared"]["MAP_FILE_PATH"] = MAP_FILE_PATH
+    
+    
+    
+    
+    # this is where the overall settings are stored
+    # these will remain constant over different versions of the app
+    # so think of language settings, mode settings, etc.
+    # locations per camera, paths to deployments, etc.
+    map_file = os.path.join(CONFIG_DIR, "map.json") 
+    if not os.path.exists(map_file):
+
+        # start with a clean slate
+        map = {
+            "projects": {}
+        }
+
+        with open(map_file, "w") as f:
+            json.dump(map, f, indent=2)
+
+    general_settings_file = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
+    if not os.path.exists(general_settings_file):
+        
+        # make directory if it does not exist
+        os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
+        
+        # create a default settings file
+        general_settings = {
+            "lang": "en",
+            "mode": 1,  # 0: simple mode, 1: advanced mode
+            "selected_projectID": None
+        }
+        with open(general_settings_file, "w") as f:
+            json.dump(general_settings, f, indent=2)
+
+
+
+
+
+    # Load language texts into session state on startup only
+    if not st.session_state.get("txts"):
+        full_txts = load_lang_txts()
+        # Store only the current language's texts in flattened structure
+        st.session_state["txts"] = {key: value[lang] for key, value in full_txts.items()}
+
+    # Load model metadata into session state on startup only
+    if not st.session_state.get("model_meta"):
+        st.session_state["model_meta"] = load_model_metadata()
+
+
+
+    # render a dummy map with a marker so that the rest of the markers this session will be rendered
+    m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)
+    folium.Marker([39.949610, -75.150282]).add_to(m)
+    
+    
 # Load custom CSS from external file
 with open(os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "css", "styles.css"), "r") as f:
     css_content = f.read()
-
 st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
 # Inject Material Icons for the header stepper bar
@@ -45,65 +283,17 @@ st.markdown("""
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 """, unsafe_allow_html=True)
 
-
-config_dir = user_config_dir("AddaxAI")
-os.makedirs(config_dir, exist_ok=True)
-
-# TODO: put the config_dir in session state 
-
-
-# this is where the overall settings are stored
-# these will remain constant over different versions of the app
-# so think of language settings, mode settings, etc.
-# locations per camera, paths to deployments, etc.
-map_file = os.path.join(config_dir, "map.json") 
-if not os.path.exists(map_file):
-
-    # start with a clean slate
-    map = {
-        "projects": {}
-    }
-
-    with open(map_file, "w") as f:
-        json.dump(map, f, indent=2)
-
-general_settings_file = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
-if not os.path.exists(general_settings_file):
+# else:
+#     # if the session state is not empty, we assume that the app is already running
+#     # and we can use the existing session state
+#     CONFIG_DIR = st.session_state["shared"]["CONFIG_DIR"]
     
-    # make directory if it does not exist
-    os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
-    
-    # create a default settings file
-    general_settings = {
-        "lang": "en",
-        "mode": 1,  # 0: simple mode, 1: advanced mode
-        "selected_projectID": None
-    }
-    with open(general_settings_file, "w") as f:
-        json.dump(general_settings, f, indent=2)
+
+# only import the modules after startup
+# from utils.config import ADDAXAI_FILES
 
 
 
-general_settings_vars = load_vars(section = "general_settings")
-lang = general_settings_vars["lang"]
-mode = general_settings_vars["mode"]
-
-# Load language texts into session state on startup only
-if not st.session_state.get("txts"):
-    full_txts = load_lang_txts()
-    # Store only the current language's texts in flattened structure
-    st.session_state["txts"] = {key: value[lang] for key, value in full_txts.items()}
-
-# Use session state texts
-txts = st.session_state["txts"]
-
-# render a dummy map with a marker so that the rest of the markers this session will be rendered
-m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)
-folium.Marker([39.949610, -75.150282]).add_to(m)
-
-# Initialize shared session state for cross-tool temporary variables
-if "shared" not in st.session_state:
-    st.session_state["shared"] = {}
 
 # save only the last 1000 lines of the log file
 # log_fpath = "/Users/peter/Desktop/streamlit_app/frontend/streamlit_log.txt"
@@ -137,6 +327,13 @@ except FileNotFoundError:
     print(f"Log file {log_fpath} not found.")
 except Exception as e:
     print(f"Unexpected error: {e}")
+
+
+
+
+# Use session state texts and model metadata
+txts = st.session_state["txts"]
+model_meta = st.session_state["model_meta"]
 
 # page navigation
 # st.logo("/Users/peter/Desktop/streamlit_app/frontend/logo.png", size = "large")

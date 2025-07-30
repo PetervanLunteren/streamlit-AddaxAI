@@ -61,8 +61,12 @@ from utils.common import load_vars, update_vars, replace_vars, info_box, load_ma
 from utils.config import *
 # AddaxAI_files = os.path.join(
 #     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
+ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
+ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
 CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
 DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
+VIDEO_EXTENSIONS = st.session_state["shared"]["VIDEO_EXTENSIONS"]
+IMG_EXTENSIONS = st.session_state["shared"]["IMG_EXTENSIONS"]
 
 # load camera IDs
 config_dir = user_config_dir("AddaxAI")
