@@ -12,3 +12,4 @@ pyproject.toml
 vars/*
 models/*
 assets/logs/log.txt
+assets/logs/previous_sessions/*

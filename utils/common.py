@@ -43,19 +43,23 @@ import tarfile
 #     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 # from utils.config import ADDAXAI_FILES
 
-ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
+
+from utils.config import *
+
+
+# ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
 
 
 
-CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
-DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
+# CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
+# DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
 
-# load camera IDs
+# # load camera IDs
 
-CONFIG_DIR = st.session_state["shared"]["CONFIG_DIR"]
-# MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
+# CONFIG_DIR = st.session_state["shared"]["CONFIG_DIR"]
+# # MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
 MAP_FILE_PATH = st.session_state["shared"]["MAP_FILE_PATH"]
-ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
+# ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
 
 # set versions
 with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'version.txt'), 'r') as file:
@@ -924,15 +928,180 @@ def requires_addaxai_update(required_version):
     return False
 
 
-def info_box(msg, icon=":material/info:"):
+def info_box(msg, title = None, icon=":material/info:"):
+    
+    if title:
+        msg = f'<span style="font-weight: bold;">{title}</span><br>{msg}'
+    
     flexible_callout(msg,
                      icon=icon,
                      background_color="#d9e3e7af",
                      font_color="#086164",
                      icon_size=23)
 
+def warning_box(msg, title = None, icon=":material/warning:"):
+    
+    if title:
+        msg = f'<span style="font-weight: bold;">{title}</span><br>{msg}'
+    
+    flexible_callout(msg,
+                     icon=icon,
+                     background_color="#fffbeb",
+                     font_color="#936b0c",
+                     icon_size=23)
 
 # import streamlit as st
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODEL METADATA MANAGEMENT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def fetch_latest_model_info():
+    """
+    Downloads the latest model metadata from GitHub and creates folder structure
+    for new models. Shows notifications for any new models found.
+    
+    This function:
+    1. Downloads model_meta.json from the GitHub repository
+    2. Compares models in metadata vs existing model directories
+    3. Creates folders and variables.json for any new models
+    4. Shows info_box notifications with model info popover for new models
+    
+    Called during app startup to keep model metadata current.
+    """
+    import streamlit as st
+    
+    from utils.config import log
+    log(f"EXECUTED: fetch_latest_model_info()")
+    
+    # Define paths using the global ADDAXAI_FILES_ST from config
+    model_meta_url = "https://raw.githubusercontent.com/PetervanLunteren/streamlit-AddaxAI/refs/heads/main/assets/model_meta/model_meta.json"
+    model_meta_local = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "model_meta", "model_meta.json")
+    models_dir = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "models")
+    
+    try:
+        # Download latest model metadata with reasonable timeout
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0",
+            "Accept-Encoding": "*",
+            "Connection": "keep-alive"
+        }
+        
+        response = requests.get(model_meta_url, timeout=10, headers=headers)
+        
+        if response.status_code == 200:
+            # Save updated model metadata
+            os.makedirs(os.path.dirname(model_meta_local), exist_ok=True)
+            with open(model_meta_local, 'wb') as file:
+                file.write(response.content)
+            
+            log("Updated model_meta.json successfully.")
+            
+            # Load the downloaded metadata
+            with open(model_meta_local, 'r') as f:
+                model_meta = json.load(f)
+            
+            # Check if this is first startup (no models exist at all)
+            is_first_startup = True
+            for model_type in ["det", "cls"]:
+                type_dir = os.path.join(models_dir, model_type)
+                if os.path.exists(type_dir):
+                    existing_models = [d for d in os.listdir(type_dir) 
+                                     if os.path.isdir(os.path.join(type_dir, d))]
+                    if existing_models:
+                        is_first_startup = False
+                        break
+            
+            if is_first_startup:
+                logger.info("First startup detected - creating all model directories without notifications")
+            
+            # Process both detection and classification models
+            for model_type in ["det", "cls"]:
+                if model_type in model_meta:
+                    model_dicts = model_meta[model_type]
+                    all_models = list(model_dicts.keys())
+                    
+                    # Get existing model directories
+                    type_dir = os.path.join(models_dir, model_type)
+                    os.makedirs(type_dir, exist_ok=True)
+                    
+                    existing_models = []
+                    if os.path.exists(type_dir):
+                        existing_models = [d for d in os.listdir(type_dir) 
+                                         if os.path.isdir(os.path.join(type_dir, d))]
+                    
+                    # Find new models (in metadata but not in filesystem)
+                    new_models = [model for model in all_models if model not in existing_models]
+                    
+                    # Create directories for new models
+                    for model_id in new_models:
+                        model_info = model_dicts[model_id]
+                        
+                        # Create model directory
+                        model_dir = os.path.join(type_dir, model_id)
+                        os.makedirs(model_dir, exist_ok=True)
+                        
+                        # Create variables.json file with model metadata
+                        variables_file = os.path.join(model_dir, "variables.json")
+                        with open(variables_file, 'w') as f:
+                            json.dump(model_info, f, indent=4)
+                        
+                        logger.info(f"Created directory and variables.json for new {model_type} model: {model_id}")
+                        
+                        # Show notification for new model (only if not first startup)
+                        if not is_first_startup:
+                            friendly_name = model_info.get('friendly_name', model_id)
+                            model_type_name = "species identification model" if model_type == "cls" else "detection"
+                            
+                            # Create info box
+                            info_box(
+                                msg = f"New {model_type_name.lower()} model available: {friendly_name}",
+                                title="New model added",
+                                icon=":material/new_releases:"
+                            )
+                                
+
+            
+        else:
+            logger.warning(f"Failed to download model metadata. Status code: {response.status_code}")
+            
+    except requests.exceptions.Timeout:
+        logger.warning("Request timed out. Model metadata update stopped.")
+    except Exception as e:
+        logger.error(f"Could not update model metadata: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CALLBACK ERROR LOGGING WRAPPER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def logged_callback(func):
+    """
+    Decorator to wrap Streamlit callbacks with error logging.
+    
+    This ensures that any exceptions in callbacks are logged to the file
+    before Streamlit catches and displays them in the UI.
+    
+    Usage:
+        @logged_callback
+        def on_button_click():
+            # Your callback code here
+            pass
+    """
+    import functools
+    import traceback
+    from utils.config import log
+    
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            log(f"ERROR in callback {func.__name__}: {type(e).__name__}: {e}")
+            log(traceback.format_exc())
+            # Re-raise so Streamlit still shows the error in UI
+            raise
+    
+    return wrapper
 
 # SPECIES SELECTOR

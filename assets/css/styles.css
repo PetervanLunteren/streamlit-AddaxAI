@@ -9,10 +9,22 @@ footer {visibility: hidden;}
     padding-top: 25px !important;
 }
 
-/* Target the popover container */
+/* Target all popover containers - works for species selector, add project, add location, etc. */
 [data-testid="stPopoverBody"] {
-    width: 800px !important;
-    max-width: 90vw;
+    width: 800px !important;  /* Adjust the width as needed */
+    max-width: 90vw !important;          /* Optional: prevent overflow on small screens */
+    min-width: 600px !important;
+}
+
+/* More specific targeting for popover content */
+div[data-testid="stPopoverBody"] > div {
+    width: 100% !important;
+    min-width: 600px !important;
+}
+
+/* Target popover content specifically */
+[data-testid="stPopoverBody"] .stContainer {
+    width: 100% !important;
 }
 
 /* Custom CSS to style the button in the header */

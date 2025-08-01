@@ -27,6 +27,28 @@ lang_selected = st.selectbox(
 )
 
 
+# start from scratch debug button
+if st.button("Start from scratch", use_container_width=True, type="primary"):
+    
+    # remove all vars files in the vars directory
+    vars_dir = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "vars")
+    for filename in os.listdir(vars_dir):
+        file_path = os.path.join(vars_dir, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+        
+    # remove the map file
+    map, MAP_FILE_PATH = load_map()
+    if os.path.exists(MAP_FILE_PATH):
+        os.remove(MAP_FILE_PATH)
+    
+    # reset session state
+    st.session_state.clear()
+    
+    st.rerun()
+
+
+
 # import settings file
 map, MAP_FILE_PATH = load_map()
 
@@ -44,7 +66,11 @@ with st.expander("st.session_state", expanded=False):
 save_btn = st.button(":material/save: Save settings", use_container_width=True,
                         type = "primary", key = "language_btn")
 if save_btn:
-    save_global_vars({"lang": lang_selected})
+    # save_global_vars({"lang": lang_selected})
+    set_session_var("shared", "lang", lang_selected)
+    update_vars("general_settings", {
+        "lang": lang_selected
+    })
     st.rerun()
     
     

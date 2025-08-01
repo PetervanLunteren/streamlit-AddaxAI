@@ -25,7 +25,7 @@ from utils.config import *
 # import local modules
 from utils.common import (load_lang_txts, load_vars, StepperBar, print_widget_label, 
                          update_vars, clear_vars, info_box, MultiProgressBars,
-                         init_session_state, get_session_var, set_session_var, update_session_vars)
+                         init_session_state, get_session_var, set_session_var, update_session_vars, warning_box)
 from utils.analyse_advanced import (browse_directory_widget,
                                         check_folder_metadata,
                                         project_selector_widget,
@@ -36,7 +36,7 @@ from utils.analyse_advanced import (browse_directory_widget,
                                         load_model_metadata,
                                         det_model_selector_widget,
                                         species_selector_widget,
-                                        load_taxon_mapping,
+                                        load_taxon_mapping_cached,  # Use cached version
                                         add_deployment_to_queue,
                                         install_env,
                                         run_process_queue,
@@ -46,23 +46,77 @@ from utils.analyse_advanced import (browse_directory_widget,
 
 # st.write(AddaxAI_files)
 
-# load files
-txts = load_lang_txts()
-general_settings_vars = load_vars(section="general_settings")
-analyse_advanced_vars = load_vars(section="analyse_advanced")
-model_meta = load_model_metadata()
+# ═══════════════════════════════════════════════════════════════════════════════
+# OPTIMIZED RESOURCE LOADING - Use cached session state values from main.py
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# init session state for this tool
+# ✅ OPTIMIZATION 1: Use cached resources from main.py session state 
+# Eliminates 3 expensive file reads per rerun:
+# - load_lang_txts() -> txts (language JSON file)
+# - load_model_metadata() -> model_meta (large model metadata JSON) 
+# - load_vars("general_settings") -> lang/mode (settings JSON file)
+txts = st.session_state["txts"]
+model_meta = st.session_state["model_meta"]
+lang = st.session_state["shared"]["lang"]
+mode = st.session_state["shared"]["mode"]
+
+# Load persistent vars (needs fresh data for queue management)
+analyse_advanced_vars = load_vars(section="analyse_advanced")
+
+# Initialize session state for this tool
 init_session_state("analyse_advanced")
 
-# init vars
+# Initialize step from session state
 step = get_session_var("analyse_advanced", "step", 0)
-lang = general_settings_vars["lang"]
-mode = general_settings_vars["mode"]
 
-# get from st.session_state
-ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
-ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
+from utils.config import *
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MODEL AVAILABILITY CHECKING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Simple filesystem checks for model and environment availability
+# Lightweight operations that run on every check - no caching complexity
+
+def check_model_availability(model_type, model_id, model_meta):
+    """
+    Check model and environment availability.
+    Simple filesystem checks - no caching complexity.
+    
+    Args: 
+        model_type: 'cls' or 'det'
+        model_id: Model identifier
+        model_meta: Model metadata dictionary
+    
+    Returns:
+        dict: {
+            'env_exists': bool,
+            'model_exists': bool,
+            'env_name': str,
+            'model_fname': str,
+            'friendly_name': str
+        }
+    """
+    model_info = model_meta[model_type][model_id]
+    env_name = model_info["env"]
+    model_fname = model_info["model_fname"]
+    friendly_name = model_info["friendly_name"]
+    
+    env_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
+    model_path = os.path.join(ADDAXAI_FILES_ST, "models", model_type, model_id, model_fname)
+    
+    return {
+        'env_exists': os.path.exists(env_path),
+        'model_exists': os.path.exists(model_path),
+        'env_name': env_name,
+        'model_fname': model_fname,
+        'friendly_name': friendly_name
+    }
+
+
+# # get from st.session_state
+# ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
+# ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
 
 # st.write(f"TEMP_DIR: {TEMP_DIR}")
 # st.write(f"CONFIG_DIR: {CONFIG_DIR}")
@@ -274,24 +328,26 @@ with st.container(border=True):
 
             if selected_cls_modelID and selected_cls_modelID != "NONE":
                 
-                # download the env if needed
-                req_env = model_meta['cls'][selected_cls_modelID]["env"]
-                if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{req_env}")):
+                # Check model availability (simple filesystem checks)
+                availability = check_model_availability('cls', selected_cls_modelID, model_meta)
+                
+                # Check environment availability
+                if not availability['env_exists']:
                     needs_installing = True
-                    st.warning(
-                        f"The selected classification model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-                    if st.button(f"Install {req_env}", use_container_width=False):
-                        set_session_var("analyse_advanced", "required_env_name", req_env)
+                    warning_box(title = "Virtual environment required",
+                        msg = f"The selected model needs a specific virtual environment that is not yet installed. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.",
+                        icon = ":material/warning:")
+                    if st.button(f"Install virtual environment", key = "install_cls_virtual_env", use_container_width=False):
+                        set_session_var("analyse_advanced", "required_env_name", availability['env_name'])
                         modal_install_env.open()
                         
-                # download the model if needed
-                model_fname = model_meta['cls'][selected_cls_modelID]["model_fname"]
-                friendly_model_name = model_meta['cls'][selected_cls_modelID]["friendly_name"]
-                if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "models", "cls", selected_cls_modelID, model_fname)):
+                # Check model file availability
+                if not availability['model_exists']:
                     needs_installing = True
-                    st.warning(
-                        f"The selectedclassification model __{friendly_model_name}__ still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-                    if st.button(f"Download model", use_container_width=False, key="download_cls_model_button"):
+                    warning_box(
+                        title= "Model download required",
+                        msg = f"The selected classification model still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
+                    if st.button(f"Download model files", use_container_width=False, key="download_cls_model_button"):
                         set_session_var("analyse_advanced", "download_modelID", selected_cls_modelID)
                         modal_download_model.open()
         # st.write("")
@@ -304,24 +360,26 @@ with st.container(border=True):
                 selected_det_modelID = det_model_selector_widget(model_meta)
                 if selected_det_modelID:
                     
-                    # install the env if needed
-                    req_env = model_meta['det'][selected_det_modelID]["env"]
-                    if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{req_env}")):
+                    # Check model availability (simple filesystem checks)
+                    availability = check_model_availability('det', selected_det_modelID, model_meta)
+                    
+                    # Check environment availability
+                    if not availability['env_exists']:
                         needs_installing = True
-                        st.warning(
-                            f"The selected detection model needs the virtual environment {req_env}. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-                        if st.button(f"Install virtual environment *{req_env}*", use_container_width=False):
-                            set_session_var("analyse_advanced", "required_env_name", req_env)
+                        warning_box(title = "Virtual environment required",
+                            msg = f"The selected model needs a specific virtual environment that is not yet installed. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.",
+                            icon = ":material/warning:")
+                        if st.button(f"Install virtual environment", key="install_det_virtual_env", use_container_width=False):
+                            set_session_var("analyse_advanced", "required_env_name", availability['env_name'])
                             modal_install_env.open()
                     
-                    # download the model if needed
-                    model_fname = model_meta['det'][selected_det_modelID]["model_fname"]
-                    friendly_model_name = model_meta['det'][selected_det_modelID]["friendly_name"]
-                    if not os.path.exists(os.path.join(ADDAXAI_FILES_ST, "models", "det", selected_det_modelID, model_fname)):
+                    # Check model file availability
+                    if not availability['model_exists']:
                         needs_installing = True
-                        st.warning(
-                            f"The selected detection model {friendly_model_name} still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-                        if st.button(f"Download model", use_container_width=False, key = "download_det_model_button"):
+                        warning_box(
+                            title= "Model download required",
+                            msg = f"The selected classification model still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
+                        if st.button(f"Download model files", use_container_width=False, key="download_det_model_button"):
                             set_session_var("analyse_advanced", "download_modelID", selected_det_modelID)
                             modal_download_model.open()
                     
@@ -350,7 +408,7 @@ with st.container(border=True):
                 else:
                     st.button(":material/arrow_forward: Next",
                             use_container_width=True, disabled=True,
-                            key="model_next_button_dummy", help="You need to install the required virtual environment for the selected models before proceeding. ")
+                            key="model_next_button_dummy", help="You need to install the required virtual environment or download the model files for the selected models before proceeding. ")
             else:
                 st.button(":material/arrow_forward: Next",
                         use_container_width=True, disabled=True,
@@ -361,12 +419,16 @@ with st.container(border=True):
         st.write("Species Selection!")
 
         selected_cls_modelID = get_session_var("analyse_advanced", "selected_cls_modelID")
-        taxon_mapping = load_taxon_mapping(selected_cls_modelID)
+        # ✅ OPTIMIZATION 3: Cached taxon mapping loading
+        # Only loads CSV file when classification model changes
+        # Previous: CSV parsing on every step 3 visit
+        # Now: Cached in session state by model ID
+        taxon_mapping = load_taxon_mapping_cached(selected_cls_modelID)
         # st.write(taxon_mapping)
         with st.container(border=True):
             print_widget_label("Species presence",
                                help_text="Here you can select the model of your choosing.")
-            selected_species = species_selector_widget(taxon_mapping)
+            selected_species = species_selector_widget(taxon_mapping, selected_cls_modelID)
 
         st.write("Selected species:", selected_species)
 

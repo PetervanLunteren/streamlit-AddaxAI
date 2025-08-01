@@ -1,249 +1,168 @@
+"""
+AddaxAI Streamlit Application - Main Entry Point
 
+This is the main entry point for the AddaxAI wildlife camera trap analysis platform.
+The application uses an optimized startup/rerun pattern to minimize I/O operations:
+- On startup (empty session_state): Load all files, initialize caches
+- On reruns: Use cached data from session_state for maximum performance
 
-# WAARWAS IK? ik was bezig om de main.py beter te maken, zodat niet altijd alles weer opnieuw hoeft te gaan bij iedere rerun. Er zitten vast nog wel bugs in. Dus beter even testen.
-# als dat allemaal werkt, dan ga ik dit script opschonen, dan gewoon van het begin af naar het eind werken van de AI pipeline en alles klaar maken, dus taxon-mappings, env-requiremetns, etc.
-# Goed bijhouden de TODO's en de issues, zodat ik niet vergeet wat ik nog moet doen.
+Architecture:
+- Three-tier variable storage: session_state (temp) → vars/*.json (persistent) → ~/.config/AddaxAI/map.json (global)
+- Write-through caching: Changes update both persistent storage and session_state
+- Startup detection: if st.session_state == {} triggers initialization
 
+CLI to run:
+cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
 
+TODOs:
+- https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
+- https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
+- RDE
+- put all golabl variables in st.sessionstate, like model_meta, txts, vars, map, etc.
+- make function that checks the model_meta online and adds the variables.json file to the model folder if it does not exist
+- this must be offline, but I can only do that at the end when I know which icons I'm using.
+"""
 
-
-# for later
-# TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
-# TODO: https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
-# TODO: RDE
-# todo: put all golabl variables in st.sessionstate, like model_meta, txts, vars, map, etc.
-# todo: make function that checks the model_meta online and adds the variables.json file to the model folder if it does not exist
-# TODO: this must be offline, but I can only do that at the end when I know which icons I'm using.
-
-
-# CLI to run it
-# cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
-
-
-# packages
-
+# Standard library imports
 import streamlit as st
 import sys
 import os
 import time
 import json
-import platform
+
+# Third-party imports
+from streamlit_lottie import st_lottie
 from appdirs import user_config_dir, user_cache_dir
 import folium
 
+# Local imports - global config must be imported before anything else
+from utils.config import *
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# GLOBAL CONFIGURATION & SETUP (runs on every request)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-
-# Force all output to be unbuffered and go to stdout
+# Force all output to be unbuffered for real-time logging
 sys.stdout.reconfigure(line_buffering=True)
-sys.stderr = sys.stdout  # Redirect stderr to stdout too
+# Note: stderr redirection moved to after TeeOutput setup to ensure errors are logged
 
-
-# ADDAXAI_FILES = st.session_state["shared"].get("ADDAXAI_FILES", os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))))
-
-if "shared" in st.session_state and "ADDAXAI_FILES" in st.session_state["shared"]:
-    # If the shared state already has ADDAXAI_FILES, use it
-    ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
-else:
-    # If not, set it to the default value
-    ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-
-# if "ADDAXAI_FILES" not in st.session_state["shared"]:
-
-# ADDAXAI_FILES = st.session_state.get("shared").get("ADDAXAI_FILES", ADDAXAI_FILES)
-
-# make sure the config file is set
+# Set Streamlit config file path
 os.environ["STREAMLIT_CONFIG"] = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
 
-st.set_page_config(initial_sidebar_state="auto", page_icon=os.path.join(
-    ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), page_title="AddaxAI")
+# Configure Streamlit page settings
+st.set_page_config(
+    initial_sidebar_state="auto", 
+    page_icon=os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "images", "logo_square.png"), 
+    page_title="AddaxAI"
+)
 
+# Material Icons must be injected on every rerun for stepper components
+st.markdown("""
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+""", unsafe_allow_html=True)
 
-# from utils.config import ADDAXAI_FILES
+# Load and inject custom CSS (only on startup for performance)
+with open(os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "css", "styles.css"), "r") as f:
+    css_content = f.read()
+st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
+# DEBUG
+with st.expander("Session state", expanded=False):
+    st.write(st.session_state)
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# STARTUP INITIALIZATION (runs only when session_state is empty)
+# ═══════════════════════════════════════════════════════════════════════════════
 
+# Detect app startup: empty session_state means this is a fresh session
+if st.session_state == {}:
 
-
-
-st.write(st.session_state)
-
-
-# init shared session state
-# Initialize shared session state for cross-tool temporary variables
-STARTUP_APP = False
-if "shared" not in st.session_state:
+    # ─────────────────────────────────────────────────────────────────────────
+    # Display loading animation and status during startup
+    # ─────────────────────────────────────────────────────────────────────────
     
-    STARTUP_APP = True    
+    # Load Lottie animation for startup loading screen
+    lottie_animation_fpath = os.path.join(ADDAXAI_FILES_ST, "assets", "loaders", "squirrel.json")
+    with open(lottie_animation_fpath, "r") as f:
+        lottie_animation = json.load(f)
+
+    _, col_animation, _ = st.columns([1, 2, 1])
+    with col_animation:
+        # Create a container for the animation that we can clear later
+        animation_container = st.empty()
+        
+        with animation_container:
+            st_lottie(
+                lottie_animation,
+                speed=1,
+                reverse=False,
+                loop=True,
+                quality="high",
+                key="lottie_animation"
+            )
+
+    status_placeholder = st.empty()
+    status_placeholder.status("Loading AddaxAI Streamlit app...")
+    time.sleep(0.5)  # Simulate loading time
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # Initialize session state and directory structure
+    # ─────────────────────────────────────────────────────────────────────────
     
+    # Initialize shared session state container for cross-tool temporary variables
+    st.session_state["shared"] = {}
+    
+    # Create config and temp directories (done at startup since appdirs 
+    # may not be available in different conda environments used by tools)
     CONFIG_DIR = user_config_dir("AddaxAI")
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
     TEMP_DIR = os.path.join(user_cache_dir("AddaxAI"), "temp")
     os.makedirs(TEMP_DIR, exist_ok=True)
-
-    # Initialize shared session state for cross-tool temporary variables
-    if "shared" not in st.session_state:
-        st.session_state["shared"] = {}
     
-    def get_os_name():
-        system = platform.system()
-        if system == "Windows":
-            return "windows"
-        elif system == "Linux":
-            return "linux"
-        elif system == "Darwin":
-            return "macos"
-
-    OS_NAME = get_os_name()
-    
-    # ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-    ADDAXAI_FILES_ST = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI") # this is only temporary, will be removed later
-    MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", OS_NAME, "micromamba")
-    VIDEO_EXTENSIONS = ('.mp4','.avi','.mpeg','.mpg','.mov','.mkv')
-    IMG_EXTENSIONS = ('.jpg', '.jpeg', '.gif', '.png', '.tif', '.tiff', '.bmp')
     MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
     
-    
-    def log_function(msg):
-        with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'logs', 'log.txt'), 'a') as f:
-            f.write(f"{msg}\n")
-        print(msg)
-    
-    
+    # Store paths in session state for access by all tools
     st.session_state["shared"] = {
         "CONFIG_DIR": CONFIG_DIR,
         "TEMP_DIR": TEMP_DIR,
-        "OS_NAME": OS_NAME,
-        "ADDAXAI_FILES": ADDAXAI_FILES,
-        "ADDAXAI_FILES_ST": ADDAXAI_FILES_ST,
-        "MICROMAMBA": MICROMAMBA,
-        "VIDEO_EXTENSIONS": VIDEO_EXTENSIONS,
-        "IMG_EXTENSIONS": IMG_EXTENSIONS,
-        "log": log_function,
         "MAP_FILE_PATH": MAP_FILE_PATH
-    }
-
-else:
-    STARTUP_APP = False
-    CONFIG_DIR = st.session_state["shared"]["CONFIG_DIR"]
-    TEMP_DIR = st.session_state["shared"]["TEMP_DIR"]
-    OS_NAME = st.session_state["shared"]["OS_NAME"]
-    ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
-    ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
-    MICROMAMBA = st.session_state["shared"]["MICROMAMBA"]
-    VIDEO_EXTENSIONS = st.session_state["shared"]["VIDEO_EXTENSIONS"]
-    IMG_EXTENSIONS = st.session_state["shared"]["IMG_EXTENSIONS"]
-    MAP_FILE_PATH = st.session_state["shared"]["MAP_FILE_PATH"]
-
-
-
-
-
-
-
-from utils.common import load_lang_txts, load_vars, update_vars
-from utils.analyse_advanced import load_known_projects, load_model_metadata
-from utils.common import print_widget_label
-
-general_settings_vars = load_vars(section = "general_settings")
-lang = general_settings_vars["lang"]
-mode = general_settings_vars["mode"]
-
-# only do this when the app starts up, not on every rerun
-if STARTUP_APP:
+        }
     
+    # ─────────────────────────────────────────────────────────────────────────
+    # Load utility modules and initialize settings cache
+    # ─────────────────────────────────────────────────────────────────────────
     
-    # import platform
-    # from appdirs import user_config_dir, user_cache_dir
-    
-    status_placeholder = st.empty()
-    status_placeholder.status("Loading AddaxAI Streamlit app...")
-    time.sleep(2)
-    
-    # remove the status placeholder
-    status_placeholder.empty()
+    # Import utils now that shared session state exists (modules depend on it)
+    from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, print_widget_label, fetch_latest_model_info
+    from utils.analyse_advanced import load_known_projects, load_model_metadata
     
 
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # Initialize global configuration files
+    # ─────────────────────────────────────────────────────────────────────────
+    
+    # Initialize global map.json if it doesn't exist
+    # (stores project definitions, camera locations, deployment history)
+    if not os.path.exists(MAP_FILE_PATH):
 
-
-
-
-
-
-    # CONFIG_DIR = user_config_dir("AddaxAI")
-    # os.makedirs(CONFIG_DIR, exist_ok=True)
-    
-    # TEMP_DIR = os.path.join(user_cache_dir("AddaxAI"), "temp")
-    # os.makedirs(TEMP_DIR, exist_ok=True)
-
-    # # Initialize shared session state for cross-tool temporary variables
-    # if "shared" not in st.session_state:
-    #     st.session_state["shared"] = {}
-    
-    # def get_os_name():
-    #     system = platform.system()
-    #     if system == "Windows":
-    #         return "windows"
-    #     elif system == "Linux":
-    #         return "linux"
-    #     elif system == "Darwin":
-    #         return "macos"
-
-    # OS_NAME = get_os_name()
-    
-    # ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-    # ADDAXAI_FILES_ST = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI") # this is only temporary, will be removed later
-    # MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", OS_NAME, "micromamba")
-    # VIDEO_EXTENSIONS = ('.mp4','.avi','.mpeg','.mpg','.mov','.mkv')
-    # IMG_EXTENSIONS = ('.jpg', '.jpeg', '.gif', '.png', '.tif', '.tiff', '.bmp')
-    # MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
-    
-    
-    # def log_function(msg):
-    #     with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'logs', 'log.txt'), 'a') as f:
-    #         f.write(f"{msg}\n")
-    #     print(msg)
-    
-    
-    # # populate the shared session state with some default values
-    # st.session_state["shared"]["CONFIG_DIR"] = CONFIG_DIR
-    # st.session_state["shared"]["TEMP_DIR"] = TEMP_DIR
-    # st.session_state["shared"]["OS_NAME"] = OS_NAME
-    # st.session_state["shared"]["ADDAXAI_FILES"] = ADDAXAI_FILES
-    # st.session_state["shared"]["ADDAXAI_FILES_ST"] = ADDAXAI_FILES_ST
-    # st.session_state["shared"]["MICROMAMBA"] = MICROMAMBA
-    # st.session_state["shared"]["VIDEO_EXTENSIONS"] = VIDEO_EXTENSIONS
-    # st.session_state["shared"]["IMG_EXTENSIONS"] = IMG_EXTENSIONS
-    # st.session_state["shared"]["log"] = log_function
-    # st.session_state["shared"]["MAP_FILE_PATH"] = MAP_FILE_PATH
-    
-    
-    
-    
-    # this is where the overall settings are stored
-    # these will remain constant over different versions of the app
-    # so think of language settings, mode settings, etc.
-    # locations per camera, paths to deployments, etc.
-    map_file = os.path.join(CONFIG_DIR, "map.json") 
-    if not os.path.exists(map_file):
-
-        # start with a clean slate
+        # Create empty projects structure
         map = {
             "projects": {}
         }
 
-        with open(map_file, "w") as f:
+        with open(MAP_FILE_PATH, "w") as f:
             json.dump(map, f, indent=2)
 
+    # Initialize general_settings.json if it doesn't exist
     general_settings_file = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
     if not os.path.exists(general_settings_file):
         
-        # make directory if it does not exist
+        # Create vars directory if needed
         os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
         
-        # create a default settings file
+        # Create default settings
         general_settings = {
             "lang": "en",
             "mode": 1,  # 0: simple mode, 1: advanced mode
@@ -252,98 +171,104 @@ if STARTUP_APP:
         with open(general_settings_file, "w") as f:
             json.dump(general_settings, f, indent=2)
 
+    # Load general settings from file and cache in session state
+    # (avoids file reads on every rerun for lang/mode)
+    general_settings_vars = load_vars(section = "general_settings")
+    lang = general_settings_vars["lang"]
+    mode = general_settings_vars["mode"]
+    
+    set_session_var("shared", "lang", lang)
+    set_session_var("shared", "mode", mode)
 
-
-
-
-    # Load language texts into session state on startup only
+    # ─────────────────────────────────────────────────────────────────────────
+    # Load and cache expensive resources (language, models, UI assets)
+    # ─────────────────────────────────────────────────────────────────────────
+    
+    # Load language texts and cache in session state (avoids file I/O on reruns)
     if not st.session_state.get("txts"):
         full_txts = load_lang_txts()
-        # Store only the current language's texts in flattened structure
+        # Store only current language's texts in flattened structure for efficiency
         st.session_state["txts"] = {key: value[lang] for key, value in full_txts.items()}
 
-    # Load model metadata into session state on startup only
+    # Load AI model metadata and cache in session state (large JSON file)
     if not st.session_state.get("model_meta"):
         st.session_state["model_meta"] = load_model_metadata()
 
+    # Download latest model metadata and create folder structure for new models
+    # This will show notifications for any new models that aren't in local filesystem
+    fetch_latest_model_info()
 
-
-    # render a dummy map with a marker so that the rest of the markers this session will be rendered
+    # Initialize Folium maps (render dummy to prepare marker system)
     m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)
     folium.Marker([39.949610, -75.150282]).add_to(m)
     
+    # Archive previous session log and create fresh log (only on startup)
+    log_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "logs", "log.txt")
+    previous_sessions_dir = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "logs", "previous_sessions")
     
-# Load custom CSS from external file
-with open(os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "css", "styles.css"), "r") as f:
-    css_content = f.read()
-st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
-
-# Inject Material Icons for the header stepper bar
-st.markdown("""
-<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-""", unsafe_allow_html=True)
-
-# else:
-#     # if the session state is not empty, we assume that the app is already running
-#     # and we can use the existing session state
-#     CONFIG_DIR = st.session_state["shared"]["CONFIG_DIR"]
+    try:
+        # Create previous_sessions directory if it doesn't exist
+        os.makedirs(previous_sessions_dir, exist_ok=True)
+        
+        # If there's an existing log file, archive it with timestamp
+        if os.path.exists(log_fpath) and os.path.getsize(log_fpath) > 0:
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            archived_log_path = os.path.join(previous_sessions_dir, f"log_{timestamp}.txt")
+            
+            # Move the existing log to archive
+            import shutil
+            shutil.move(log_fpath, archived_log_path)
+            
+        # Create a fresh log file for this session
+        with open(log_fpath, "w", encoding="utf-8") as file:
+            from datetime import datetime
+            session_start = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            file.write(f"AddaxAI Streamlit App Log - Session Started: {session_start}\n")
+            file.write("=" * 60 + "\n")
+            file.write("This log contains all output from the current session.\n")
+            file.write("Previous sessions are archived in: assets/logs/previous_sessions/\n")
+            file.write("=" * 60 + "\n\n")
+        
+        # Use simple log() function from config.py for reliable logging
+        from utils.config import log
+        log("Logging system initialized using simple log() function")
+        log("Testing log function - this should appear in both console and log file")
+            
+    except PermissionError:
+        print(f"Permission denied when accessing {log_fpath}. Could not setup logging.")
+    except Exception as e:
+        print(f"Error setting up logging: {e}")
     
+    # Clean up loading UI elements
+    status_placeholder.empty()
+    animation_container.empty()
 
-# only import the modules after startup
-# from utils.config import ADDAXAI_FILES
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN APPLICATION (runs on startup and every rerun)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-
-
-
-# save only the last 1000 lines of the log file
-# log_fpath = "/Users/peter/Desktop/streamlit_app/frontend/streamlit_log.txt"
-log_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI",
-                         "streamlit-AddaxAI", "assets", "logs", "log.txt")
-if not os.path.exists(log_fpath):
-    # create an empty log file
-    with open(log_fpath, "w", encoding="utf-8") as file:
-        file.write("AddaxAI Streamlit App Log\n")
-        file.write("========================================\n")
-        file.write("This is the log file for the AddaxAI Streamlit app.\n")
-        file.write("It will contain the last 1000 lines of the log.\n")
-        file.write("========================================\n\n")  
-with open(log_fpath, "r", encoding="utf-8") as file:
-    log = file.readlines()
-    if len(log) > 1000:
-        log = log[-1000:]
-with open(log_fpath, "w", encoding="utf-8") as file:
-    file.writelines(log)
-try:  # DEBUG there seems to be a problem with the permissions here
-    with open(log_fpath, "r", encoding="utf-8") as file:
-        log = file.readlines()
-    if len(log) > 1000:
-        log = log[-1000:]
-    with open(log_fpath, "w", encoding="utf-8") as file:
-        file.writelines(log)
-except PermissionError:
-    print(
-        f"Permission denied when accessing {log_fpath}. Could not trim log file.")
-except FileNotFoundError:
-    print(f"Log file {log_fpath} not found.")
-except Exception as e:
-    print(f"Unexpected error: {e}")
-
-
-
-
-# Use session state texts and model metadata
+# Get cached values from session state (efficient - no file reads on rerun)
+mode = st.session_state["shared"]["mode"]
+lang = st.session_state["shared"]["lang"]
 txts = st.session_state["txts"]
 model_meta = st.session_state["model_meta"]
 
-# page navigation
-# st.logo("/Users/peter/Desktop/streamlit_app/frontend/logo.png", size = "large")
+# ─────────────────────────────────────────────────────────────────────────
+# Configure page navigation based on mode
+# ─────────────────────────────────────────────────────────────────────────
+
+# Display application logo
 st.logo(os.path.join(ADDAXAI_FILES, "AddaxAI",
         "streamlit-AddaxAI", "assets", "images", "logo.png"), size="large")
-if mode == 0:  # simple mode
+
+# Create navigation based on selected mode
+if mode == 0:  # Simple mode - single analysis tool only
     analyse_sim_page = st.Page(
         os.path.join("tools", "analyse_simple.py"), title=txts["analyse_txt"], icon=":material/rocket_launch:")
     pg = st.navigation([analyse_sim_page])
-elif mode == 1:  # advanced mode
+    
+elif mode == 1:  # Advanced mode - full toolkit
     analyse_adv_page = st.Page(
         os.path.join("tools", "analyse_advanced.py"), title=txts["analyse_txt"], icon=":material/add:")
     repeat_detection_elimination_page = st.Page(
@@ -362,26 +287,39 @@ elif mode == 1:  # advanced mode
         os.path.join("tools", "settings.py"), title=txts["settings_txt"], icon=":material/settings:")
     pg = st.navigation([analyse_adv_page, repeat_detection_elimination_page, verify_page,
                        depth_estimation_page, explore_page, postprocess_page, camera_management_page, settings_page])
+
+# Run the selected page
 pg.run()
 
-# mode settings
+# ─────────────────────────────────────────────────────────────────────────
+# Sidebar controls (mode and project selection)
+# ─────────────────────────────────────────────────────────────────────────
+
+# Import utils
+from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, print_widget_label, logged_callback
+from utils.analyse_advanced import load_known_projects, load_model_metadata
+
+# Mode selection options
 mode_options = {
     0: "Simple",
     1: "Advanced",
 }
 
 
+@logged_callback
 def on_mode_change():
-    # Only update persistent storage, no session state needed
+    """Write-through callback: updates both persistent file and session state cache"""
     if "mode_selection" in st.session_state:
-        mode_selection = st.session_state["mode_selection"]
-        update_vars("general_settings", {
-            "mode": mode_selection
-        })
+        mode_selection = st.session_state["mode_selectionX"]  # Intentional error for testing
+        
+        # Write to persistent file for next session
+        update_vars("general_settings", {"mode": mode_selection})
+        
+        # Update session state for immediate use this session
+        set_session_var("shared", "mode", mode_selection)
 
-
+# Mode selector in sidebar
 print_widget_label("Mode", help_text="help text", sidebar=True)
-# Use persistent value directly
 mode_selected = st.sidebar.segmented_control(
     "Mode",
     options=mode_options.keys(),
@@ -393,30 +331,32 @@ mode_selected = st.sidebar.segmented_control(
     on_change=on_mode_change,
     default=mode)
 
-# No session state cleanup needed - only persistent storage used
-
-
 def on_project_change():
-    # Only update persistent storage, no session state needed
+    """Write-through callback: updates both persistent file and session state cache"""
     if "project_selection_sidebar" in st.session_state:
         project_selection = st.session_state["project_selection_sidebar"]
-        update_vars("general_settings", {
-            "selected_projectID": project_selection
-        })
+        
+        # Write to persistent file for next session
+        update_vars("general_settings", {"selected_projectID": project_selection})
+        
+        # Update session state for immediate use this session
+        set_session_var("shared", "selected_projectID", project_selection)
+        
 
-if mode == 1:  # advanced mode
+# Project selector (only shown in advanced mode)
+if mode == 1:  # Advanced mode requires project context
 
-    # check what is already known and selected
+    # Load existing projects from global map.json
     projects, selected_projectID = load_known_projects()
 
-    # if first project, show only button and no dropdown
+    # Show project selector only if projects exist
     if not projects == {}:
         
         options = list(projects.keys())
-        # Use persistent value directly
+        # Find index of currently selected project
         selected_index = options.index(selected_projectID) if selected_projectID in options else 0
 
-        # overwrite selected_projectID if user has selected a different project
+        # Project selector in sidebar
         print_widget_label("Project", help_text="The project selected here is the one that all tools will work with. If you have a new project, you can add it at + add deployment when you want to process the first batch data.", sidebar=True)
         selected_projectID = st.sidebar.selectbox(
             "Project",
@@ -426,5 +366,3 @@ if mode == 1:  # advanced mode
             key="project_selection_sidebar",
             on_change=on_project_change
         )
-        
-        # No session state cleanup needed - only persistent storage used
