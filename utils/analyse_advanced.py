@@ -116,6 +116,14 @@ map_file = os.path.join(config_dir, "map.json")
 with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
+
+
+
+
+
+
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # I/O OPTIMIZATION FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -183,6 +191,14 @@ def get_cached_map():
     st.session_state[map_cache_key] = map_data
     
     return map_data, map_file
+
+def load_known_projects():
+    map, _ = get_cached_map()
+    general_settings_vars = get_cached_vars(section="general_settings")
+    projects = map["projects"]
+    selected_projectID = general_settings_vars.get(
+        "selected_projectID")
+    return projects, selected_projectID
 
 def invalidate_map_cache():
     """
@@ -416,6 +432,418 @@ def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
             f"Failed with exit code {process.returncode}.")
 
 
+def add_location_modal(modal: Modal):
+    # init vars from session state instead of persistent storage
+    selected_lat = get_session_var("analyse_advanced", "selected_lat", None)
+    selected_lng = get_session_var("analyse_advanced", "selected_lng", None)
+    exif_set = get_session_var("analyse_advanced", "exif_set", False)
+    coords_found_in_exif = get_session_var("analyse_advanced", "coords_found_in_exif", False)
+    exif_lat = get_session_var("analyse_advanced", "exif_lat", None)
+    exif_lng = get_session_var("analyse_advanced", "exif_lng", None)
+
+    # update values if coordinates found in metadata
+    if coords_found_in_exif:
+        info_box(
+            f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}).")
+        if not exif_set:
+            # Update session state instead of persistent storage
+            update_session_vars("analyse_advanced", {
+                "selected_lat": exif_lat,
+                "selected_lng": exif_lng,
+                "exif_set": True,
+            })
+            st.rerun()
+
+    # load known locations
+    known_locations, _ = load_known_locations()
+
+    # base map
+    m = fl.Map(
+        location=[0, 0],
+        zoom_start=1,
+        control_scale=True
+    )
+
+    # terrain layer
+    fl.TileLayer(
+        tiles='https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.jpg',
+        attr='© Stamen, © OpenStreetMap',
+        name='Stamen Terrain',
+        overlay=False,
+        control=True
+    ).add_to(m)
+
+    # satellite layer
+    fl.TileLayer(
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr='© Esri',
+        name='Esri Satellite',
+        overlay=False,
+        control=True
+    ).add_to(m)
+
+    # layer control
+    fl.LayerControl().add_to(m)
+
+    # add markers
+    bounds = []
+    if known_locations:
+
+        # add the selected location
+        if selected_lat and selected_lng:
+            fl.Marker(
+                [selected_lat, selected_lng],
+                title="Selected location",
+                tooltip="Selected location",
+                icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
+            ).add_to(m)
+            bounds.append([selected_lat, selected_lng])
+
+        # add the other known locations
+        for location_id, location_info in known_locations.items():
+            coords = [location_info["lat"], location_info["lon"]]
+            fl.Marker(
+                coords,
+                tooltip=location_id,
+                icon=fl.Icon(icon="camera", prefix="fa", color="darkblue")
+            ).add_to(m)
+            bounds.append(coords)
+            m.fit_bounds(bounds, padding=(75, 75))
+
+    else:
+
+        # add the selected location
+        if selected_lat and selected_lng:
+            fl.Marker(
+                [selected_lat, selected_lng],
+                title="Selected location",
+                tooltip="Selected location",
+                icon=fl.Icon(icon="camera", prefix="fa", color="darkred")
+            ).add_to(m)
+
+            # only one marker so set bounds to the selected location
+            buffer = 0.001
+            bounds = [
+                [selected_lat - buffer, selected_lng - buffer],
+                [selected_lat + buffer, selected_lng + buffer]
+            ]
+            m.fit_bounds(bounds)
+
+    # fit map to markers with some extra padding
+    if bounds:
+        m.fit_bounds(bounds, padding=(75, 75))
+
+    # add brief lat lng popup on mouse click
+    m.add_child(fl.LatLngPopup())
+
+    # render map in center
+    _, map_col, _ = st.columns([0.025, 0.95, 0.025])
+    with map_col:
+        map_data = st_folium(m, height=325, width=700)
+
+    # update lat lng widgets when clicking on map
+    if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
+        selected_lat = map_data["last_clicked"]["lat"]
+        selected_lng = map_data["last_clicked"]["lng"]
+        # Update session state instead of persistent storage  
+        update_session_vars("analyse_advanced", {
+            "selected_lat": selected_lat,
+            "selected_lng": selected_lng,
+        })
+        st.rerun()
+
+    # user input
+    col1, col2 = st.columns([1, 1])
+
+    # lat
+    with col1:
+        print_widget_label("Enter latitude or click on the map",
+                           help_text="Enter the latitude of the location.")
+        old_lat = selected_lat if selected_lat is not None else 0.0
+        new_lat = st.number_input(
+            "Enter latitude or click on the map",
+            value=selected_lat,
+            format="%.6f",
+            step=0.000001,
+            min_value=-90.0,
+            max_value=90.0,
+            label_visibility="collapsed",
+        )
+        selected_lat = new_lat
+        if new_lat != old_lat:
+            st.rerun()
+
+    # lng
+    with col2:
+        print_widget_label("Enter longitude or click on the map",
+                           help_text="Enter the longitude of the location.")
+        old_lng = selected_lng if selected_lng is not None else 0.0
+        new_lng = st.number_input(
+            "Enter longitude or click on the map",
+            value=selected_lng,
+            format="%.6f",
+            step=0.000001,
+            min_value=-180.0,
+            max_value=180.0,
+            label_visibility="collapsed",
+        )
+        selected_lng = new_lng
+        if new_lng != old_lng:
+            st.rerun()
+
+    # location ID
+    print_widget_label("Enter unique location ID",
+                       help_text="This ID will be used to identify the location in the system.")
+    new_location_id = st.text_input(
+        "Enter new Location ID",
+        label_visibility="collapsed",
+    )
+    new_location_id = new_location_id.strip()
+
+    col1, col2 = st.columns([1, 1])
+
+    # button to save location
+    with col1:
+        if st.button(":material/save: Save location", use_container_width=True, type="primary"):
+
+            # check validity
+            if new_location_id == "":
+                st.error("Location ID cannot be empty.")
+            elif new_location_id in known_locations.keys():
+                st.error(
+                    f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
+            elif selected_lat == 0.0 and selected_lng == 0.0:
+                st.error(
+                    "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
+            elif selected_lat is None or selected_lng is None:
+                st.error(
+                    "Error: Latitude and Longitude cannot be empty. Please select a valid location.")
+            else:
+
+                # if all good, add location
+                add_location(new_location_id, selected_lat, selected_lng)
+                
+                # reset session state variables and close modal
+                update_session_vars("analyse_advanced", {
+                    "coords_found_in_exif": False,
+                    "exif_set": False,
+                    "exif_lat": None,
+                    "exif_lng": None,
+                    "selected_lat": None,
+                    "selected_lng": None,
+                    "show_modal_add_location": False
+                })
+                st.rerun()
+
+    with col2:
+        if st.button(":material/cancel: Cancel", use_container_width=True):
+            # Close modal by setting session state flag to False
+            set_session_var("analyse_advanced", "show_modal_add_location", False)
+            st.rerun()
+
+
+def show_none_model_info_modal(modal: Modal):
+    st.markdown(
+        """
+        **Generic animal detection (no identification)**
+
+        Selecting this option means the system will use a general-purpose detection model that locates and labels objects only as:
+        - *animal*
+        - *vehicle*
+        - *person*
+
+        No species-level identification will be performed.
+
+        This option is helpful if:
+        - There is no suitable species identification model available.
+        - You want to filter out empty images.
+        - You want to ID the animals manually without using a idnetification model.
+        
+        If you want to use a specific species identification model, please select one from the dropdown menu.
+        """
+    )
+
+    if st.button(":material/close: Close", use_container_width=True):
+        # Close modal by setting session state flag to False
+        set_session_var("analyse_advanced", "show_modal_none_model_info", False)
+        st.rerun()
+
+
+def species_selector_modal(modal: Modal, nodes, all_leaf_values):
+    butn_col1, butn_col2 = st.columns([1, 1])
+    with butn_col1:
+        select_all_clicked = st.button(":material/select_check_box: Select all", key="modal_expand_all_button", use_container_width=True)
+    with butn_col2:
+        select_none_clicked = st.button(":material/check_box_outline_blank: Select none", key="modal_collapse_all_button", use_container_width=True)
+    
+    # Get current state
+    selected_nodes = get_session_var("analyse_advanced", "selected_nodes", [])
+    expanded_nodes = get_session_var("analyse_advanced", "expanded_nodes", [])
+    last_selected = get_session_var("analyse_advanced", "last_selected", {})
+    
+    # Handle button clicks after the buttons are rendered
+    if select_all_clicked:
+        # Use cached leaf values for faster performance
+        set_session_var("analyse_advanced", "selected_nodes", all_leaf_values)
+        set_session_var("analyse_advanced", "last_selected", {"checked": all_leaf_values, "expanded": expanded_nodes})
+        selected_nodes = all_leaf_values  # Update local variable
+        
+    if select_none_clicked:
+        # Clear selection and update structured session state
+        set_session_var("analyse_advanced", "selected_nodes", [])
+        set_session_var("analyse_advanced", "expanded_nodes", [])
+        set_session_var("analyse_advanced", "last_selected", {})
+        selected_nodes = []  # Update local variable
+        expanded_nodes = []
+            
+    with st.container(border=True):
+        selected = tree_select(
+            nodes,
+            check_model="leaf",
+            checked=selected_nodes,
+            expanded=expanded_nodes,
+            show_expand_all=True,
+            half_check_color="#086164",
+            check_color="#086164",
+            key="modal_tree_select"
+        )
+
+    # Handle selection update
+    if selected is not None:
+        new_checked = selected.get("checked", [])
+        new_expanded = selected.get("expanded", [])
+        last_checked = last_selected.get("checked", [])
+        last_expanded = last_selected.get("expanded", [])
+
+        if new_checked != last_checked or new_expanded != last_expanded:
+            # Update structured session state
+            update_session_vars("analyse_advanced", {
+                "selected_nodes": new_checked,
+                "expanded_nodes": new_expanded,
+                "last_selected": selected
+            })
+            st.rerun()  # Force rerun
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button(":material/check: Apply Selection", use_container_width=True, type="primary"):
+            # Close modal by setting session state flag to False
+            set_session_var("analyse_advanced", "show_modal_species_selector", False)
+            st.rerun()
+
+    with col2:
+        if st.button(":material/cancel: Cancel", use_container_width=True):
+            # Close modal by setting session state flag to False
+            set_session_var("analyse_advanced", "show_modal_species_selector", False)
+            st.rerun()
+
+
+def show_cls_model_info_modal(modal: Modal, model_info):
+    friendly_name = model_info.get('friendly_name', None)
+    if friendly_name and friendly_name != "":
+        st.write("")
+        print_widget_label("Name", "rocket_launch")
+        st.write(friendly_name)
+
+    description = model_info.get('description', None)
+    if description and description != "":
+        st.write("")
+        print_widget_label("Description", "history_edu")
+        st.write(description)
+
+    all_classes = model_info.get('all_classes', None)
+    if all_classes and all_classes != []:
+        st.write("")
+        print_widget_label("Classes", "pets")
+        formatted_classes = [format_class_name(cls) for cls in all_classes]
+        if len(formatted_classes) == 1:
+            string = formatted_classes[0] + "."
+        else:
+            string = ', '.join(formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
+        st.write(string.capitalize())
+
+    developer = model_info.get('developer', None)
+    if developer and developer != "":
+        st.write("")
+        print_widget_label("Developer", "code")
+        st.write(developer)
+
+    owner = model_info.get('owner', None)
+    if owner and owner != "":
+        st.write("")
+        print_widget_label("Owner", "account_circle")
+        st.write(owner)
+
+    info_url = model_info.get('info_url', None)
+    if info_url and info_url != "":
+        st.write("")
+        print_widget_label("More information", "info")
+        st.write(info_url)
+
+    citation = model_info.get('citation', None)
+    if citation and citation != "":
+        st.write("")
+        print_widget_label("Citation", "article")
+        st.write(citation)
+
+    license = model_info.get('license', None)
+    if license and license != "":
+        st.write("")
+        print_widget_label("License", "copyright")
+        st.write(license)
+
+    if st.button(":material/close: Close", use_container_width=True):
+        # Close modal by setting session state flag to False
+        set_session_var("analyse_advanced", "show_modal_cls_model_info", False)
+        st.rerun()
+
+
+def add_project_modal(
+    modal: Modal
+):
+    # load known projects IDs
+    known_projects, _ = load_known_projects()
+
+    # input for project ID
+    print_widget_label("Unique project ID",
+                        help_text="This ID will be used to identify the project in the system.")
+    project_id = st.text_input(
+        "project ID", max_chars=50, label_visibility="collapsed")
+    project_id = project_id.strip()
+
+    # input for optional comments
+    print_widget_label("Optionally add any comments or notes",
+                        help_text="This is a free text field where you can add any comments or notes about the project.")
+    comments = st.text_area(
+        "Comments", height=150, label_visibility="collapsed")
+    comments = comments.strip()
+
+    col1, col2 = st.columns([1, 1])
+
+    # button to save project
+    with col1:
+        if st.button(":material/save: Save project", use_container_width=True, type ="primary"):
+
+            # check validity
+            if not project_id.strip():
+                st.error("project ID cannot be empty.")
+            elif project_id in list(known_projects.keys()):
+                st.error(
+                    f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
+            else:
+
+                # if all good, add project
+                add_project(project_id, comments)
+                
+                # Close modal by setting session state flag to False
+                set_session_var("analyse_advanced", "show_modal_add_project", False)
+                st.rerun()
+
+    with col2:
+        if st.button(":material/cancel: Cancel", use_container_width=True):
+            # Close modal by setting session state flag to False
+            set_session_var("analyse_advanced", "show_modal_add_project", False)
+            st.rerun()
 
 def download_model(
     modal: Modal,
@@ -680,7 +1108,10 @@ def project_selector_widget():
 
     # if first project, show only button and no dropdown
     if projects == {}:
-        add_new_project_popover("Define your first project")
+        if st.button(":material/add_circle: Define your first project", use_container_width=True):
+            # Set session state flag to show modal on next rerun
+            set_session_var("analyse_advanced", "show_modal_add_project", True)
+            st.rerun()
 
     # if there are projects, show dropdown and button
     else:
@@ -700,9 +1131,12 @@ def project_selector_widget():
                 label_visibility="collapsed"
             )
 
-        # popover to add a new project
+        # button to add a new project
         with col2:
-            add_new_project_popover("New")
+            if st.button(":material/add_circle: New", use_container_width=True, help = "Add a new project"):
+                # Set session state flag to show modal on next rerun
+                set_session_var("analyse_advanced", "show_modal_add_project", True)
+                st.rerun()
 
         # adjust the selected project
         # map, _ = load_map()
@@ -746,7 +1180,10 @@ def location_selector_widget():
 
     # if first location, show only button and no dropdown
     if locations == {}:
-        add_new_location_popover("Define your first location")
+        if st.button(":material/add_circle: Define your first location", use_container_width=True):
+            # Set session state flag to show modal on next rerun
+            set_session_var("analyse_advanced", "show_modal_add_location", True)
+            st.rerun()
 
         # # show info box if coordinates are found in metadata
         # if st.session_state.coords_found_in_exif:
@@ -791,7 +1228,10 @@ def location_selector_widget():
 
         # popover to add a new location
         with col2:
-            add_new_location_popover("New")
+            if st.button(":material/add_circle: New", use_container_width=True, help="Add a new location"):
+                # Set session state flag to show modal on next rerun
+                set_session_var("analyse_advanced", "show_modal_add_location", True)
+                st.rerun()
 
         # # info box if coordinates are found in metadata
         # if st.session_state.coords_found_in_exif:
@@ -952,13 +1392,7 @@ def datetime_selector_widget():
         return selected_datetime
 
 
-def load_known_projects():
-    map, _ = get_cached_map()
-    general_settings_vars = get_cached_vars(section="general_settings")
-    projects = map["projects"]
-    selected_projectID = general_settings_vars.get(
-        "selected_projectID")
-    return projects, selected_projectID
+
 
 
 def load_known_locations():
@@ -1154,11 +1588,16 @@ def add_project(projectID, comments):
         "selected_locationID": None,  # reset location selection
         "selected_deploymentID": None,  # reset deployment selection
     })
+    
+    # update the session state variable for selected project ID
+    set_session_var("shared", "selected_projectID", projectID)
+    
     # map["vars"]["analyse_advanced"]["selected_projectID"] = projectID
 
     # Save updated settings
     with open(map_file, "w") as file:
         json.dump(map, file, indent=2)
+        
     # Invalidate map cache after update
     invalidate_map_cache()
 
@@ -1169,289 +1608,55 @@ def add_project(projectID, comments):
     return selected_index, project_list
 
 
-def add_new_project_popover(txt):
-    # use st.empty to create a popover container
-    # so that it can be closed on button click
-    # and the popover can be reused
-    popover_container = st.empty()
-    with popover_container.container():
-        with st.popover(f":material/add_circle: {txt}",
-                        help="Define a new project",
-                        use_container_width=True):
+# def add_new_project_popover(txt):
+#     # use st.empty to create a popover container
+#     # so that it can be closed on button click
+#     # and the popover can be reused
+#     popover_container = st.empty()
+#     with popover_container.container():
+#         with st.popover(f":material/add_circle: {txt}",
+#                         help="Define a new project",
+#                         use_container_width=True):
 
-            # load known projects IDs
-            known_projects, _ = load_known_projects()
+#             # load known projects IDs
+#             known_projects, _ = load_known_projects()
 
-            # input for project ID
-            print_widget_label("Unique project ID",
-                               help_text="This ID will be used to identify the project in the system.")
-            project_id = st.text_input(
-                "project ID", max_chars=50, label_visibility="collapsed")
-            project_id = project_id.strip()
+#             # input for project ID
+#             print_widget_label("Unique project ID",
+#                                help_text="This ID will be used to identify the project in the system.")
+#             project_id = st.text_input(
+#                 "project ID", max_chars=50, label_visibility="collapsed")
+#             project_id = project_id.strip()
 
-            # input for optional comments
-            print_widget_label("Optionally add any comments or notes",
-                               help_text="This is a free text field where you can add any comments or notes about the project.")
-            comments = st.text_area(
-                "Comments", height=150, label_visibility="collapsed")
-            comments = comments.strip()
+#             # input for optional comments
+#             print_widget_label("Optionally add any comments or notes",
+#                                help_text="This is a free text field where you can add any comments or notes about the project.")
+#             comments = st.text_area(
+#                 "Comments", height=150, label_visibility="collapsed")
+#             comments = comments.strip()
 
-            # button to save project
-            if st.button(":material/save: Save project", use_container_width=True):
+#             # button to save project
+#             if st.button(":material/save: Save project", use_container_width=True):
 
-                # check validity
-                if not project_id.strip():
-                    st.error("project ID cannot be empty.")
-                elif project_id in list(known_projects.keys()):
-                    st.error(
-                        f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
-                else:
+#                 # check validity
+#                 if not project_id.strip():
+#                     st.error("project ID cannot be empty.")
+#                 elif project_id in list(known_projects.keys()):
+#                     st.error(
+#                         f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
+#                 else:
 
-                    # if all good, add project
-                    add_project(project_id, comments)
+#                     # if all good, add project
+#                     add_project(project_id, comments)
 
-                    # reset session state variables before reloading
-                    # st.session_state.clear()
-                    popover_container.empty()
-                    st.rerun()
+#                     # reset session state variables before reloading
+#                     # st.session_state.clear()
+#                     popover_container.empty()
+#                     st.rerun()
 
 
-def add_new_location_popover(txt):
-
-    # use st.empty to create a popover container
-    # so that it can be closed on button click
-    # and the popover can be reused
-    popover_container = st.empty()
-    with popover_container.container():
-        with st.popover(f":material/add_circle: {txt}",
-                        help="Define a new location",
-                        use_container_width=True):
-
-            # init vars from session state instead of persistent storage
-            selected_lat = get_session_var("analyse_advanced", "selected_lat", None)
-            selected_lng = get_session_var("analyse_advanced", "selected_lng", None)
-            exif_set = get_session_var("analyse_advanced", "exif_set", False)
-            coords_found_in_exif = get_session_var("analyse_advanced", "coords_found_in_exif", False)
-            exif_lat = get_session_var("analyse_advanced", "exif_lat", None)
-            exif_lng = get_session_var("analyse_advanced", "exif_lng", None)
-
-            # # init session state vars
-            # if "selected_lat" not in st.session_state:
-            #     st.session_state.selected_lat = None
-            # if "selected_lng" not in st.session_state:
-            #     st.session_state.selected_lng = None
-            # if "exif_set" not in st.session_state:
-            #     st.session_state.exif_set = False
-            # if "coords_found_in_exif" not in st.session_state:
-            #     st.session_state.coords_found_in_exif = False
-
-            # update values if coordinates found in metadata
-            if coords_found_in_exif:
-                info_box(
-                    f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}).")
-                if not exif_set:
-                    # Update session state instead of persistent storage
-                    update_session_vars("analyse_advanced", {
-                        "selected_lat": exif_lat,
-                        "selected_lng": exif_lng,
-                        "exif_set": True,
-                    })
-                    st.rerun()
-
-            # load known locations
-            known_locations, _ = load_known_locations()
-
-            # base map
-            m = fl.Map(
-                location=[0, 0],
-                zoom_start=1,
-                control_scale=True
-            )
-
-            # terrain layer
-            fl.TileLayer(
-                tiles='https://tiles.stadiamaps.com/tiles/stamen_terrain/{z}/{x}/{y}.jpg',
-                attr='© Stamen, © OpenStreetMap',
-                name='Stamen Terrain',
-                overlay=False,
-                control=True
-            ).add_to(m)
-
-            # satellite layer
-            fl.TileLayer(
-                tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-                attr='© Esri',
-                name='Esri Satellite',
-                overlay=False,
-                control=True
-            ).add_to(m)
-
-            # layer control
-            fl.LayerControl().add_to(m)
-
-            # add markers
-            bounds = []
-            if known_locations:
-
-                # add the selected location
-                if selected_lat and selected_lng:
-                    fl.Marker(
-                        [selected_lat,
-                            selected_lng],
-                        title="Selected location",
-                        tooltip="Selected location",
-                        icon=fl.Icon(icon="camera", prefix="fa",
-                                     color="darkred")
-                    ).add_to(m)
-                    bounds.append([selected_lat,
-                                   selected_lng])
-
-                # add the other known locations
-                for location_id, location_info in known_locations.items():
-                    coords = [location_info["lat"], location_info["lon"]]
-                    fl.Marker(
-                        coords,
-                        tooltip=location_id,
-                        icon=fl.Icon(icon="camera", prefix="fa",
-                                     color="darkblue")
-                    ).add_to(m)
-                    bounds.append(coords)
-                    m.fit_bounds(bounds, padding=(75, 75))
-
-            else:
-
-                # add the selected location
-                if selected_lat and selected_lng:
-                    fl.Marker(
-                        [selected_lat,
-                            selected_lng],
-                        title="Selected location",
-                        tooltip="Selected location",
-                        icon=fl.Icon(icon="camera", prefix="fa",
-                                     color="darkred")
-                    ).add_to(m)
-
-                    # only one marker so set bounds to the selected location
-                    buffer = 0.001
-                    bounds = [
-                        [selected_lat - buffer,
-                            selected_lng - buffer],
-                        [selected_lat + buffer,
-                            selected_lng + buffer]
-                    ]
-                    m.fit_bounds(bounds)
-
-            # fit map to markers with some extra padding
-            if bounds:
-                m.fit_bounds(bounds, padding=(75, 75))
-
-            # add brief lat lng popup on mouse click
-            m.add_child(fl.LatLngPopup())
-
-            # render map in center
-            _, map_col, _ = st.columns([0.025, 0.95, 0.025])
-            with map_col:
-                map_data = st_folium(m, height=325, width=700)
-            # map_data = st_folium(m, height=300, width=700)
-
-            # update lat lng widgets when clicking on map
-            if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
-                selected_lat = map_data["last_clicked"]["lat"]
-                selected_lng = map_data["last_clicked"]["lng"]
-                # fl.Marker(
-                #     [selected_lat, selected_lng],
-                #     title="Selected location",
-                #     tooltip="Selected location",
-                #     icon=fl.Icon(icon="camera", prefix="fa", color="green")
-                # ).add_to(m)
-                # Update session state instead of persistent storage  
-                update_session_vars("analyse_advanced", {
-                    "selected_lat": selected_lat,
-                    "selected_lng": selected_lng,
-                })
-                st.rerun()
-
-            # user input
-            col1, col2 = st.columns([1, 1])
-
-            # lat
-            with col1:
-                print_widget_label("Enter latitude or click on the map",
-                                   help_text="Enter the latitude of the location.")
-                old_lat = selected_lat if not None else 0.0
-                new_lat = st.number_input(
-                    "Enter latitude or click on the map",
-                    value=selected_lat,
-                    format="%.6f",
-                    step=0.000001,
-                    min_value=-90.0,
-                    max_value=90.0,
-                    label_visibility="collapsed",
-                )
-                selected_lat = new_lat
-                if new_lat != old_lat:
-                    st.rerun()
-
-            # lng
-            with col2:
-                print_widget_label("Enter longitude or click on the map",
-                                   help_text="Enter the longitude of the location.")
-                old_lng = selected_lng if not None else 0.0
-                new_lng = st.number_input(
-                    "Enter longitude or click on the map",
-                    value=selected_lng,
-                    format="%.6f",
-                    step=0.000001,
-                    min_value=-180.0,
-                    max_value=180.0,
-                    label_visibility="collapsed",
-                )
-                selected_lng = new_lng
-                if new_lng != old_lng:
-                    st.rerun()
-
-            # location ID
-            print_widget_label("Enter unique location ID",
-                               help_text="This ID will be used to identify the location in the system.")
-            new_location_id = st.text_input(
-                "Enter new Location ID",
-                label_visibility="collapsed",
-            )
-            new_location_id = new_location_id.strip()
-
-            # button to save location
-            if st.button(":material/save: Save location", use_container_width=True):
-
-                # check validity
-                if new_location_id == "":
-                    st.error("Location ID cannot be empty.")
-                elif new_location_id in known_locations.keys():
-                    st.error(
-                        f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
-                elif selected_lat == 0.0 and selected_lng == 0.0:
-                    st.error(
-                        "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
-                elif selected_lat is None or selected_lng is None:
-                    st.error(
-                        "Error: Latitude and Longitude cannot be empty. Please select a valid location.")
-                else:
-
-                    # if all good, add location
-                    add_location(
-                        new_location_id, selected_lat, selected_lng)
-                    new_location_id = None
-
-                    # reset session state variables before reloading
-                    update_session_vars("analyse_advanced", {
-                        "coords_found_in_exif": False,
-                        "exif_set": False,
-                        "exif_lat": None,
-                        "exif_lng": None,
-                        "selected_lat": None,
-                        "selected_lng": None
-                    })
-                    popover_container.empty()
-                    st.rerun()
+# OLD POPOVER FUNCTION - CONVERTED TO MODAL
+# add_new_location_popover() has been replaced with modal_add_location.open()
 
 
 def browse_directory_widget():
@@ -1573,7 +1778,12 @@ def det_model_selector_widget(model_meta):
         set_session_var("analyse_advanced", "selected_det_modelID", selected_modelID)
 
     with col2:
-        show_cls_model_info_popover(det_model_meta[selected_modelID])
+        if st.button(":material/info: Info", use_container_width=True, help="Model information", key = "det_model_info_button"):
+            # Store model info in session state for modal access
+            set_session_var("analyse_advanced", "modal_cls_model_info_data", det_model_meta[selected_modelID])
+            # Set session state flag to show modal on next rerun
+            set_session_var("analyse_advanced", "show_modal_cls_model_info", True)
+            st.rerun()
 
     return selected_modelID
 
@@ -1626,9 +1836,17 @@ def cls_model_selector_widget(model_meta):
 
     with col2:
         if selected_modelID != "NONE":
-            show_cls_model_info_popover(cls_model_meta[selected_modelID])
+            if st.button(":material/info: Info", use_container_width=True, help="Model information", key = "cls_model_info_button"):
+                # Store model info in session state for modal access
+                set_session_var("analyse_advanced", "modal_cls_model_info_data", cls_model_meta[selected_modelID])
+                # Set session state flag to show modal on next rerun
+                set_session_var("analyse_advanced", "show_modal_cls_model_info", True)
+                st.rerun()
         else:
-            show_none_model_info_popover()
+            if st.button(":material/info: Info", use_container_width=True, help="Model information", key = "none_model_info_button"):
+                # Set session state flag to show modal on next rerun
+                set_session_var("analyse_advanced", "show_modal_none_model_info", True)
+                st.rerun()
 
     return selected_modelID
 
@@ -1892,49 +2110,8 @@ def check_folder_metadata():
         info_box(info_txt, icon=":material/info:")
 
 
-def show_none_model_info_popover():
-
-    popover_container = st.empty()
-    with popover_container.container():
-        with st.popover(f":material/info: Info",
-                        help="Model information",
-                        use_container_width=True):
-            st.write(
-                "This model is used for generic animal detection, without identifying specific species or classes.")
-            st.write(
-                "It is useful for detecting animals in images or videos without the need for specific classification.")
-
-
-def show_none_model_info_popover():
-    # # use st.empty to create a popover container
-    # # so that it can be closed on button click
-    # # and the popover can be reused
-    # popover_container = st.empty()
-    # with popover_container.container():
-    with st.popover(
-        ":material/info: Info",
-        help="Model information",
-        use_container_width=True
-    ):
-        st.markdown(
-            """
-            **Generic animal detection (no identification)**
-
-            Selecting this option means the system will use a general-purpose detection model that locates and labels objects only as:
-            - *animal*
-            - *vehicle*
-            - *person*
-
-            No species-level identification will be performed.
-
-            This option is helpful if:
-            - There is no suitable species identification model available.
-            - You want to filter out empty images.
-            - You want to ID the animals manually without using a idnetification model.
-            
-            If you want to use a specific species identification model, please select one from the dropdown menu.
-            """
-        )
+# OLD POPOVER FUNCTION - CONVERTED TO MODAL
+# show_none_model_info_popover() has been replaced with modal_show_none_model_info.open()
 
 # format the class name for display
 
@@ -1949,82 +2126,8 @@ def format_class_name(s):
         return s
 
 
-def show_cls_model_info_popover(model_info):
-    # use st.empty to create a popover container
-    # so that it can be closed on button click
-    # and the popover can be reused
-    popover_container = st.empty()
-    with popover_container.container():
-        with st.popover(f":material/info: Info",
-                        help="Model information",
-                        use_container_width=True):
-
-            friendly_name = model_info.get('friendly_name', None)
-            if friendly_name and friendly_name != "":
-                st.write("")
-                print_widget_label("Name", "rocket_launch")
-                st.write(friendly_name)
-
-            description = model_info.get('description', None)
-            if description and description != "":
-                st.write("")
-                print_widget_label("Description", "history_edu")
-                st.write(description)
-
-            all_classes = model_info.get('all_classes', None)
-            if all_classes and all_classes != []:
-                st.write("")
-                print_widget_label("Classes", "pets")
-                formatted_classes = [format_class_name(
-                    cls) for cls in all_classes]
-                if len(formatted_classes) == 1:
-                    string = formatted_classes[0] + "."
-                else:
-                    string = ', '.join(
-                        formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
-                st.write(string.capitalize())
-
-            developer = model_info.get('developer', None)
-            if developer and developer != "":
-                st.write("")
-                print_widget_label("Developer", "code")
-                st.write(developer)
-
-            owner = model_info.get('owner', None)
-            if owner and owner != "":
-                st.write("")
-                print_widget_label("Owner", "account_circle")
-                st.write(owner)
-
-            info_url = model_info.get('info_url', None)
-            if info_url and info_url != "":
-                st.write("")
-                print_widget_label("More information", "info")
-                st.write(info_url)
-
-            citation = model_info.get('citation', None)
-            if citation and citation != "":
-                st.write("")
-                print_widget_label("Citation", "article")
-                st.write(citation)
-
-            license = model_info.get('license', None)
-            if license and license != "":
-                st.write("")
-                print_widget_label("License", "copyright")
-                st.write(license)
-
-            min_version = model_info.get('min_version', None)
-            if min_version and min_version != "":
-                st.write("")
-                print_widget_label("Required AddaxAI version", "verified")
-                needs_EA_update_bool = requires_addaxai_update(min_version)
-                if needs_EA_update_bool:
-                    st.write(
-                        f"This model requires AddaxAI version {min_version}. Your current AddaxAI version {current_AA_version} will not be able to run this model. An update is required. Update via the [Addax Data Science website](https://addaxdatascience.com/addaxai/).")
-                else:
-                    st.write(
-                        f"Current version of AddaxAI (v{current_AA_version}) is able to use this model. No update required.")
+# OLD POPOVER FUNCTION - CONVERTED TO MODAL  
+# show_cls_model_info_popover() has been replaced with modal_show_cls_model_info.open()
 
 # @st.dialog("Model information", width="large")
 # def show_model_info(model_info):
@@ -2408,7 +2511,7 @@ def add_deployment_to_queue():
     clear_vars("analyse_advanced")
     
     # return
-    
+     
     
 def read_selected_species(cls_model_ID):
     """
@@ -2497,60 +2600,14 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
 
     col1, col2 = st.columns([1, 3])
     with col1:
-
-
-
-        # UI - assuming tree_select is your widget for tree picking
-        with st.popover(":material/pets: Select", use_container_width=True):
-            
-            butn_col1, butn_col2 = st.columns([1, 1])
-            with butn_col1:
-                select_all_clicked = st.button(":material/select_check_box: Select all", key="expand_all_button", use_container_width=True)
-            with butn_col2:
-                select_none_clicked = st.button(":material/check_box_outline_blank: Select none", key="collapse_all_button", use_container_width=True)
-            
-            # Handle button clicks after the buttons are rendered
-            if select_all_clicked:
-                # Use cached leaf values for faster performance
-                set_session_var("analyse_advanced", "selected_nodes", all_leaf_values)
-                set_session_var("analyse_advanced", "last_selected", {"checked": all_leaf_values, "expanded": expanded_nodes})
-                selected_nodes = all_leaf_values  # Update local variable
-                
-            if select_none_clicked:
-                # Clear selection and update structured session state
-                set_session_var("analyse_advanced", "selected_nodes", [])
-                set_session_var("analyse_advanced", "expanded_nodes", [])
-                set_session_var("analyse_advanced", "last_selected", {})
-                selected_nodes = []  # Update local variable
-                expanded_nodes = []
-                    
-            with st.container(border=True):
-                selected = tree_select(
-                    nodes,
-                    check_model="leaf",
-                    checked=selected_nodes,
-                    expanded=expanded_nodes,
-                    show_expand_all=True,
-                    half_check_color="#086164",
-                    check_color="#086164",
-                    key="tree_select2"
-                )
-
-        # Handle selection update and rerun
-        if selected is not None:
-            new_checked = selected.get("checked", [])
-            new_expanded = selected.get("expanded", [])
-            last_checked = last_selected.get("checked", [])
-            last_expanded = last_selected.get("expanded", [])
-
-            if new_checked != last_checked or new_expanded != last_expanded:
-                # Update structured session state
-                update_session_vars("analyse_advanced", {
-                    "selected_nodes": new_checked,
-                    "expanded_nodes": new_expanded,
-                    "last_selected": selected
-                })
-                st.rerun()  # Force rerun
+        # OLD POPOVER CONVERTED TO MODAL - species_selector_popover() replaced with modal_species_selector
+        if st.button(":material/pets: Select", use_container_width=True):
+            # Store modal data in session state
+            set_session_var("analyse_advanced", "modal_species_nodes", nodes)
+            set_session_var("analyse_advanced", "modal_species_leaf_values", all_leaf_values)
+            # Set session state flag to show modal on next rerun
+            set_session_var("analyse_advanced", "show_modal_species_selector", True)
+            st.rerun()
 
     # Count leaf nodes
     def count_leaf_nodes(nodes):

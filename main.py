@@ -1,3 +1,10 @@
+
+
+# WAAR WAS IK? ik was bezig met die popovers voor project and location. het doet niet automatisch de new project in de dropdowns. Task staat al klaar voor claude
+
+
+
+
 """
 AddaxAI Streamlit Application - Main Entry Point
 
@@ -310,7 +317,7 @@ mode_options = {
 def on_mode_change():
     """Write-through callback: updates both persistent file and session state cache"""
     if "mode_selection" in st.session_state:
-        mode_selection = st.session_state["mode_selectionX"]  # Intentional error for testing
+        mode_selection = st.session_state["mode_selection"]  # Intentional error for testing
         
         # Write to persistent file for next session
         update_vars("general_settings", {"mode": mode_selection})

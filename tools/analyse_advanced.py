@@ -40,7 +40,12 @@ from utils.analyse_advanced import (browse_directory_widget,
                                         add_deployment_to_queue,
                                         install_env,
                                         run_process_queue,
-                                        download_model
+                                        download_model,
+                                        add_project_modal,
+                                        add_location_modal,
+                                        show_cls_model_info_modal,
+                                        show_none_model_info_modal,
+                                        species_selector_modal
                                         )
 
 
@@ -155,28 +160,70 @@ def check_model_availability(model_type, model_id, model_meta):
     
 
 
-# the modals need to be defined before they are used
-modal_install_env = Modal(f"Installing virtual environment",
-                          key="installing-env", show_close_button=False)
-if modal_install_env.is_open():
+# ═══════════════════════════════════════════════════════════════════════════════
+# LEGACY MODALS - Now optimized to only create when needed using session state
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# modal for installing environment - only create when needed
+if get_session_var("analyse_advanced", "show_modal_install_env", False):
+    modal_install_env = Modal(f"Installing virtual environment", key="installing-env", show_close_button=False)
     with modal_install_env.container():
         install_env(modal_install_env, get_session_var("analyse_advanced", "required_env_name"))
 
-# modal for processing queue
-modal_process_queue = Modal(f"Processing queue...", key="process_queue",
-                show_close_button=False)
-if modal_process_queue.is_open():
+# modal for processing queue - only create when needed
+if get_session_var("analyse_advanced", "show_modal_process_queue", False):
+    modal_process_queue = Modal(f"Processing queue...", key="process_queue", show_close_button=False)
     with modal_process_queue.container():
         # Process queue should always be loaded from persistent storage
         process_queue = analyse_advanced_vars.get("process_queue", [])
         run_process_queue(modal_process_queue, process_queue)
 
-# modal for downloading models
-modal_download_model = Modal(f"Downloading model...", key="download_model",
-                show_close_button=False)
-if modal_download_model.is_open():
+# modal for downloading models - only create when needed
+if get_session_var("analyse_advanced", "show_modal_download_model", False):
+    modal_download_model = Modal(f"Downloading model...", key="download_model", show_close_button=False)
     with modal_download_model.container():
         download_model(modal_download_model, get_session_var("analyse_advanced", "download_modelID"), model_meta)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# OPTIMIZED MODAL MANAGEMENT - Only create modals when needed using session state
+# ═══════════════════════════════════════════════════════════════════════════════
+# This approach prevents expensive modal creation on every rerun by using session
+# state flags to conditionally create modals only when they should be displayed.
+
+# modal for adding new project - only create when needed
+if get_session_var("analyse_advanced", "show_modal_add_project", False):
+    modal_add_project = Modal(f"Adding project...", key="add_project", show_close_button=False)
+    with modal_add_project.container():
+        add_project_modal(modal_add_project)
+
+# modal for adding new location - only create when needed
+if get_session_var("analyse_advanced", "show_modal_add_location", False):
+    modal_add_location = Modal(f"Adding location...", key="add_location", show_close_button=False)
+    with modal_add_location.container():
+        add_location_modal(modal_add_location)
+
+# modal for showing classification model info - only create when needed
+if get_session_var("analyse_advanced", "show_modal_cls_model_info", False):
+    modal_show_cls_model_info = Modal(f"Model information", key="show_cls_model_info", show_close_button=False)
+    with modal_show_cls_model_info.container():
+        # Get model info from session state when modal is open
+        model_info = get_session_var("analyse_advanced", "modal_cls_model_info_data", {})
+        show_cls_model_info_modal(modal_show_cls_model_info, model_info)
+
+# modal for showing none model info - only create when needed
+if get_session_var("analyse_advanced", "show_modal_none_model_info", False):
+    modal_show_none_model_info = Modal(f"Model information", key="show_none_model_info", show_close_button=False)
+    with modal_show_none_model_info.container():
+        show_none_model_info_modal(modal_show_none_model_info)
+
+# modal for species selector - only create when needed
+if get_session_var("analyse_advanced", "show_modal_species_selector", False):
+    modal_species_selector = Modal(f"Select species", key="species_selector", show_close_button=False)
+    with modal_species_selector.container():
+        # Get cached data from session state
+        nodes = get_session_var("analyse_advanced", "modal_species_nodes", [])
+        all_leaf_values = get_session_var("analyse_advanced", "modal_species_leaf_values", [])
+        species_selector_modal(modal_species_selector, nodes, all_leaf_values)
         
 
 
@@ -339,7 +386,9 @@ with st.container(border=True):
                         icon = ":material/warning:")
                     if st.button(f"Install virtual environment", key = "install_cls_virtual_env", use_container_width=False):
                         set_session_var("analyse_advanced", "required_env_name", availability['env_name'])
-                        modal_install_env.open()
+                        # Set session state flag to show modal on next rerun
+                        set_session_var("analyse_advanced", "show_modal_install_env", True)
+                        st.rerun()
                         
                 # Check model file availability
                 if not availability['model_exists']:
@@ -349,7 +398,9 @@ with st.container(border=True):
                         msg = f"The selected classification model still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
                     if st.button(f"Download model files", use_container_width=False, key="download_cls_model_button"):
                         set_session_var("analyse_advanced", "download_modelID", selected_cls_modelID)
-                        modal_download_model.open()
+                        # Set session state flag to show modal on next rerun
+                        set_session_var("analyse_advanced", "show_modal_download_model", True)
+                        st.rerun()
         # st.write("")
 
         # select detection model
@@ -371,7 +422,9 @@ with st.container(border=True):
                             icon = ":material/warning:")
                         if st.button(f"Install virtual environment", key="install_det_virtual_env", use_container_width=False):
                             set_session_var("analyse_advanced", "required_env_name", availability['env_name'])
-                            modal_install_env.open()
+                            # Set session state flag to show modal on next rerun
+                            set_session_var("analyse_advanced", "show_modal_install_env", True)
+                            st.rerun()
                     
                     # Check model file availability
                     if not availability['model_exists']:
@@ -381,7 +434,9 @@ with st.container(border=True):
                             msg = f"The selected classification model still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
                         if st.button(f"Download model files", use_container_width=False, key="download_det_model_button"):
                             set_session_var("analyse_advanced", "download_modelID", selected_det_modelID)
-                            modal_download_model.open()
+                            # Set session state flag to show modal on next rerun
+                            set_session_var("analyse_advanced", "show_modal_download_model", True)
+                            st.rerun()
                     
 
         # place the buttons
@@ -512,5 +567,6 @@ else:
                                 f"**Animal detection model**: {deployment['selected_det_modelID']}")
 
     if st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary"):
-        # Process queue is always persistent, no need to copy to session state
-        modal_process_queue.open()
+        # Set session state flag to show modal on next rerun
+        set_session_var("analyse_advanced", "show_modal_process_queue", True)
+        st.rerun()
