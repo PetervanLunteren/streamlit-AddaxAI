@@ -1,9 +1,5 @@
 
 
-# WAAR WAS IK? ik was bezig met die popovers voor project and location. het doet niet automatisch de new project in de dropdowns. Task staat al klaar voor claude
-
-
-
 
 """
 AddaxAI Streamlit Application - Main Entry Point
@@ -48,8 +44,6 @@ import json
 # Third-party imports
 from streamlit_lottie import st_lottie
 from appdirs import user_config_dir, user_cache_dir
-import folium
-from streamlit_folium import st_folium
 
 
 # Local imports - global config must be imported before anything else

@@ -534,17 +534,19 @@ def add_location_modal(modal: Modal):
     # add brief lat lng popup on mouse click
     m.add_child(fl.LatLngPopup())
 
-    # render dummy map to avoid weird behavior on first load
-    dummy_m = fl.Map(location=[39.949610, -75.150282], zoom_start=16)
-    fl.Marker([39.949610, -75.150282]).add_to(dummy_m)
-    with st.sidebar:
-        _ = st_folium(dummy_m, height=1, width=1)
-        st.sidebar.empty()
-
-    # render real map
+    # render map
+    # due to a bug there is extra whitespace below the map, so we use a custom class to reduce the height
+    # https://discuss.streamlit.io/t/folium-map-white-space-under-the-map-on-the-first-rendering/84363
     _, col_map_view, _ = st.columns([0.1, 1, 0.1])
     with col_map_view:
-        map_data = st_folium(m, height=280, width=600)
+        st.markdown("""
+        <style>
+        iframe[title="streamlit_folium.st_folium"] { 
+            height: 280px; 
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        map_data = st_folium(m, width=600)  # Height parameter is set in CSS control above
 
     # update lat lng widgets when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
