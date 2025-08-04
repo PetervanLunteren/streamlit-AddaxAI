@@ -317,6 +317,10 @@ def run_cls(cls_modelID, json_fpath, pbars):
     """
     Run the classifier on the given deployment folder using the specified model ID.
     """
+    # Skip classification if no model selected
+    if cls_modelID == "NONE":
+        return True
+    
     # cls_model_file = os.path.join(CLS_DIR, f"{cls_modelID}.pt")
     
     model_meta = get_cached_model_meta()  # ✅ OPTIMIZED: Uses session state cache
@@ -941,6 +945,8 @@ def install_env(
     
     if st.button("Cancel", use_container_width=True):
         st.warning("Installation cancelled. You can try again later.")
+        # Clear the session variable to prevent reopening the modal
+        set_session_var("analyse_advanced", "show_modal_install_env", False)
         sleep_time.sleep(2)
         modal.close()
         return
@@ -980,10 +986,14 @@ def install_env(
 
     # ✅ Show result message above
     if process.returncode == 0:
+        # Clear the session variable to prevent reopening the modal
+        set_session_var("analyse_advanced", "show_modal_install_env", False)
         modal.close()
     else:
         status_placeholder.error(f"Installation failed with exit code {process.returncode}.")
         if st.button("Close window", use_container_width=True):
+            # Clear the session variable to prevent reopening the modal
+            set_session_var("analyse_advanced", "show_modal_install_env", False)
             modal.close()
         
    
@@ -1538,10 +1548,23 @@ def det_model_selector_widget(model_meta):
     display_names = [item[0] for item in model_choices]
     modelID_lookup = {**{item[0]: item[1] for item in model_choices}}
 
-    # Load previously selected model ID
+    # Load previously selected model ID from current project
     general_settings_vars = get_cached_vars(section="general_settings")
-    previously_selected_det_modelID = general_settings_vars.get(
-        "previously_selected_det_modelID", "MD5A")
+    selected_projectID = general_settings_vars.get("selected_projectID")
+    
+    # Default detection model
+    previously_selected_det_modelID = DEFAULT_DETECTION_MODEL
+    
+    if selected_projectID:
+        # Load project-specific preferred detection model
+        map_data, _ = get_cached_map()
+        project_data = map_data["projects"].get(selected_projectID, {})
+        preferred_models = project_data.get("preferred_models", {})
+        previously_selected_det_modelID = preferred_models.get("det_model", DEFAULT_DETECTION_MODEL)
+    else:
+        # Fallback to global setting if no project selected
+        previously_selected_det_modelID = general_settings_vars.get(
+            "previously_selected_det_modelID", DEFAULT_DETECTION_MODEL)
 
     # Resolve previously selected modelID to display name
     previously_selected_display_name = next(
@@ -1563,6 +1586,28 @@ def det_model_selector_widget(model_meta):
         
         # Store selection in session state
         set_session_var("analyse_advanced", "selected_det_modelID", selected_modelID)
+        
+        # Save selection to persistent storage if it changed
+        if selected_modelID != previously_selected_det_modelID:
+            if selected_projectID:
+                # Save to project-specific preferred models
+                map_data, map_file_path = get_cached_map()
+                if selected_projectID not in map_data["projects"]:
+                    map_data["projects"][selected_projectID] = {}
+                if "preferred_models" not in map_data["projects"][selected_projectID]:
+                    map_data["projects"][selected_projectID]["preferred_models"] = {}
+                
+                map_data["projects"][selected_projectID]["preferred_models"]["det_model"] = selected_modelID
+                
+                # Save updated map
+                with open(map_file_path, 'w') as f:
+                    json.dump(map_data, f, indent=2)
+                
+                # Invalidate cache so next read gets fresh data
+                invalidate_map_cache()
+            else:
+                # Fallback to global setting if no project selected
+                update_vars("general_settings", {"previously_selected_det_modelID": selected_modelID})
 
     with col2:
         if st.button(":material/info: Info", use_container_width=True, help="Model information", key = "det_model_info_button"):
@@ -1571,6 +1616,14 @@ def det_model_selector_widget(model_meta):
             # Set session state flag to show modal on next rerun
             set_session_var("analyse_advanced", "show_modal_cls_model_info", True)
             st.rerun()
+
+    # Show AGPL license warning for YOLOv11 models
+    if selected_modelID in ["MD1000-LARCH-0-0", "MD1000-SORREL-0-0"]:
+        info_box(
+            msg="YOLOv11 models require AGPL-3.0 compliance or commercial license from Ultralytics. You are responsible for license compliance.",
+            title="YOLOv11 AGPL License Warning",
+            icon=":material/gavel:"
+        )
 
     return selected_modelID
 
@@ -1595,10 +1648,23 @@ def cls_model_selector_widget(model_meta):
     modelID_lookup = {none_display: "NONE", **
                       {item[0]: item[1] for item in model_choices}}
 
-    # Load previously selected model ID
+    # Load previously selected model ID from current project
     general_settings_vars = get_cached_vars(section="general_settings")
-    previously_selected_modelID = general_settings_vars.get(
-        "selected_modelID", "SAH-DRY-ADS-v1")
+    selected_projectID = general_settings_vars.get("selected_projectID")
+    
+    # Default classification model
+    previously_selected_modelID = DEFAULT_CLASSIFICATION_MODEL
+    
+    if selected_projectID:
+        # Load project-specific preferred classification model
+        map_data, _ = get_cached_map()
+        project_data = map_data["projects"].get(selected_projectID, {})
+        preferred_models = project_data.get("preferred_models", {})
+        previously_selected_modelID = preferred_models.get("cls_model", DEFAULT_CLASSIFICATION_MODEL)
+    else:
+        # Fallback to global setting if no project selected
+        previously_selected_modelID = general_settings_vars.get(
+            "selected_modelID", DEFAULT_CLASSIFICATION_MODEL)
 
     # Resolve previously selected modelID to display name
     previously_selected_display_name = next(
@@ -1620,6 +1686,28 @@ def cls_model_selector_widget(model_meta):
         
         # Store selection in session state
         set_session_var("analyse_advanced", "selected_cls_modelID", selected_modelID)
+        
+        # Save selection to persistent storage if it changed
+        if selected_modelID != previously_selected_modelID:
+            if selected_projectID:
+                # Save to project-specific preferred models
+                map_data, map_file_path = get_cached_map()
+                if selected_projectID not in map_data["projects"]:
+                    map_data["projects"][selected_projectID] = {}
+                if "preferred_models" not in map_data["projects"][selected_projectID]:
+                    map_data["projects"][selected_projectID]["preferred_models"] = {}
+                
+                map_data["projects"][selected_projectID]["preferred_models"]["cls_model"] = selected_modelID
+                
+                # Save updated map
+                with open(map_file_path, 'w') as f:
+                    json.dump(map_data, f, indent=2)
+                
+                # Invalidate cache so next read gets fresh data
+                invalidate_map_cache()
+            else:
+                # Fallback to global setting if no project selected
+                update_vars("general_settings", {"selected_modelID": selected_modelID})
 
     with col2:
         if selected_modelID != "NONE":
@@ -1952,6 +2040,10 @@ def load_taxon_mapping_cached(cls_model_ID):
     Optimized taxon mapping loader with session state caching.
     Only loads when model ID changes, eliminating CSV parsing on every step 3 visit.
     """
+    # Return empty list for NONE model (no classification)
+    if cls_model_ID == "NONE":
+        return []
+        
     cache_key = f"taxon_mapping_{cls_model_ID}"
     
     # Check if already cached in session state

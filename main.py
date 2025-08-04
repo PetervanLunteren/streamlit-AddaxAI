@@ -1,5 +1,5 @@
 
-
+# WAAR WAS IK? Ik heb de MD modellen toegevoegd and de NONE sitaatie opgelost. Volgende stap is de CLS modellen aan HF toevoegen en dan zorgen dat ze allemaal werken. 
 
 """
 AddaxAI Streamlit Application - Main Entry Point
@@ -27,6 +27,11 @@ TODOs:
 - add SpeciesNet
 - add video processing
 - reformat obj names, function names, and variable names, and classes, etc
+- add GPU / CPU icon to pbars 
+- do the loading squirell in a modal too, to you cant click anything else while loading
+- open a model when the folder_selection.py script is done with an info box saying a new window has opened. It the model will only close once the tkinter script is done sucessfully.
+- if NONE cls model is selected, then dont show the cls pbars. 
+- The pbars for progress should be taken care of. They should be updated, the texts proper,etc
 """
 
 # Standard library imports

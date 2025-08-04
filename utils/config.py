@@ -101,3 +101,13 @@ def log(msg):
     with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'logs', 'log.txt'), 'a') as f:
         f.write(f"{msg}\n")
     print(msg)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEFAULT MODEL CONSTANTS  
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Default detection model ID
+DEFAULT_DETECTION_MODEL = "MD5A"
+
+# Default classification model ID (NONE means no classification)
+DEFAULT_CLASSIFICATION_MODEL = "NONE"

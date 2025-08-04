@@ -7,7 +7,7 @@ from utils.config import *
 
 
 # import local modules
-from components import StepperBar, print_widget_label, warning_box
+from components import StepperBar, print_widget_label, warning_box, info_box
 from utils.common import (
     load_vars, update_vars, clear_vars, 
                          init_session_state, get_session_var, set_session_var, update_session_vars)
@@ -414,12 +414,20 @@ with st.container(border=True):
         # Only loads CSV file when classification model changes
         # Previous: CSV parsing on every step 3 visit
         # Now: Cached in session state by model ID
-        taxon_mapping = load_taxon_mapping_cached(selected_cls_modelID)
-        # st.write(taxon_mapping)
-        with st.container(border=True):
-            print_widget_label("Species presence",
-                               help_text="Here you can select the model of your choosing.")
-            selected_species = species_selector_widget(taxon_mapping, selected_cls_modelID)
+        if not selected_cls_modelID == "NONE":
+            taxon_mapping = load_taxon_mapping_cached(selected_cls_modelID)
+            # st.write(taxon_mapping)
+            with st.container(border=True):
+                print_widget_label("Species presence",
+                                help_text="Here you can select the model of your choosing.")
+                selected_species = species_selector_widget(taxon_mapping, selected_cls_modelID)
+
+        else:
+            selected_species = None
+            info_box(
+                title="No species identification model selected",
+                msg="This is where you normally would selectw hich species are present in your project area, but you have not selected a species identification model. Please proceed to add the deployment to the queue."            )
+
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
