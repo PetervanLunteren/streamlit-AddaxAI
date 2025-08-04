@@ -28,6 +28,14 @@ TODOs:
 - put all golabl variables in st.sessionstate, like model_meta, txts, vars, map, etc.
 - make function that checks the model_meta online and adds the variables.json file to the model folder if it does not exist
 - this must be offline, but I can only do that at the end when I know which icons I'm using.
+- make it accessible for all models and envs
+- add SpeciesNet
+- add video processing
+- reformat files and folders
+- reformat obj names, function names, and variable names, and classes, etc
+- clean up code, remove unused imports, etc
+- also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
+
 """
 
 # Standard library imports
@@ -202,16 +210,6 @@ if st.session_state == {}:
     # Download latest model metadata and create folder structure for new models
     # This will show notifications for any new models that aren't in local filesystem
     fetch_latest_model_info()
-
-    # Initialize Folium maps (render dummy to prepare marker system)
-    m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)
-    folium.Marker([39.949610, -75.150282]).add_to(m)
-    with st.sidebar:
-        time.sleep(0.3)  # Ensure sidebar is ready before rendering
-        _ = st_folium(m, height=100, width=100)
-        time.sleep(0.3)  # Allow time for map to render
-        st.sidebar.empty()  # Clear the sidebar
-        time.sleep(0.3)
     
     # Archive previous session log and create fresh log (only on startup)
     log_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "logs", "log.txt")
@@ -331,7 +329,7 @@ def on_mode_change():
 
 # Mode selector in sidebar
 print_widget_label("Mode", help_text="help text", sidebar=True)
-mode_selected = st.sidebar.segmented_control(
+mode_selected = st.sidebar.segmented_control( 
     "Mode",
     options=mode_options.keys(),
     format_func=mode_options.get,

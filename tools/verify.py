@@ -40,7 +40,7 @@ with st.form(key="verify_form", clear_on_submit=False):
     # Confidence range slider
     st.divider()
     print_widget_label("In what confidence range?", help_text = "help text")
-    min_conf, max_conf = 0.01, 1.0
+    # min_conf, max_conf = 0.01, 1.0  # UNUSED: Variables assigned but never used
     selected_conf = st.slider("Confidence", min_value=0.01, max_value=1.00, value=(0.4, 1.0), step=0.01, format="%.2f", label_visibility="collapsed")
 
 

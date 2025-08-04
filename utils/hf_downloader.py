@@ -3,10 +3,10 @@ import time
 import requests
 import threading
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor  # as_completed - UNUSED: Vulture detected unused import
+# from urllib.parse import urlparse  # UNUSED: Vulture detected unused import
 from tqdm import tqdm
-from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub import HfApi  # hf_hub_download - UNUSED: Vulture detected unused import
 from huggingface_hub.utils import RepositoryNotFoundError, RevisionNotFoundError
 
 
@@ -38,8 +38,8 @@ class HuggingFaceRepoDownloader:
         self.adjustment_interval = 10  # seconds
         
         # Progress tracking
-        self.total_bytes = 0
-        self.downloaded_bytes = 0
+        # self.total_bytes = 0  # UNUSED: Vulture detected unused attribute
+        # self.downloaded_bytes = 0  # UNUSED: Vulture detected unused attribute
         self.pbar = None
         self.lock = threading.Lock()
     
@@ -108,7 +108,7 @@ class HuggingFaceRepoDownloader:
     def update_progress(self, bytes_downloaded):
         """Update the progress bar thread-safely (no UI updates from threads)."""
         with self.lock:
-            self.downloaded_bytes += bytes_downloaded
+            # self.downloaded_bytes += bytes_downloaded  # UNUSED: Vulture detected unused attribute
             if self.pbar:
                 self.pbar.update(bytes_downloaded)
     
@@ -116,7 +116,7 @@ class HuggingFaceRepoDownloader:
         """Measure and record download speed for adaptive scaling."""
         if bytes_downloaded > 0:
             elapsed = time.time() - start_time
-            if elapsed > 0:
+            if elapsed > 0: 
                 speed = bytes_downloaded / elapsed  # bytes per second
                 with self.lock:
                     self.speed_samples.append(speed)
@@ -219,7 +219,7 @@ class HuggingFaceRepoDownloader:
             
             # Get repository info and total size
             total_size, files_info = self.get_repo_info(repo_id, revision)
-            self.total_bytes = total_size
+            # self.total_bytes = total_size  # UNUSED: Vulture detected unused attribute
             
             print(f"📦 Repository size: {total_size / (1024*1024*1024):.2f} GB")
             print(f"📁 Files to download: {len(files_info)}")

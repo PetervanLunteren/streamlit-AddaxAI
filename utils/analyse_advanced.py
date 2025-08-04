@@ -37,7 +37,6 @@ Cache keys stored in st.session_state:
 - "cached_map": Global map.json contents
 """
 
-from utils import init_paths
 
 from streamlit_tree_select import tree_select
 import os
@@ -48,27 +47,22 @@ import folium as fl
 from streamlit_folium import st_folium
 import streamlit as st
 from appdirs import user_config_dir
-# import pandas as pd
 import statistics
-# from collections import defaultdict
 import subprocess
-import re
 import csv
 import string
 import math
 import time as sleep_time
-from datetime import datetime, time  # , timedelta
-# from datetime import datetime
+from datetime import datetime, time  
 import os
 from pathlib import Path
 from utils.hf_downloader import HuggingFaceRepoDownloader
 
 from datetime import datetime
-import tarfile
+# import tarfile  # UNUSED: Vulture detected unused import
 import requests
 
 from PIL import Image
-# from st_flexible_callout_elements import flexible_callout
 import random
 from PIL.ExifTags import TAGS
 from hachoir.metadata import extractMetadata
@@ -77,36 +71,11 @@ import piexif
 from tqdm import tqdm
 from streamlit_modal import Modal
 
-# st.write("sys.path:", sys.path)
-# st.write("length of sys.path:", len(sys.path))
-# st.write("This is the module its looking for: /Applications/AddaxAI_files/cameratraps/megadetector/detection/video_utils.py")
+
+from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, MultiProgressBars, unique_animal_string, get_session_var, set_session_var, update_session_vars  # requires_addaxai_update, - UNUSED: Vulture detected unused import
 
 
-# sys.path.insert(0, '/Applications/AddaxAI_files/cameratraps')
-
-
-# local imports
-# from megadetector.detection.video_utils import VIDEO_EXTENSIONS
-# VIDEO_EXTENSIONS = []
-# # from megadetector.utils.path_utils import IMG_EXTENSIONS
-# IMG_EXTENSIONS = []
-from utils.common import load_vars, update_vars, replace_vars, info_box, load_map, print_widget_label, clear_vars, requires_addaxai_update, MultiProgressBars, random_animal_adjective, get_session_var, set_session_var, update_session_vars
-# from utils.download import download_urls
-
-
-# set global variables
-# AddaxAI_files = os.path.dirname(os.path.dirname(
-#     os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 from utils.config import *
-
-# AddaxAI_files = os.path.join(
-#     AddaxAI_files, "AddaxAI", "streamlit-AddaxAI")
-# ADDAXAI_FILES = st.session_state["shared"]["ADDAXAI_FILES"]
-# ADDAXAI_FILES_ST = st.session_state["shared"]["ADDAXAI_FILES_ST"]
-# CLS_DIR = os.path.join(ADDAXAI_FILES, "models", "cls")
-# DET_DIR = os.path.join(ADDAXAI_FILES, "models", "det")
-# VIDEO_EXTENSIONS = st.session_state["shared"]["VIDEO_EXTENSIONS"]
-# IMG_EXTENSIONS = st.session_state["shared"]["IMG_EXTENSIONS"]
 
 # load camera IDs
 config_dir = user_config_dir("AddaxAI")
@@ -115,13 +84,6 @@ map_file = os.path.join(config_dir, "map.json")
 # set versions
 with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
-
-
-
-
-
-
-
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -223,7 +185,12 @@ def run_process_queue(
 
     with cancel_col:
         if st.button(":material/cancel: Cancel", use_container_width=True):
+            # Set a flag to cancel processing and close modal
+            st.session_state["cancel_processing"] = True
+            set_session_var("analyse_advanced", "show_modal_process_queue", False)
             modal.close()
+            st.rerun()
+            return
 
     # overall_progress = st.empty()
     pbars = MultiProgressBars(container_label="Processing queue...",)
@@ -244,7 +211,15 @@ def run_process_queue(
     total_deployment_idx = len(process_queue)
     current_deployment_idx = 1
 
+    # Clear any existing cancel flag
+    st.session_state["cancel_processing"] = False
+    
     while True:
+        
+        # Check if processing was cancelled
+        if st.session_state.get("cancel_processing", False):
+            st.warning("Processing was cancelled by user.")
+            break
         
         # update the queue from file
         process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
@@ -276,54 +251,68 @@ def run_process_queue(
         
         model_meta = get_cached_model_meta()  # ✅ OPTIMIZED: Uses session state cache
         
-        run_md(selected_det_modelID, model_meta["det"][selected_det_modelID], selected_folder, temp_json_path, pbars)
+        # Check for cancellation before starting detection
+        if st.session_state.get("cancel_processing", False):
+            break
+            
+        detection_success = run_md(selected_det_modelID, model_meta["det"][selected_det_modelID], selected_folder, temp_json_path, pbars)
+        
+        # If detection was cancelled or failed, skip to next iteration
+        if detection_success is False:
+            continue
 
         # run the classifier
         if selected_cls_modelID:
+            # Check for cancellation before starting classification  
+            if st.session_state.get("cancel_processing", False):
+                break
+                
             pbars.update_label("Running classifier...")
-            run_cls(selected_folder, selected_cls_modelID, temp_json_path, pbars)
+            classification_success = run_cls(selected_cls_modelID, temp_json_path, pbars)
+            
+            # If classification was cancelled or failed, skip to next iteration
+            if classification_success is False:
+                continue
         
         # if all processes are done, update the map file
-        with st.status("Finalizing..."):
-            # if the cls was succesful, the results JSON should be located at the TEMP_DIR, "addaxai-deployment-temp.json"
-            # temp_json_path = os.path.join(TEMP_DIR, "addaxai-deployment-temp.json")
-            # perm_json_path = os.path.join(selected_folder, "addaxai-deployment.json")
+        if os.path.exists(temp_json_path):
             
-            if os.path.exists(temp_json_path):
-                
-                # first add the deployment info to the map file
-                map, map_file = get_cached_map()
-                deployment_id = f"dep-{random_animal_adjective()}"
-                deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get("deployments", {})
-                deployments[deployment_id] = {
-                    "folder": selected_folder,
-                    "min_datetime": selected_min_datetime,
-                    "det_modelID": selected_det_modelID,
-                    "cls_modelID": selected_cls_modelID
-                }
-                
-                # write the updated map to the map file
-                map["projects"][selected_projectID]["locations"][selected_locationID]["deployments"] = deployments
-                
-                with open(map_file, "w") as file:
-                    json.dump(map, file, indent=2)
-                # Invalidate map cache after update
-                invalidate_map_cache()
-                
-                
-                # once that is done, move the deployment info to the deployment folder
-                os.rename(temp_json_path, perm_json_path)
-                
-                # # once that is done, remove the deployment from the process queue, so that it resumes the next deployment if something happens 
-                replace_vars(section="analyse_advanced", new_vars = {"process_queue": process_queue[1:]})
-                current_deployment_idx += 1
-                
-           
-        
+            # first add the deployment info to the map file
+            map, map_file = get_cached_map()
+            deployment_id = f"dep-{unique_animal_string()}"
+            deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get("deployments", {})
+            deployments[deployment_id] = {
+                "folder": selected_folder,
+                "min_datetime": selected_min_datetime,
+                "det_modelID": selected_det_modelID,
+                "cls_modelID": selected_cls_modelID
+            }
+            
+            # write the updated map to the map file
+            map["projects"][selected_projectID]["locations"][selected_locationID]["deployments"] = deployments
+            
+            with open(map_file, "w") as file:
+                json.dump(map, file, indent=2)
+            # Invalidate map cache after update
+            invalidate_map_cache()
+            
+            
+            # once that is done, move the deployment info to the deployment folder
+            os.rename(temp_json_path, perm_json_path)
+            
+            # # once that is done, remove the deployment from the process queue, so that it resumes the next deployment if something happens 
+            replace_vars(section="analyse_advanced", new_vars = {"process_queue": process_queue[1:]})
+            current_deployment_idx += 1
 
-    modal.close()
+    # Clear the cancel flag when processing ends (whether completed or cancelled)
+    st.session_state["cancel_processing"] = False
     
-def run_cls(deployment_folder, cls_modelID, json_fpath, pbars):
+    # Close modal by setting session state flag to False
+    set_session_var("analyse_advanced", "show_modal_process_queue", False)
+    modal.close()
+    st.rerun()
+    
+def run_cls(cls_modelID, json_fpath, pbars):
     """
     Run the classifier on the given deployment folder using the specified model ID.
     """
@@ -339,14 +328,9 @@ def run_cls(deployment_folder, cls_modelID, json_fpath, pbars):
     cls_detec_thresh = 0.01
     cls_class_thresh = 0.01
     cls_animal_smooth = False
-    # json_fpath = os.path.join(deployment_folder, "addaxai-deployment.json")
     temp_frame_folder = "None"
     cls_tax_fallback = False
     cls_tax_levels_idx = 0
-    
-    
-    # FileNotFoundError: [Errno 2] No such file or directory: '/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/cls/SAH-DRY-ADS-v1/variables.json'
-
 
 
     command_args = []
@@ -362,14 +346,11 @@ def run_cls(deployment_folder, cls_modelID, json_fpath, pbars):
     command_args.append(str(cls_tax_fallback))
     command_args.append(str(cls_tax_levels_idx))
 
-    # command = [
-    #     f"{ADDAXAI_FILES_ST}/envs/env-pytorch/bin/python",
-    #     "-m", "megadetector.classification.run_classifier_batch",
-    #     cls_model_file,
-    #     deployment_folder,
-    #     output_file
-    # ]
 
+    # Set environment variables for subprocess
+    env = os.environ.copy()
+    env['PYTHONPATH'] = ADDAXAI_FILES_ST
+    
     status_placeholder = st.empty()
     process = subprocess.Popen(
         command_args,
@@ -378,13 +359,22 @@ def run_cls(deployment_folder, cls_modelID, json_fpath, pbars):
         text=True,
         bufsize=1,
         shell=False,
-        universal_newlines=True
+        universal_newlines=True,
+        cwd=ADDAXAI_FILES_ST,  # Set working directory to project root
+        env=env  # Pass environment with PYTHONPATH
     )
 
     for line in process.stdout:
+        # Check if processing was cancelled
+        if st.session_state.get("cancel_processing", False):
+            log("Classification cancelled by user - terminating subprocess")
+            process.terminate()
+            process.wait()
+            return False
+            
         line = line.strip()
-        print(line)
-        st.code(line)
+        log(line)
+        # st.code(line)
         pbars.update_from_tqdm_string("classifier", line)
 
     process.stdout.close()
@@ -416,10 +406,18 @@ def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
         text=True,
         bufsize=1,
         shell=False,
-        universal_newlines=True
+        universal_newlines=True,
+        cwd=ADDAXAI_FILES_ST  # Set working directory to project root
     )
 
     for line in process.stdout:
+        # Check if processing was cancelled
+        if st.session_state.get("cancel_processing", False):
+            log("Detection cancelled by user - terminating subprocess")
+            process.terminate()
+            process.wait()
+            return False
+            
         line = line.strip()
         print(line)
         pbars.update_from_tqdm_string("detector", line)
@@ -535,7 +533,14 @@ def add_location_modal(modal: Modal):
     # add brief lat lng popup on mouse click
     m.add_child(fl.LatLngPopup())
 
-    # render map (component pre-initialized in main.py startup)
+    # render dummy map to avoid weird behavior on first load
+    dummy_m = fl.Map(location=[39.949610, -75.150282], zoom_start=16)
+    fl.Marker([39.949610, -75.150282]).add_to(dummy_m)
+    with st.sidebar:
+        _ = st_folium(dummy_m, height=1, width=1)
+        st.sidebar.empty()
+
+    # render real map
     _, col_map_view, _ = st.columns([0.1, 1, 0.1])
     with col_map_view:
         map_data = st_folium(m, height=280, width=600)
@@ -852,6 +857,19 @@ def download_model(
     
     # modal.close()
     
+    # Check if download is already in progress to prevent multiple simultaneous downloads
+    download_key = f"download_in_progress_{download_modelID}"
+    if st.session_state.get(download_key, False):
+        st.info("Download already in progress... Please wait.")
+        if st.button("Cancel", use_container_width=True):
+            # Reset the download flag and close modal
+            st.session_state[download_key] = False
+            set_session_var("analyse_advanced", "show_modal_download_model", False)
+            modal.close()
+            st.rerun()
+            return
+        return
+    
     info_box(
         "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
     )
@@ -859,8 +877,13 @@ def download_model(
     # button_placeholder = st.empty()
     
     if st.button("Cancel", use_container_width=True):
+        set_session_var("analyse_advanced", "show_modal_download_model", False)
         modal.close()
+        st.rerun()
         return
+
+    # Set flag to indicate download is starting
+    st.session_state[download_key] = True
 
     # check if it is an detection or classification model
     if download_modelID in model_meta['det']:
@@ -890,9 +913,15 @@ def download_model(
     with open(variables_path, "w") as f:
         json.dump(download_model_info, f, indent=4)
 
+    # Reset the download flag when download completes
+    st.session_state[download_key] = False
+    
     # Show result message above
     if success:
+        # Close modal by setting session state flag to False
+        set_session_var("analyse_advanced", "show_modal_download_model", False)
         modal.close()
+        st.rerun()
     else:
         status_placeholder.error(f"Download failed! Please try again later.")
 
@@ -954,151 +983,7 @@ def install_env(
         if st.button("Close window", use_container_width=True):
             modal.close()
         
-        
-
-
-
-
-
-# this one is old (when I still thought I needed to download the env)
-# but i left it here since it clearly shows how to use the progress bars
-def DEMO_PBARS(
-    modal: Modal,
-    env_name: str,
-):
-    
-    # modal = Modal(f"Installing ENV", key="installing-env", show_close_button=False)
-    # modal.open()
-    # if modal.is_open():
-    #     with modal.container():
-            
-        info_box(
-            "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
-            "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources."
-        )
-        
-        if st.button("Cancel", use_container_width=True):
-            st.warning("Installation cancelled. You can try again later.")
-            sleep_time.sleep(2)
-            modal.close()
-            return
-
-
-
-
-
-        # url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/{env_name}.tar.xz"
-        url = f"https://addaxaipremiumstorage.blob.core.windows.net/github-zips/latest/macos/envs/env-{env_name}.tar.xz"
-        local_filename = f"envs/env-{env_name}.tar.xz"
-
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-        total_size = int(response.headers.get('content-length', 0))
-
-        # show progress bars
-        pbars = MultiProgressBars("Installing virual environment")
-        pbars.add_pbar("download", "Waiting to download...", "Downloading...", "Download complete!", max_value=total_size)
-        pbars.add_pbar("extract", "Waiting to extract...", "Extracting...", "Extraction complete!", max_value=None)
-        # pbars.add_status("install", "Waiting to install...", "Installing...", "Installation complete!")
-
-        # download progress bar
-        block_size = 1024
-        pbar = tqdm(total=total_size / (1024 * 1024), unit='MB', unit_scale=False, unit_divisor=1)
-        with open(local_filename, 'wb') as f:
-            for data in response.iter_content(block_size):
-                f.write(data)
-                mb = len(data) / (1024 * 1024)
-                pbar.update(mb)
-                label = pbars.generate_label_from_tqdm(pbar)
-                pbars.update("download", n=len(data), text=label)
-        pbar.close()
-        
-        # Extract progress bar
-        with tarfile.open(local_filename, mode="r:xz") as tar:
-            members = tar.getmembers()
-            pbars.set_max_value("extract", len(members))  # ✅ This is clean and intuitive
-            pbar = tqdm(total=len(members), unit="files", unit_scale=False)
-            for member in members:
-                tar.extract(member, path="envs/")
-                pbar.update(1)
-                label = pbars.generate_label_from_tqdm(pbar)
-                pbars.update("extract", n=1, text=label)
-            pbar.close()
-        os.remove(local_filename)
-        
-        # pip install requirements
-        
-        
-        
-        # # install_placeholder.write("")
-
-        # pip_cmd =                 [
-        #     os.path.join(AddaxAI_streamlit_files, "envs", f"env-{env_name}", "bin", "python"),
-        #             "-m", "pip", "install", "-r",
-        #             os.path.join(AddaxAI_streamlit_files, "envs", "reqs", f"env-{env_name}", "macos", "requirements.txt")
-        #         ]
-        
-        
-        # # Trigger pip install
-
-        # status = pbars.update_status("install", phase="mid")
-
-        # with status:
-        #     with st.container(border=True, height=300):
-        #         output_placeholder = st.empty()
-        #         live_output = "Booting up pip installation...\n\n"
-        #         output_placeholder.code(live_output)
-
-        #         process = subprocess.Popen(
-        #             pip_cmd,
-        #             stdout=subprocess.PIPE,
-        #             stderr=subprocess.STDOUT,
-        #             text=True,
-        #             bufsize=1
-        #         )
-
-        #         for line in process.stdout:
-        #             live_output += line
-        #             output_placeholder.code(live_output)
-
-        #         process.wait()
-
-        # pbars.update_status("install", phase="post")
-        
-        modal.close()
-    
-    
-    # modal.close()
-
-
-
-# def project_selector_widget_sidebar():
-    
-#     # check what is already known and selected
-#     projects, selected_projectID = load_known_projects()
-
-#     # if first project, show only button and no dropdown
-#     if projects == {}:
-#         return
-
-#     options = list(projects.keys())
-#     selected_index = options.index(
-#         selected_projectID) if selected_projectID in options else 0
-
-#     # overwrite selected_projectID if user has selected a different project
-#     selected_projectID = st.sidebar.selectbox(
-#         "Existing projects",
-#         options=options,
-#         index=selected_index,
-#         label_visibility="collapsed"
-#     )
-
-#     # return
-#     return selected_projectID
-
-
-
-
+   
 def project_selector_widget():
 
     # check what is already known and selected
@@ -1169,10 +1054,6 @@ def location_selector_widget():
     locations, location = load_known_locations()
 
     # # calculate distance to closest known locations if coordinates are found in metadata
-    # if "closest_location" not in st.session_state:
-    #     st.session_state.closest_location = None
-    # if st.session_state.coords_found_in_exif:
-    #     st.session_state.closest_location = match_locations((st.session_state.exif_lat, st.session_state.exif_lng), locations)
     if coords_found_in_exif:  # SESSION
         closest_location = match_locations((exif_lat, exif_lng), locations)
 
@@ -1184,8 +1065,6 @@ def location_selector_widget():
             st.rerun()
 
         # # show info box if coordinates are found in metadata
-        # if st.session_state.coords_found_in_exif:
-        #     info_box(f"Coordinates ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}) were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
         if coords_found_in_exif:  # SESSION
             info_box(
                 f"Coordinates ({exif_lat:.5f}, {exif_lng:.5f}) were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
@@ -1203,9 +1082,6 @@ def location_selector_widget():
                 location) if location in options else 0
 
             # # if coordinates are found in metadata, pre-select the closest location
-            # if st.session_state.coords_found_in_exif and st.session_state.closest_location is not None:
-            #     closes_location_name, _ = st.session_state.closest_location
-            #     selected_index = options.index(closes_location_name) if closes_location_name in options else 0
 
             if coords_found_in_exif and closest_location is not None:
                 # if coordinates are found in metadata, pre-select the closest location
@@ -1232,16 +1108,6 @@ def location_selector_widget():
                 st.rerun()
 
         # # info box if coordinates are found in metadata
-        # if st.session_state.coords_found_in_exif:
-
-        #     # define message based on whether a closest location was found
-        #     message = f"Coordinates extracted from image metadata: ({st.session_state.exif_lat:.5f}, {st.session_state.exif_lng:.5f}). "
-        #     if st.session_state.closest_location is not None:
-        #         name, dist = st.session_state.closest_location
-        #         message += f"Matches known location <i>{name}</i>, about {dist} meters away."
-        #     else:
-        #         message += f"No known location found within 50 meters."
-        #     info_box(message)
 
         # info box if coordinates are found in metadata
         if coords_found_in_exif:
@@ -1319,9 +1185,6 @@ def datetime_selector_widget():
     )
 
     # Initialize the session state for exif_min_datetime if not set
-    # if "exif_min_datetime" not in st.session_state:
-    #     st.session_state.exif_min_datetime = None
-    # if present, it will be of format "datetime.datetime(2013, 1, 17, 13, 5, 21)"
 
     # Pre-fill defaults
     default_date = None
@@ -1330,9 +1193,6 @@ def datetime_selector_widget():
     default_second = "--"
 
     if exif_min_datetime:
-        # # In case it's stored as a string like "datetime.datetime(2013, 1, 17, 13, 5, 21)"
-        # if isinstance(st.session_state.exif_min_datetime, str):
-        #     st.session_state.exif_min_datetime = eval(st.session_state.exif_min_datetime)
 
         dt = exif_min_datetime
         default_date = dt.date()
@@ -1389,10 +1249,6 @@ def datetime_selector_widget():
 
         return selected_datetime
 
-
-
-
-
 def load_known_locations():
     map, _ = get_cached_map()
     general_settings_vars = get_cached_vars(section="general_settings")
@@ -1405,107 +1261,101 @@ def load_known_locations():
     return locations, selected_locationID
 
 
-def load_known_deployments():
-    settings, _ = get_cached_map()
-    general_settings_vars = get_cached_vars(section="general_settings")
-    selected_projectID = general_settings_vars.get("selected_projectID")
-    project = settings["projects"][selected_projectID]
-    
-    # Get selections from session state instead of persistent storage
-    selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
-    location = project["locations"][selected_locationID]
-    deployments = location["deployments"]
-    selected_deploymentID = get_session_var("analyse_advanced", "selected_deploymentID")
-    return deployments, selected_deploymentID
+# UNUSED FUNCTION - Vulture detected unused function
+# def load_known_deployments():
+#     settings, _ = get_cached_map()
+#     general_settings_vars = get_cached_vars(section="general_settings")
+#     selected_projectID = general_settings_vars.get("selected_projectID")
+#     project = settings["projects"][selected_projectID]
+#     
+#     # Get selections from session state instead of persistent storage
+#     selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
+#     location = project["locations"][selected_locationID]
+#     deployments = location["deployments"]
+#     selected_deploymentID = get_session_var("analyse_advanced", "selected_deploymentID")
+#     return deployments, selected_deploymentID
 
-def generate_deployment_id():
+# UNUSED FUNCTION - Vulture detected unused function
+# def generate_deployment_id():
+# 
+#     # Create a consistent 5-char hash from the datetime and some randomness
+#     rand_str_1 = ''.join(random.choices(
+#         string.ascii_uppercase + string.digits, k=5))
+#     rand_str_2 = ''.join(random.choices(
+#         string.ascii_uppercase + string.digits, k=5))
+# 
+# 
+# 
+#     # Combine into deployment ID
+#     return f"dep-{rand_str_1}-{rand_str_2}"
 
-    # Create a consistent 5-char hash from the datetime and some randomness
-    rand_str_1 = ''.join(random.choices(
-        string.ascii_uppercase + string.digits, k=5))
-    rand_str_2 = ''.join(random.choices(
-        string.ascii_uppercase + string.digits, k=5))
 
-
-
-    # Combine into deployment ID
-    return f"dep-{rand_str_1}-{rand_str_2}"
-
-
-def add_deployment(selected_min_datetime):
-
-    # settings, _ = load_settings()
-    # selected_folder = settings["vars"]["analyse_advanced"].get(
-    #     "selected_folder")
-    # selected_projectID = settings["vars"]["analyse_advanced"].get(
-    #     "selected_projectID")
-    # project = settings["projects"][selected_projectID]
-    # location = project["location"]
-    # location = project["locations"][location]
-    # deployments = location["deployments"]
-
-    map, _ = get_cached_map()
-    analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
-    general_settings_vars = get_cached_vars(section="general_settings")
-    selected_folder = analyse_advanced_vars.get(
-        "selected_folder")
-    selected_projectID = general_settings_vars.get(
-        "selected_projectID")
-    project = map["projects"][selected_projectID]
-    selected_locationID = analyse_advanced_vars.get(
-        "selected_locationID")
-    location = project["locations"][selected_locationID]
-    deployments = location["deployments"]
-
-    # check what the exif datetime is
-    exif_min_datetime_str = analyse_advanced_vars.get(
-        "exif_min_datetime", None)
-    exif_min_datetime = (
-        datetime.fromisoformat(exif_min_datetime_str)
-        if exif_min_datetime_str is not None
-        else None
-    )
-    exif_max_datetime_str = analyse_advanced_vars.get(
-        "exif_max_datetime", None)
-    exif_max_datetime = (
-        datetime.fromisoformat(exif_max_datetime_str)
-        if exif_max_datetime_str is not None
-        else None
-    )
-
-    # then calculate the difference between the selected datetime and the exif datetime
-    diff_min_datetime = selected_min_datetime - exif_min_datetime
-    # TODO: if the exif_min_datetime is None, it errors. fix that.
-
-    # Adjust exif_max_datetime if selected_min_datetime is later than exif_min_datetime
-    selected_max_datetime = exif_max_datetime + diff_min_datetime
-
-    # generate a unique deployment ID
-    deployment_id = f"dep-{random_animal_adjective()}"
-
-    # Store deployment selection in session state instead of persistent vars
-    set_session_var("analyse_advanced", "selected_deploymentID", deployment_id)
-
-    # Add new deployment # TODO: i want to have this information at the end, right? When the deploymeny is processed?
-    deployments[deployment_id] = {
-        "deploymentStart": datetime.isoformat(selected_min_datetime),
-        # this is not ctually selected, but calculated from the exif metadata
-        "deploymentEnd": datetime.isoformat(selected_max_datetime),
-        "path": selected_folder,
-        "datetimeDiffSeconds": diff_min_datetime.total_seconds()
-    }
-
-    # Save updated settings
-    with open(map_file, "w") as file:
-        json.dump(map, file, indent=2)
-    # Invalidate map cache after update
-    invalidate_map_cache()
-
-    # Return list of deployments and index of the new one
-    deployment_list = list(deployments.values())
-    selected_index = deployment_list.index(deployments[deployment_id])
-
-    return selected_index, deployment_list
+# UNUSED FUNCTION - Vulture detected unused function
+# def add_deployment(selected_min_datetime):
+# 
+# 
+#     map, _ = get_cached_map()
+#     analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
+#     general_settings_vars = get_cached_vars(section="general_settings")
+#     selected_folder = analyse_advanced_vars.get(
+#         "selected_folder")
+#     selected_projectID = general_settings_vars.get(
+#         "selected_projectID")
+#     project = map["projects"][selected_projectID]
+#     selected_locationID = analyse_advanced_vars.get(
+#         "selected_locationID")
+#     location = project["locations"][selected_locationID]
+#     deployments = location["deployments"]
+# 
+#     # check what the exif datetime is
+#     exif_min_datetime_str = analyse_advanced_vars.get(
+#         "exif_min_datetime", None)
+#     exif_min_datetime = (
+#         datetime.fromisoformat(exif_min_datetime_str)
+#         if exif_min_datetime_str is not None
+#         else None
+#     )
+#     exif_max_datetime_str = analyse_advanced_vars.get(
+#         "exif_max_datetime", None)
+#     exif_max_datetime = (
+#         datetime.fromisoformat(exif_max_datetime_str)
+#         if exif_max_datetime_str is not None
+#         else None
+#     )
+# 
+#     # then calculate the difference between the selected datetime and the exif datetime
+#     diff_min_datetime = selected_min_datetime - exif_min_datetime
+#     # TODO: if the exif_min_datetime is None, it errors. fix that.
+# 
+#     # Adjust exif_max_datetime if selected_min_datetime is later than exif_min_datetime
+#     selected_max_datetime = exif_max_datetime + diff_min_datetime
+# 
+#     # generate a unique deployment ID
+#     deployment_id = f"dep-{unique_animal_string()}"
+# 
+#     # Store deployment selection in session state instead of persistent vars
+#     set_session_var("analyse_advanced", "selected_deploymentID", deployment_id)
+# 
+#     # Add new deployment # TODO: i want to have this information at the end, right? When the deploymeny is processed?
+#     deployments[deployment_id] = {
+#         "deploymentStart": datetime.isoformat(selected_min_datetime),
+#         # this is not ctually selected, but calculated from the exif metadata
+#         "deploymentEnd": datetime.isoformat(selected_max_datetime),
+#         "path": selected_folder,
+#         "datetimeDiffSeconds": diff_min_datetime.total_seconds()
+#     }
+# 
+#     # Save updated settings
+#     with open(map_file, "w") as file:
+#         json.dump(map, file, indent=2)
+#     # Invalidate map cache after update
+#     invalidate_map_cache()
+# 
+#     # Return list of deployments and index of the new one
+#     deployment_list = list(deployments.values())
+#     selected_index = deployment_list.index(deployments[deployment_id])
+# 
+#     return selected_index, deployment_list
 
 
 def add_location(location_id, lat, lon):
@@ -1533,14 +1383,6 @@ def add_location(location_id, lat, lon):
 
     # add the selected location ID to session state instead of persistent vars
     set_session_var("analyse_advanced", "selected_locationID", location_id)
-    # analyse_advanced_vars = load_vars(section="analyse_advanced")
-    # analyse_advanced_vars["selected_locationID"] = location_id
-
-    # # Sort locations (optional: dicts don't preserve order unless using OrderedDict or Python 3.7+)
-    # sorted_locations = dict(
-    #     sorted(locations.items(), key=lambda item: item[0].lower()))
-    # settings["projects"][selected_projectID]["locations"] = sorted_locations
-    # settings["projects"][selected_projectID]["location"] = location_id
 
     # Save updated settings
     with open(map_file, "w") as file:
@@ -1560,10 +1402,6 @@ def add_project(projectID, comments):
     projects = map["projects"]
     projectIDs = projects.keys()
 
-    # analyse_advanced_vars = load_vars(section="analyse_advanced")
-    # selected_projectID = analyse_advanced_vars["selected_projectID"]
-
-    # st.write(projectIDs)
 
     # Check if project_id is unique
     if projectID in projectIDs:
@@ -1604,58 +1442,6 @@ def add_project(projectID, comments):
     selected_index = project_list.index(projects[projectID])
 
     return selected_index, project_list
-
-
-# def add_new_project_popover(txt):
-#     # use st.empty to create a popover container
-#     # so that it can be closed on button click
-#     # and the popover can be reused
-#     popover_container = st.empty()
-#     with popover_container.container():
-#         with st.popover(f":material/add_circle: {txt}",
-#                         help="Define a new project",
-#                         use_container_width=True):
-
-#             # load known projects IDs
-#             known_projects, _ = load_known_projects()
-
-#             # input for project ID
-#             print_widget_label("Unique project ID",
-#                                help_text="This ID will be used to identify the project in the system.")
-#             project_id = st.text_input(
-#                 "project ID", max_chars=50, label_visibility="collapsed")
-#             project_id = project_id.strip()
-
-#             # input for optional comments
-#             print_widget_label("Optionally add any comments or notes",
-#                                help_text="This is a free text field where you can add any comments or notes about the project.")
-#             comments = st.text_area(
-#                 "Comments", height=150, label_visibility="collapsed")
-#             comments = comments.strip()
-
-#             # button to save project
-#             if st.button(":material/save: Save project", use_container_width=True):
-
-#                 # check validity
-#                 if not project_id.strip():
-#                     st.error("project ID cannot be empty.")
-#                 elif project_id in list(known_projects.keys()):
-#                     st.error(
-#                         f"Error: The ID '{project_id}' is already taken. Please choose a unique ID, or select the existing project from dropdown menu.")
-#                 else:
-
-#                     # if all good, add project
-#                     add_project(project_id, comments)
-
-#                     # reset session state variables before reloading
-#                     # st.session_state.clear()
-#                     popover_container.empty()
-#                     st.rerun()
-
-
-# OLD POPOVER FUNCTION - CONVERTED TO MODAL
-# add_new_location_popover() has been replaced with modal_add_location.open()
-
 
 def browse_directory_widget():
     # Get selected folder from session state instead of persistent storage
@@ -1849,27 +1635,28 @@ def cls_model_selector_widget(model_meta):
     return selected_modelID
 
 
-def select_model_widget(model_type, prev_selected_model):
-    # prepare radio button options
-    model_info = load_all_model_info(model_type)
-    model_options = {}
-    for key, info in model_info.items():
-        model_options[key] = {"option": info["friendly_name"],
-                              "caption": f":material/calendar_today: Released {info['release']} &nbsp;|&nbsp; "
-                              f":material/code_blocks: Developed by {info['developer']} &nbsp;|&nbsp; "
-                              f":material/description: {info['short_description']}"}
-    selected_model = radio_buttons_with_captions(
-        option_caption_dict=model_options,
-        key=f"{model_type}_model",
-        scrollable=True,
-        default_option=prev_selected_model)
-
-    # more info button
-    friendly_name = model_info[selected_model]["friendly_name"]
-    if st.button(f":material/info: More info about :grey-background[{friendly_name}]", key=f"{model_type}_model_info_button"):
-        show_model_info(model_info[selected_model])
-
-    return selected_model
+# UNUSED FUNCTION - Vulture detected unused function
+# def select_model_widget(model_type, prev_selected_model):
+#     # prepare radio button options
+#     model_info = load_all_model_info(model_type)
+#     model_options = {}
+#     for key, info in model_info.items():
+#         model_options[key] = {"option": info["friendly_name"],
+#                               "caption": f":material/calendar_today: Released {info['release']} &nbsp;|&nbsp; "
+#                               f":material/code_blocks: Developed by {info['developer']} &nbsp;|&nbsp; "
+#                               f":material/description: {info['short_description']}"}
+#     selected_model = radio_buttons_with_captions(
+#         option_caption_dict=model_options,
+#         key=f"{model_type}_model",
+#         scrollable=True,
+#         default_option=prev_selected_model)
+# 
+#     # more info button
+#     friendly_name = model_info[selected_model]["friendly_name"]
+#     if st.button(f":material/info: More info about :grey-background[{friendly_name}]", key=f"{model_type}_model_info_button"):
+#         show_model_info(model_info[selected_model])
+# 
+#     return selected_model
 
 
 def load_all_model_info(type):
@@ -1923,21 +1710,22 @@ def get_video_datetime(file_path):
     return None
 
 
-def get_file_datetime(file_path):
-    # Try image EXIF
-    if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
-        dt = get_image_datetime(file_path)
-        if dt:
-            return dt
-
-    # Try video metadata
-    if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
-        dt = get_video_datetime(file_path)
-        if dt:
-            return dt
-
-    # Fallback: file modified time
-    return datetime.fromtimestamp(file_path.stat().st_mtime)
+# UNUSED FUNCTION - Vulture detected unused function
+# def get_file_datetime(file_path):
+#     # Try image EXIF
+#     if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
+#         dt = get_image_datetime(file_path)
+#         if dt:
+#             return dt
+# 
+#     # Try video metadata
+#     if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
+#         dt = get_video_datetime(file_path)
+#         if dt:
+#             return dt
+# 
+#     # Fallback: file modified time
+#     return datetime.fromtimestamp(file_path.stat().st_mtime)
 
 
 def get_image_gps(file_path):
@@ -1999,18 +1787,19 @@ def get_video_gps(file_path):
         return None
 
 
-def get_file_gps(file_path):
-    suffix = file_path.suffix.lower()
-
-    # Image formats
-    if suffix in ['.jpg', '.jpeg', '.png']:
-        return get_image_gps(file_path)
-
-    # Video formats
-    if suffix in ['.mp4', '.avi', '.mov', '.mkv']:
-        return get_video_gps(file_path)
-
-    return None
+# UNUSED FUNCTION - Vulture detected unused function
+# def get_file_gps(file_path):
+#     suffix = file_path.suffix.lower()
+# 
+#     # Image formats
+#     if suffix in ['.jpg', '.jpeg', '.png']:
+#         return get_image_gps(file_path)
+# 
+#     # Video formats
+#     if suffix in ['.mp4', '.avi', '.mov', '.mkv']:
+#         return get_video_gps(file_path)
+# 
+#     return None
 
 
 def check_folder_metadata():
@@ -2123,94 +1912,23 @@ def format_class_name(s):
         s = s.lower()
         return s
 
-
-# OLD POPOVER FUNCTION - CONVERTED TO MODAL  
-# show_cls_model_info_popover() has been replaced with modal_show_cls_model_info.open()
-
-# @st.dialog("Model information", width="large")
-# def show_model_info(model_info):
-#     friendly_name = model_info.get('friendly_name', None)
-#     if friendly_name and friendly_name != "":
-#         st.write("")
-#         print_widget_label("Name", "rocket_launch")
-#         st.write(friendly_name)
-#     # print_widget_label("Name", "rocket_launch")
-#     # st.write(model_name)
-
-#     description = model_info.get('description', None)
-#     if description and description != "":
-#         st.write("")
-#         print_widget_label("Description", "history_edu")
-#         st.write(description)
-
-#     all_classes = model_info.get('all_classes', None)
-#     if all_classes and all_classes != []:
-#         st.write("")
-#         print_widget_label("Classes", "pets")
-#         formatted_classes = [all_classes[0].replace('_', ' ').capitalize(
-#         )] + [cls.replace('_', ' ').lower() for cls in all_classes[1:]]
-#         output = ', '.join(
-#             formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
-#         st.write(output)
-
-#     developer = model_info.get('developer', None)
-#     if developer and developer != "":
-#         st.write("")
-#         print_widget_label("Developer", "code")
-#         st.write(developer)
-
-#     owner = model_info.get('owner', None)
-#     if owner and owner != "":
-#         st.write("")
-#         print_widget_label("Owner", "account_circle")
-#         st.write(owner)
-
-#     info_url = model_info.get('info_url', None)
-#     if info_url and info_url != "":
-#         st.write("")
-#         print_widget_label("More information", "info")
-#         st.write(info_url)
-
-#     citation = model_info.get('citation', None)
-#     if citation and citation != "":
-#         st.write("")
-#         print_widget_label("Citation", "article")
-#         st.write(citation)
-
-#     license = model_info.get('license', None)
-#     if license and license != "":
-#         st.write("")
-#         print_widget_label("License", "copyright")
-#         st.write(license)
-
-#     min_version = model_info.get('min_version', None)
-#     if min_version and min_version != "":
-#         st.write("")
-#         print_widget_label("Required AddaxAI version", "verified")
-#         needs_EA_update_bool = requires_addaxai_update(min_version)
-#         if needs_EA_update_bool:
-#             st.write(
-#                 f"This model requires AddaxAI version {min_version}. Your current AddaxAI version {current_AA_version} will not be able to run this model. An update is required. Update via the [Addax Data Science website](https://addaxdatascience.com/addaxai/).")
-#         else:
-#             st.write(
-#                 f"Current version of AddaxAI (v{current_AA_version}) is able to use this model. No update required.")
+# UNUSED FUNCTION - Vulture detected unused function
+# def load_model_info(model_name):
+#     return json.load(open(os.path.join(CLS_DIR, model_name, "variables.json"), "r"))
 
 
-def load_model_info(model_name):
-    return json.load(open(os.path.join(CLS_DIR, model_name, "variables.json"), "r"))
-
-
-def save_cls_classes(cls_model_key, slected_classes):
-    # load
-    model_info_json = os.path.join(
-        ADDAXAI_FILES_ST, "model_info.json")
-    with open(model_info_json, "r") as file:
-        model_info = json.load(file)
-    model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
-
-    # save
-    with open(model_info_json, "w") as file:
-        json.dump(model_info, file, indent=4)
+# UNUSED FUNCTION - Vulture detected unused function
+# def save_cls_classes(cls_model_key, slected_classes):
+#     # load
+#     model_info_json = os.path.join(
+#         ADDAXAI_FILES_ST, "model_info.json")
+#     with open(model_info_json, "r") as file:
+#         model_info = json.load(file)
+#     model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
+# 
+#     # save
+#     with open(model_info_json, "w") as file:
+#         json.dump(model_info, file, indent=4)
 
 
 def load_taxon_mapping(cls_model_ID):
@@ -2239,48 +1957,6 @@ def load_taxon_mapping_cached(cls_model_ID):
         st.session_state[cache_key] = load_taxon_mapping(cls_model_ID)
     
     return st.session_state[cache_key]
-
-
-# def slugify(text):
-#     """Create a slug-friendly string for the value keys."""
-#     text = text.lower()
-#     text = re.sub(r'\s+', '_', text)
-#     text = re.sub(r'[^a-z0-9_]+', '', text)
-#     return text
-
-# def flatten_single_child_nodes(nodes):
-#     flattened = []
-#     for node in nodes:
-#         if "children" in node and len(node["children"]) == 1:
-#             child = node["children"][0]
-#             grandchildren = child.get("children", [])
-
-#             # If child is leaf (no children), use child's label and value (likely model_class)
-#             if not grandchildren:
-#                 merged_label = child['label']
-#                 merged_value = child['value']
-#                 merged_children = []
-#             else:
-#                 # Child has children, keep parent's label/value
-#                 merged_label = node['label']
-#                 merged_value = node['value']
-#                 merged_children = flatten_single_child_nodes(grandchildren)
-
-#             merged_node = {
-#                 "label": merged_label,
-#                 "value": merged_value
-#             }
-#             if merged_children:
-#                 merged_node["children"] = merged_children
-
-#             flattened.append(merged_node)
-
-#         else:
-#             new_node = node.copy()
-#             if "children" in node and node["children"]:
-#                 new_node["children"] = flatten_single_child_nodes(node["children"])
-#             flattened.append(new_node)
-#     return flattened
 
 def sort_leaf_first(nodes):
     leaves = []
@@ -2403,7 +2079,7 @@ def build_taxon_tree(taxon_mapping):
 
     def dict_to_list(d):
         result = []
-        for node_key, node_val in d.items():
+        for _, node_val in d.items():  # node_key unused - Vulture detected unused variable
             children_list = dict_to_list(
                 node_val["children"]) if node_val["children"] else []
             node = {
@@ -2431,35 +2107,7 @@ def get_all_leaf_values(nodes):
             leaf_values.append(node["value"])
     return leaf_values
 
-selected_species = ["cow", "dog", "cat"]
-# the json is here: /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/cls/SAH-DRY-ADS-v1/variables.json
-# it looks like this:
-# {
-#     "model_fname": "sub_saharan_drylands_v1.pt",
-#     "description": "The Sub-Saharan Drylands model is a deep learning image classifier trained on 13 million camera trap images from diverse ecosystems across eastern and southern Africa. Covering 328 categories, primarily at the species level, it supports taxonomic fallback, predicting higher-level taxa (e.g., genus or family) when species-level certainty is low. The model is designed for wildlife identification across savannas, dry forests, arid shrublands, and semi-desert habitats. Training data includes images from South Africa, Tanzania, Kenya, Mozambique, Botswana, Namibia, Rwanda, Madagascar, and Uganda. All training images are open-source and available via LILA BC (https://lila.science/).",
-#     "developer": "Addax Data Science",
-#     "env": "pytorch",
-#     "type": "addax-sdzwa-pt",
-#     "download_info": [
-#     ],
-#     "citation": "https://joss.theoj.org/papers/10.21105/joss.05581",
-#     "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
-#     "total_download_size": "215 MB",
-#     "info_url": "https://addaxdatascience.com/",
-#     "all_classes": [
-#     ],
-#     "selected_classes": [
-#     ],
-#     "var_cls_detec_thresh": "0.40",
-#     "var_cls_detec_thresh_default": "0.40",
-#     "var_cls_class_thresh": "0.50",
-#     "var_cls_class_thresh_default": "0.50",
-#     "var_smooth_cls_animal": false,
-#     "var_tax_levels_idx": 0,
-#     "var_tax_fallback": true,
-#     "min_version": "6.16"
-# }
-# the selected_species should go into the "selected_classes" field of the json file
+
 
 def add_deployment_to_queue():
     
@@ -2489,12 +2137,6 @@ def add_deployment_to_queue():
     }
     
     # Add the new deployment to the queue
-    # st.write(f"previous_process_queue: {previous_process_queue}")
-    
-    # updated_process_queue = [new_deployment] + previous_process_queue
-    # st.write(f"updated_process_queue: {updated_process_queue}")
-    
-    # sleep_time.sleep(10)  # simulate processing time
     
     process_queue.append(new_deployment)
 
@@ -2543,21 +2185,6 @@ def write_selected_species(selected_species, cls_model_ID):
     # Load the existing JSON content
     with open(json_path, "r") as f:
         data = json.load(f)
-        
-    # # test
-    # all_classes = data["all_classes"]
-    
-    # missing = set(all_classes) - set(selected_species)  # in all_classes but not in selected_species
-    # extra = set(selected_species) - set(all_classes)    # in selected_species but not in all_classes
-
-    # st.write("Missing species:", len(missing))
-    # st.write("Missing species:", sorted(missing))
-    # st.write("Extra species:", len(extra))
-    # st.write("Extra species:", sorted(extra))
-    
-    # st.write("are the lists the same:", sorted(all_classes) == sorted(selected_species))
-        
-    # sleep_time.sleep(5)
     
     # Update the selected_classes field
     data["selected_classes"] = selected_species
@@ -2638,122 +2265,3 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
     return current_selected
     # st.write("Selected nodes:", current_selected)
 
-
-# def species_selector_widget(taxon_mapping):
-
-#     nodes = [
-#         {
-#             "label": "Class Mammalia", "value": "class_mammalia", "children": [
-#                 {
-#                     "label": "Order Rodentia", "value": "order_rodentia", "children": [
-#                         {
-#                             "label": "Family Sciuridae (squirrels)", "value": "family_sciuridae", "children": [
-#                                 {
-#                                     "label": "Genus Tamias (chipmunks)", "value": "genus_tamias", "children": [
-#                                         {"label": "Tamias striatus (eastern chipmunk)",
-#                                          "value": "tamias_striatus"},
-#                                         # This one is a species in genus Tamiasciurus, might move later
-#                                         {"label": "Tamiasciurus hudsonicus (red squirrel)", "value": "tamiasciurus_hudsonicus"}
-#                                     ]
-#                                 },
-#                                 {
-#                                     "label": "Genus Sciurus (tree squirrels)", "value": "genus_sciurus", "children": [
-#                                         {"label": "Sciurus niger (eastern fox squirrel)",
-#                                          "value": "sciurus_niger"},
-#                                         {"label": "Sciurus carolinensis (eastern gray squirrel)",
-#                                          "value": "sciurus_carolinensis"},
-#                                     ]
-#                                 },
-#                                 {
-#                                     "label": "Genus Marmota (marmots)", "value": "genus_marmota", "children": [
-#                                         {"label": "Marmota monax (groundhog)",
-#                                          "value": "marmota_monax"},
-#                                         {"label": "Marmota flaviventris (yellow-bellied marmot)",
-#                                          "value": "marmota_flaviventris"},
-#                                     ]
-#                                 },
-#                                 {"label": "Otospermophilus beecheyi (california ground squirrel)",
-#                                  "value": "otospermophilus_beecheyi"}
-#                             ]
-#                         },
-#                         {
-#                             "label": "Family Muridae (gerbils and relatives)", "value": "family_muridae", "children": [
-#                                 # add species/genus here if any
-#                             ]
-#                         },
-#                         {
-#                             "label": "Family Geomyidae (pocket gophers)", "value": "family_geomyidae", "children": [
-#                                 # add species/genus here if any
-#                             ]
-#                         },
-#                         {
-#                             "label": "Family Erethizontidae (new world porcupines)", "value": "family_erethizontidae", "children": [
-#                                 {"label": "Erethizon dorsatus (north american porcupine)",
-#                                  "value": "erethizon_dorsatus"}
-#                             ]
-#                         }
-#                     ]
-#                 }
-#             ]
-#         },
-#         {
-#             "label": "Class Squamata", "value": "class_squamata", "children": [
-#                 {
-#                     "label": "Order Squamata (squamates)", "value": "order_squamata"
-#                     # could add families/genera/species here if you have them
-#                 }
-#             ]
-#         }
-#     ]
-
-#     # Initialize state
-#     if "selected_nodes" not in st.session_state:
-#         st.session_state.selected_nodes = []
-#     if "expanded_nodes" not in st.session_state:
-#         st.session_state.expanded_nodes = []
-#     if "last_selected" not in st.session_state:
-#         st.session_state.last_selected = {}
-
-#     # UI
-#     with st.popover("Select from tree", use_container_width=True):
-#         selected = tree_select(
-#             nodes,
-#             check_model="leaf",
-#             checked=st.session_state.selected_nodes,
-#             expanded=st.session_state.expanded_nodes,
-#             show_expand_all=True,
-#             half_check_color="#086164",
-#             check_color="#086164",
-#             key="tree_select2"
-#         )
-
-#     # If the selection is new, update and rerun
-#     if selected is not None:
-#         new_checked = selected.get("checked", [])
-#         new_expanded = selected.get("expanded", [])
-#         last_checked = st.session_state.last_selected.get("checked", [])
-#         last_expanded = st.session_state.last_selected.get("expanded", [])
-
-#         if new_checked != last_checked or new_expanded != last_expanded:
-#             st.session_state.selected_nodes = new_checked
-#             st.session_state.expanded_nodes = new_expanded
-#             st.session_state.last_selected = selected
-#             st.rerun()  # 🔁 Force a rerun so the component picks up the change
-
-#     # Feedback
-
-#     def count_leaf_nodes(nodes):
-#         count = 0
-#         for node in nodes:
-#             if "children" in node and node["children"]:
-#                 count += count_leaf_nodes(node["children"])
-#             else:
-#                 count += 1
-#         return count
-
-#     # Example usage
-#     leaf_count = count_leaf_nodes(nodes)
-#     # st.write(f"Number of leaf nodes: {leaf_count}")
-
-#     st.write("You selected:", len(st.session_state.selected_nodes),
-#              " of ", leaf_count, "classes")
