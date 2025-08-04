@@ -39,7 +39,7 @@ import json
 # Third-party imports
 from streamlit_lottie import st_lottie
 from appdirs import user_config_dir, user_cache_dir
-
+ 
 
 # Local imports - global config must be imported before anything else
 from utils.config import *
