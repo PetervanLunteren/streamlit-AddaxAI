@@ -21,17 +21,12 @@ TODOs:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 - RDE
-- put all golabl variables in st.sessionstate, like model_meta, txts, vars, map, etc.
-- make function that checks the model_meta online and adds the variables.json file to the model folder if it does not exist
-- this must be offline, but I can only do that at the end when I know which icons I'm using.
+- material icons must be offline, but I can only do that at the end when I know which icons I'm using.
 - make it accessible for all models and envs
+- also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
 - add SpeciesNet
 - add video processing
-- reformat files and folders
 - reformat obj names, function names, and variable names, and classes, etc
-- clean up code, remove unused imports, etc
-- also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
-
 """
 
 # Standard library imports
