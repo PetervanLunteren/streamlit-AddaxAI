@@ -436,21 +436,20 @@ def add_location_modal(modal: Modal):
     # init vars from session state instead of persistent storage
     selected_lat = get_session_var("analyse_advanced", "selected_lat", None)
     selected_lng = get_session_var("analyse_advanced", "selected_lng", None)
-    exif_set = get_session_var("analyse_advanced", "exif_set", False)
     coords_found_in_exif = get_session_var("analyse_advanced", "coords_found_in_exif", False)
     exif_lat = get_session_var("analyse_advanced", "exif_lat", None)
     exif_lng = get_session_var("analyse_advanced", "exif_lng", None)
-
+    
     # update values if coordinates found in metadata
-    if coords_found_in_exif:
+    if coords_found_in_exif and exif_lat is not None and exif_lng is not None:
         info_box(
             f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}).")
-        if not exif_set:
+        # Always use EXIF coordinates if no coordinates are currently selected
+        if selected_lat is None and selected_lng is None:
             # Update session state instead of persistent storage
             update_session_vars("analyse_advanced", {
                 "selected_lat": exif_lat,
                 "selected_lng": exif_lng,
-                "exif_set": True,
             })
             st.rerun()
 
@@ -536,10 +535,10 @@ def add_location_modal(modal: Modal):
     # add brief lat lng popup on mouse click
     m.add_child(fl.LatLngPopup())
 
-    # render map in center
-    _, map_col, _ = st.columns([0.025, 0.95, 0.025])
-    with map_col:
-        map_data = st_folium(m, height=325, width=700)
+    # render map (component pre-initialized in main.py startup)
+    _, col_map_view, _ = st.columns([0.1, 1, 0.1])
+    with col_map_view:
+        map_data = st_folium(m, height=280, width=600)
 
     # update lat lng widgets when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
@@ -553,43 +552,43 @@ def add_location_modal(modal: Modal):
         st.rerun()
 
     # user input
-    col1, col2 = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1]) 
 
     # lat
     with col1:
         print_widget_label("Enter latitude or click on the map",
                            help_text="Enter the latitude of the location.")
-        old_lat = selected_lat if selected_lat is not None else 0.0
         new_lat = st.number_input(
             "Enter latitude or click on the map",
-            value=selected_lat,
+            value=selected_lat if selected_lat is not None else 0.0,
             format="%.6f",
             step=0.000001,
             min_value=-90.0,
             max_value=90.0,
             label_visibility="collapsed",
+            key="modal_lat_input"
         )
-        selected_lat = new_lat
-        if new_lat != old_lat:
-            st.rerun()
+        # Update session state if user manually changed the input
+        if new_lat != selected_lat:
+            set_session_var("analyse_advanced", "selected_lat", new_lat)
 
     # lng
     with col2:
         print_widget_label("Enter longitude or click on the map",
                            help_text="Enter the longitude of the location.")
-        old_lng = selected_lng if selected_lng is not None else 0.0
         new_lng = st.number_input(
             "Enter longitude or click on the map",
-            value=selected_lng,
+            value=selected_lng if selected_lng is not None else 0.0,
             format="%.6f",
             step=0.000001,
             min_value=-180.0,
             max_value=180.0,
             label_visibility="collapsed",
+            key="modal_lng_input"
         )
-        selected_lng = new_lng
-        if new_lng != old_lng:
-            st.rerun()
+        # Update session state if user manually changed the input
+        if new_lng != selected_lng:
+            set_session_var("analyse_advanced", "selected_lng", new_lng)
 
     # location ID
     print_widget_label("Enter unique location ID",
@@ -623,14 +622,13 @@ def add_location_modal(modal: Modal):
                 # if all good, add location
                 add_location(new_location_id, selected_lat, selected_lng)
                 
-                # reset session state variables and close modal
+                # clear EXIF data since it's been used, reset selection variables, close modal
                 update_session_vars("analyse_advanced", {
-                    "coords_found_in_exif": False,
-                    "exif_set": False,
-                    "exif_lat": None,
-                    "exif_lng": None,
                     "selected_lat": None,
                     "selected_lng": None,
+                    "coords_found_in_exif": False,
+                    "exif_lat": None,
+                    "exif_lng": None,
                     "show_modal_add_location": False
                 })
                 st.rerun()

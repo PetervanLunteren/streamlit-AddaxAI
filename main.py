@@ -41,6 +41,8 @@ import json
 from streamlit_lottie import st_lottie
 from appdirs import user_config_dir, user_cache_dir
 import folium
+from streamlit_folium import st_folium
+
 
 # Local imports - global config must be imported before anything else
 from utils.config import *
@@ -72,10 +74,6 @@ st.markdown("""
 with open(os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "css", "styles.css"), "r") as f:
     css_content = f.read()
 st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
-
-# DEBUG
-with st.expander("Session state", expanded=False):
-    st.write(st.session_state)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STARTUP INITIALIZATION (runs only when session_state is empty)
@@ -208,6 +206,12 @@ if st.session_state == {}:
     # Initialize Folium maps (render dummy to prepare marker system)
     m = folium.Map(location=[39.949610, -75.150282], zoom_start=16)
     folium.Marker([39.949610, -75.150282]).add_to(m)
+    with st.sidebar:
+        time.sleep(0.3)  # Ensure sidebar is ready before rendering
+        _ = st_folium(m, height=100, width=100)
+        time.sleep(0.3)  # Allow time for map to render
+        st.sidebar.empty()  # Clear the sidebar
+        time.sleep(0.3)
     
     # Archive previous session log and create fresh log (only on startup)
     log_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "logs", "log.txt")

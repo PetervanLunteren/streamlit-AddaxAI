@@ -193,7 +193,7 @@ if get_session_var("analyse_advanced", "show_modal_download_model", False):
 # modal for adding new project - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_project", False):
     modal_add_project = Modal(f"Adding project...", key="add_project", show_close_button=False)
-    with modal_add_project.container():
+    with modal_add_project.container(): 
         add_project_modal(modal_add_project)
 
 # modal for adding new location - only create when needed
@@ -206,7 +206,7 @@ if get_session_var("analyse_advanced", "show_modal_add_location", False):
 if get_session_var("analyse_advanced", "show_modal_cls_model_info", False):
     modal_show_cls_model_info = Modal(f"Model information", key="show_cls_model_info", show_close_button=False)
     with modal_show_cls_model_info.container():
-        # Get model info from session state when modal is open
+        # Get model info from session state when modal is open 
         model_info = get_session_var("analyse_advanced", "modal_cls_model_info_data", {})
         show_cls_model_info_modal(modal_show_cls_model_info, model_info)
 
