@@ -200,6 +200,9 @@ if st.session_state == {}:
     # This will show notifications for any new models that aren't in local filesystem
     fetch_latest_model_info()
     
+    # Reload model metadata after download to ensure session state has latest data
+    st.session_state["model_meta"] = load_model_metadata()
+    
     # Archive previous session log and create fresh log (only on startup)
     log_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "logs", "log.txt")
     previous_sessions_dir = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "logs", "previous_sessions")

@@ -11,6 +11,7 @@ import requests
 
 
 from utils.config import *
+from components.ui_helpers import info_box
 
 # MAP_FILE_PATH will be set from session state when available
 # This prevents errors when importing outside of Streamlit context
@@ -356,6 +357,7 @@ def fetch_latest_model_info():
     models_dir = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "models")
     
     try:
+        log("Starting model metadata download...")
         # Download latest model metadata with reasonable timeout
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0",
@@ -363,7 +365,9 @@ def fetch_latest_model_info():
             "Connection": "keep-alive"
         }
         
+        log(f"Downloading from: {model_meta_url}")
         response = requests.get(model_meta_url, timeout=10, headers=headers)
+        log(f"Response status: {response.status_code}")
         
         if response.status_code == 200:
             # Save updated model metadata

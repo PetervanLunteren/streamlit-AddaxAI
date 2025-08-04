@@ -118,7 +118,7 @@ class MultiProgressBars:
 
         self.update(pbar_id, n - self.states[pbar_id], text=label)
 
-    def update_from_tqdm_object(self, pbar):
+    def update_from_tqdm_object(self, pbar_id, pbar):
         """Update the progress bar directly from a tqdm object."""
         if pbar_id not in self.bars:
             return
