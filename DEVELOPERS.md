@@ -52,12 +52,12 @@ clear_vars("your_tool_name")
 ```
 
 ### **Category 2: Persistent Variables (JSON Files)**
-**Storage**: `vars/tool_name.json`  
+**Storage**: `config/tool_name.json`  
 **Purpose**: Variables that must survive session crashes and app restarts
 
 **Examples**:
 ```python
-# vars/analyse_advanced.json
+# config/analyse_advanced.json
 {
     "process_queue": [
         {
@@ -72,7 +72,7 @@ clear_vars("your_tool_name")
     ]
 }
 
-# vars/general_settings.json
+# config/general_settings.json
 {
     "lang": "en",
     "mode": 1,
@@ -347,14 +347,14 @@ When updating existing code:
 
 ```
 streamlit-AddaxAI/
-├── tools/                          # Individual tool implementations
-│   ├── analyse_advanced.py         # Example of properly implemented tool
-│   └── other_tool.py
+├── pages/                          # Individual page implementations
+│   ├── analysis_advanced.py        # Example of properly implemented page
+│   └── other_page.py
 ├── utils/
 │   ├── common.py                    # Session state helper functions
 │   └── tool_specific_utils.py
-├── vars/                            # Persistent storage (git-ignored)
-│   ├── analyse_advanced.json
+├── config/                          # Persistent storage (git-ignored)
+│   ├── analysis_advanced.json
 │   ├── general_settings.json
 │   └── other_tool.json
 └── ~/.config/AddaxAI/              # Global user data

@@ -63,8 +63,7 @@ from utils.config import *
 sys.stdout.reconfigure(line_buffering=True)
 # Note: stderr redirection moved to after TeeOutput setup to ensure errors are logged
 
-# Set Streamlit config file path
-os.environ["STREAMLIT_CONFIG"] = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", ".streamlit", "config.toml") 
+# Streamlit config is loaded from .streamlit/config.toml (standard location) 
 
 # Configure Streamlit page settings
 st.set_page_config(
@@ -147,8 +146,9 @@ if st.session_state == {}:
     # ─────────────────────────────────────────────────────────────────────────
     
     # Import utils now that shared session state exists (modules depend on it)
-    from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, print_widget_label, fetch_latest_model_info
-    from utils.analyse_advanced import load_known_projects, load_model_metadata
+    from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, fetch_latest_model_info
+    from components import print_widget_label
+    from utils.analysis_utils import load_known_projects, load_model_metadata
     
 
     
@@ -169,10 +169,10 @@ if st.session_state == {}:
             json.dump(map, f, indent=2)
 
     # Initialize general_settings.json if it doesn't exist
-    general_settings_file = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "vars", f"general_settings.json")
+    general_settings_file = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "config", f"general_settings.json")
     if not os.path.exists(general_settings_file):
         
-        # Create vars directory if needed
+        # Create config directory if needed
         os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
         
         # Create default settings
@@ -273,29 +273,29 @@ st.logo(os.path.join(ADDAXAI_FILES, "AddaxAI",
 
 # Create navigation based on selected mode
 if mode == 0:  # Simple mode - single analysis tool only
-    analyse_sim_page = st.Page(
-        os.path.join("tools", "analyse_simple.py"), title=txts["analyse_txt"], icon=":material/rocket_launch:")
-    pg = st.navigation([analyse_sim_page])
+    analysis_quick_page = st.Page(
+        os.path.join("pages", "analysis_quick.py"), title=txts["analyse_txt"], icon=":material/rocket_launch:")
+    pg = st.navigation([analysis_quick_page])
     
 elif mode == 1:  # Advanced mode - full toolkit
-    analyse_adv_page = st.Page(
-        os.path.join("tools", "analyse_advanced.py"), title=txts["analyse_txt"], icon=":material/add:")
-    repeat_detection_elimination_page = st.Page(
-        os.path.join("tools", "repeat_detection_elimination.py"), title="Repeat detection elimination", icon=":material/reset_image:")
-    verify_page = st.Page(
-        os.path.join("tools", "verify.py"), title="Human verification", icon=":material/checklist:")
+    analysis_advanced_page = st.Page(
+        os.path.join("pages", "analysis_advanced.py"), title=txts["analyse_txt"], icon=":material/add:")
+    remove_duplicates_page = st.Page(
+        os.path.join("pages", "remove_duplicates.py"), title="Remove duplicates", icon=":material/reset_image:")
+    human_verification_page = st.Page(
+        os.path.join("pages", "human_verification.py"), title="Human verification", icon=":material/checklist:")
     depth_estimation_page = st.Page(
-        os.path.join("tools", "depth_estimation.py"), title="Depth estimation", icon=":material/square_foot:")
-    explore_page = st.Page(
-        os.path.join("tools", "explore.py"), title="Explore results", icon=":material/bar_chart_4_bars:")
-    postprocess_page = st.Page(
-        os.path.join("tools", "postprocess.py"), title=txts["postprocess_txt"], icon=":material/stylus_note:")
+        os.path.join("pages", "depth_estimation.py"), title="Depth estimation", icon=":material/square_foot:")
+    explore_results_page = st.Page(
+        os.path.join("pages", "explore_results.py"), title="Explore results", icon=":material/bar_chart_4_bars:")
+    post_processing_page = st.Page(
+        os.path.join("pages", "post_processing.py"), title=txts["postprocess_txt"], icon=":material/stylus_note:")
     camera_management_page = st.Page(
-        os.path.join("tools", "camera_management.py"), title="Metadata management", icon=":material/photo_camera:")
+        os.path.join("pages", "camera_management.py"), title="Camera management", icon=":material/photo_camera:")
     settings_page = st.Page(
-        os.path.join("tools", "settings.py"), title=txts["settings_txt"], icon=":material/settings:")
-    pg = st.navigation([analyse_adv_page, repeat_detection_elimination_page, verify_page,
-                       depth_estimation_page, explore_page, postprocess_page, camera_management_page, settings_page])
+        os.path.join("pages", "settings.py"), title=txts["settings_txt"], icon=":material/settings:")
+    pg = st.navigation([analysis_advanced_page, remove_duplicates_page, human_verification_page,
+                       depth_estimation_page, explore_results_page, post_processing_page, camera_management_page, settings_page])
 
 # Run the selected page
 pg.run()
@@ -304,9 +304,10 @@ pg.run()
 # Sidebar controls (mode and project selection)
 # ─────────────────────────────────────────────────────────────────────────
 
-# Import utils
-from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, print_widget_label, logged_callback
-from utils.analyse_advanced import load_known_projects, load_model_metadata
+# Import utils and components
+from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, logged_callback
+from components import print_widget_label
+from utils.analysis_utils import load_known_projects, load_model_metadata
 
 # Mode selection options
 mode_options = {

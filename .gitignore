@@ -11,5 +11,10 @@ envs/*
 pyproject.toml
 vars/*
 models/*
+
+# ignore logs
 assets/logs/log.txt
 assets/logs/previous_sessions/*
+
+# Ignore test images
+data/test-images/*

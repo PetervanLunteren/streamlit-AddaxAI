@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 # from st_aggrid import GridOptionsBuilder  # UNUSED: Vulture detected unused import
 import os
-from utils.common import print_widget_label
+from components import print_widget_label
 
 def get_location_deployment_nested_dict(df):
     
