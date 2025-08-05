@@ -394,7 +394,7 @@ def run_cls(cls_modelID, json_fpath, pbars):
 
 def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
 
-    model_file = os.path.join(ADDAXAI_FILES_ST, "models", "det", det_modelID, model_meta["model_fname"]) #"/Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI/models/det/MD5A/md_v5a.0.0.pt"
+    model_file = os.path.join(ADDAXAI_FILES_ST, "models", "det", det_modelID, model_meta["model_fname"])
     command = [
         f"{ADDAXAI_FILES_ST}/envs/env-megadetector/bin/python",
         "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data", 

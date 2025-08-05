@@ -32,6 +32,9 @@ TODOs:
 - open a model when the folder_selection.py script is done with an info box saying a new window has opened. It the model will only close once the tkinter script is done sucessfully.
 - if NONE cls model is selected, then dont show the cls pbars. 
 - The pbars for progress should be taken care of. They should be updated, the texts proper,etc
+- if no CLS is selected, it should skip species selection and the button should be add to queue. 
+- the license warning should be for all models, not just the yolov11 models. Where?
+- delete the all_classes from the variables json? It should probabaly take it from the taxon csv right? That is redundant and error prone.
 """
 
 # Standard library imports
