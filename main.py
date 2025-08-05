@@ -1,5 +1,5 @@
 
-# WAAR WAS IK? Ik heb de MD modellen toegevoegd and de NONE sitaatie opgelost. Volgende stap is de CLS modellen aan HF toevoegen en dan zorgen dat ze allemaal werken. 
+# WAAR WAS IK? Ik heb de CLS modellen toegevoegd aan HF. NU moet ik nog even de nieuwe modellen toevoegen, zoals NZ species, en Gifu japan. Dan alle taxon-mappings.csv maken en erbij voegen. Dan alle readme's de license zetten etc.
 
 """
 AddaxAI Streamlit Application - Main Entry Point
