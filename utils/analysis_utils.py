@@ -715,7 +715,8 @@ def species_selector_modal(modal: Modal, nodes, all_leaf_values):
             show_expand_all=True,
             half_check_color="#086164",
             check_color="#086164",
-            key="modal_tree_select"
+            key="modal_tree_select",
+            show_tree_lines=True
         )
 
     # Handle selection update
