@@ -119,7 +119,7 @@ if get_session_var("analyse_advanced", "show_modal_none_model_info", False):
         f"#### Model information", key="show_none_model_info", show_close_button=False)
     with modal_show_none_model_info.container():
         show_none_model_info_modal()
-
+ 
 # modal for species selector - only create when needed
 if get_session_var("analyse_advanced", "show_modal_species_selector", False):
     modal_species_selector = Modal(
@@ -127,12 +127,12 @@ if get_session_var("analyse_advanced", "show_modal_species_selector", False):
     with modal_species_selector.container():
         # Get cached data from session state
         nodes = get_session_var("analyse_advanced", "modal_species_nodes", [])
-        all_leaf_values = get_session_var(
+        all_leaf_values = get_session_var( 
             "analyse_advanced", "modal_species_leaf_values", [])
         species_selector_modal(nodes, all_leaf_values)
 
 
-st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
+st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a  task of rearrangin the previous code.*")
 
 # header
 st.header(":material/rocket_launch: Add deployment to database", divider="grey")

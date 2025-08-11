@@ -1,5 +1,5 @@
 
-# WAAR WAS IK?
+# WAAR WAS IK? Ik was bezig met de cancel button van de install envs modal.
 # TODO: 
 # - Dan alle taxon-mappings.csv maken en bij HF voegen. 
 # - Alle readme's de license zetten etc.

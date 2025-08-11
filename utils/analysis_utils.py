@@ -51,9 +51,10 @@ import statistics
 import subprocess
 import csv
 import string
-import math
+import math 
+import shutil
 from collections import deque
-import time as sleep_time
+import time as sleep_time 
 from datetime import datetime, time  
 import os
 from pathlib import Path
@@ -65,7 +66,7 @@ import requests
 
 from PIL import Image
 import random
-from PIL.ExifTags import TAGS
+from PIL.ExifTags import TAGS 
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 import piexif
@@ -940,7 +941,7 @@ def download_model(
     download_key = f"download_in_progress_{download_modelID}"
     if st.session_state.get(download_key, False):
         st.info("Download already in progress... Please wait.")
-        if st.button("Cancel", use_container_width=True):
+        if st.button(":material/cancel: Cancel", use_container_width=True):
             # Reset the download flag and close modal
             st.session_state[download_key] = False
             set_session_var("analyse_advanced", "show_modal_download_model", False)
@@ -955,7 +956,7 @@ def download_model(
     
     # button_placeholder = st.empty()
     
-    if st.button("Cancel", use_container_width=True):
+    if st.button(":material/cancel: Cancel", use_container_width=True):
         set_session_var("analyse_advanced", "show_modal_download_model", False)
         modal.close()
         st.rerun()
@@ -1004,189 +1005,178 @@ def download_model(
     else:
         status_placeholder.error(f"Download failed! Please try again later.")
 
-def run_commands_stream(commands, title):
-    """Run a list of commands (list[list[str]]) and stream only the last 10 lines into one code box."""
-    with st.spinner(title):
-        with st.expander("show details", expanded=False):
-            with st.container(border=True, height=300):
-                output_placeholder = st.empty()
-
-                # deque keeps only last 10 lines
-                last_lines = deque(maxlen=10)
-                last_lines.append("booting up micromamba installation...\n")
-
-                output_placeholder.code("".join(last_lines), language="bash")
-
-                for idx, cmd in enumerate(commands, start=1):
-                    last_lines.append(f"$ {' '.join(cmd)}\n")
-                    output_placeholder.code("".join(last_lines), language="bash")
-
-                    process = subprocess.Popen(
-                        cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=1,
-                        shell=False,
-                    )
-
-                    # stream current command output
-                    for line in process.stdout:
-                        last_lines.append(line)
-                        output_placeholder.code("".join(last_lines), language="bash")
-
-                    process.stdout.close()
-                    rc = process.wait()
-
-                    if rc != 0:
-                        last_lines.append(f"\ncommand {idx} failed with exit code {rc}\n")
-                        output_placeholder.code("".join(last_lines), language="bash")
-                        return rc  # stop on first failure
-
-                return 0  # all good
+def cancel_installation(env_name, cancel_key):
+    """Helper function to handle cancellation logic"""
+    st.session_state[cancel_key] = True
+    st.warning("Installation cancelled by user.")
+    
+    # Kill the current process and all children if running
+    if st.session_state.get("current_process"):
+        try:
+            process = st.session_state["current_process"]
+            import signal
+            if os.name == 'nt':  # Windows
+                subprocess.Popen(f"TASKKILL /F /PID {process.pid} /T", shell=True)
+            else:  # Unix/Linux/macOS
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+            st.info("Process terminated.")
+        except Exception as e:
+            st.error(f"Could not kill process: {e}")
+    
+    # Clean up temp directory
+    temp_path = os.path.join(st.session_state["shared"]["TEMP_DIR"], f"env-{env_name}")
+    try:
+        if os.path.exists(temp_path):
+            shutil.rmtree(temp_path)
+            st.success("Cleaned up temporary files.")
+    except Exception as e:
+        st.error(f"Could not clean temp directory: {e}")
+    
+    # Close the modal immediately
+    set_session_var("analyse_advanced", "show_modal_install_env", False)
+    st.session_state[cancel_key] = False
+    st.session_state["current_process"] = None
+    st.rerun()
 
 def install_env(modal: Modal, env_name: str):
+    # Initialize cancel state
+    cancel_key = "cancel_env_installation"
+    if cancel_key not in st.session_state:
+        st.session_state[cancel_key] = False
+        
+    # info box
     info_box("The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing.")
+    
+    # Show cancel button at the top
+    _, col_cancel, _ = st.columns([1, 2, 1])
+    with col_cancel:
+        if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+            cancel_installation(env_name, cancel_key)
+    st.divider()
 
     environment_file = os.path.join(ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
-    prefix_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
+    final_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
+    temp_path = os.path.join(st.session_state["shared"]["TEMP_DIR"], f"env-{env_name}")
 
     if not os.path.exists(environment_file):
         st.error(f"environment.yml not found: {environment_file}")
         return
 
-    # build the command list
-    commands = [
-        [ 
-            MICROMAMBA, "-y",
-            "env", "create",
-            "-f", environment_file,
-            "-p", prefix_path,
-        ]
+    # Check if cancelled before starting
+    if st.session_state.get(cancel_key, False):
+        st.warning("Installation was cancelled by user.")
+        st.session_state[cancel_key] = False
+        set_session_var("analyse_advanced", "show_modal_install_env", False)
+        if st.button("Close", use_container_width=True):
+            st.rerun()
+        return
+
+    # Install to temp directory first
+    cmd = [
+        MICROMAMBA, "-y",
+        "env", "create", 
+        "-f", environment_file,
+        "-p", temp_path,
     ]
-
-    # add post-step(s)
-    # for speciesnet on macos we need to use --use-pep517 and we can't assign it to an environment yml file
-    # so we run it as a separate command after the environment is created
-    if env_name == "megadetector":
-        commands.append([
-            MICROMAMBA, "run", "-p", prefix_path,
-            "pip", "install", "--use-pep517", "speciesnet==5.0.1",
-        ])
-
-    rc = run_commands_stream(commands, f"installing virtual environment '{env_name}'...")
-
-    if st.button("Cancel and close", use_container_width=True):
-        st.warning("Installation cancelled. Window closes in 2 seconds.")
-        set_session_var("analyse_advanced", "show_modal_install_env", False)
-        sleep_time.sleep(2)
-        st.rerun()
-
-    if rc != 0:
-        st.error(f"Installation failed with exit code {rc}. See details below.")
-        # if st.button("Close window", use_container_width=True):
-        #     # Clear the session variable to prevent reopening the modal
-        #     set_session_var("analyse_advanced", "show_modal_install_env", False)
-        #     # modal.close()
-        #     st.rerun()
-    else:
-        info_box(f"Environment succesfully installed! Window closes in 2 seconds.")
-        sleep_time.sleep(2)
-        # Clear the session variable to prevent reopening the modal
-        set_session_var("analyse_advanced", "show_modal_install_env", False)
-        st.rerun()
-        
-        
-    # # Show result message above
-    # if rc == 0:
-    #     # Clear the session variable to prevent reopening the modal
-    #     set_session_var("analyse_advanced", "show_modal_install_env", False)
-    #     # modal.close()
-    # else:
-    #     st.error(f"Installation failed with exit code {process.returncode}.")
-    #     if st.button("Close window", use_container_width=True):
-    #         # Clear the session variable to prevent reopening the modal
-    #         set_session_var("analyse_advanced", "show_modal_install_env", False)
-    #         # modal.close()
-
-# def install_env(
-#     modal: Modal,
-#     env_name: str,
-# ):
     
-#     # modal.close()
+    # Store process in session state so cancel button can access it
+    if "current_process" not in st.session_state:
+        st.session_state["current_process"] = None
     
-#     info_box(
-#         "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
-#     )
+    # Placeholder for status messages above the expander
+    status_placeholder = st.empty()
     
-    # if st.button("Cancel", use_container_width=True):
-    #     st.warning("Installation cancelled. You can try again later.")
-    #     # Clear the session variable to prevent reopening the modal
-    #     set_session_var("analyse_advanced", "show_modal_install_env", False)
-    #     sleep_time.sleep(2)
-    #     modal.close()
-    #     return
-
-#     environment_file = os.path.join(ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
-#     prefix_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
-
-#     # sanity check helps a ton
-#     if not os.path.exists(environment_file):
-#         st.error(f"environment.yml not found: {environment_file}")
-#         return
-
-#     command = [
-#         MICROMAMBA,
-#         "-y",              # auto-yes (global flag) 
-#         "env", "create",
-#         "-f", environment_file,
-#         "-p", prefix_path,
-#     ]
-
-#     if env_name == "megadetector":
-#         command.extend([f"&& {MICROMAMBA} run -p {prefix_path} pip install speciesnet==5.0.1 --use-pep517"])
-
-#     with st.spinner(f"installing virtual environment '{env_name}'..."):
-#         with st.expander("show details", expanded=False):
-#             with st.container(border=True, height=250):
-#                 process = subprocess.Popen(
-#                     command,
-#                     stdout=subprocess.PIPE,
-#                     stderr=subprocess.STDOUT,
-#                     text=True,            # implies universal_newlines=True
-#                     bufsize=1,            # line-buffered
-#                     shell=False,          # <-- important
-#                 )
-
-#                 output_placeholder = st.empty()
-#                 output_lines = "booting up micromamba installation...\n\n"
-#                 output_placeholder.code(output_lines, language="bash")
-
-#                 for line in process.stdout:
-#                     output_lines += line
-#                     output_placeholder.code(output_lines, language="bash")
-
-#                 process.stdout.close()
-#                 rc = process.wait()
-
-#     if rc != 0:
-#         st.error(f"micromamba failed with exit code {rc}. see details above.")
-#     else:
-#         st.success(f"environment installed at: {prefix_path}")
-
-    # # ✅ Show result message above
-    # if process.returncode == 0:
-    #     # Clear the session variable to prevent reopening the modal
-    #     set_session_var("analyse_advanced", "show_modal_install_env", False)
-    #     modal.close()
-    # else:
-    #     status_placeholder.error(f"Installation failed with exit code {process.returncode}.")
-    #     if st.button("Close window", use_container_width=True):
-    #         # Clear the session variable to prevent reopening the modal
-    #         set_session_var("analyse_advanced", "show_modal_install_env", False)
-    #         modal.close()
-        
+    with st.spinner(f"Installing virtual environment '{env_name}'..."):
+        with st.expander("show details", expanded=False):
+            with st.container(border=True, height=300):
+                output_placeholder = st.empty()
+                
+                # deque keeps only last 10 lines
+                last_lines = deque(maxlen=10)
+                last_lines.append("booting up micromamba installation...\n")
+                output_placeholder.code("".join(last_lines), language="bash")
+                
+                last_lines.append(f"$ {' '.join(cmd)}\n")
+                output_placeholder.code("".join(last_lines), language="bash")
+                
+                try:
+                    # Create process with new process group for proper killing
+                    if os.name == 'nt':  # Windows
+                        process = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1,
+                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                        )
+                    else:  # Unix/Linux/macOS
+                        process = subprocess.Popen(
+                            cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT,
+                            text=True,
+                            bufsize=1,
+                            preexec_fn=os.setsid
+                        )
+                    
+                    st.session_state["current_process"] = process
+                    
+                    # Simple output reading - cancellation is handled by button killing process
+                    for line in process.stdout:
+                        last_lines.append(line)
+                        output_placeholder.code("".join(last_lines), language="bash")
+                    
+                    rc = process.wait()
+                    st.session_state["current_process"] = None
+                    
+                    if rc != 0:
+                        last_lines.append(f"\nInstallation failed with exit code {rc}\n")
+                        output_placeholder.code("".join(last_lines), language="bash")
+                        status_placeholder.error(f"Installation failed with exit code {rc}")
+                        return
+                    
+                    # Success - run post-install command if needed
+                    if env_name == "megadetector": 
+                        last_lines.append(f"\nInstalling additional package: speciesnet...\n")
+                        output_placeholder.code("".join(last_lines), language="bash")
+                        post_cmd = [
+                            MICROMAMBA, "run", "-p", temp_path,
+                            "pip", "install", "--use-pep517", "speciesnet==5.0.1",
+                        ]
+                        
+                        post_process = subprocess.run(post_cmd, capture_output=True, text=True)
+                        if post_process.returncode != 0:
+                            last_lines.append(f"Post-install failed: {post_process.stderr}\n")
+                            output_placeholder.code("".join(last_lines), language="bash")
+                            status_placeholder.error("Post-install failed")
+                            return
+                        else:
+                            last_lines.append(f"speciesnet installed successfully!\n")
+                            output_placeholder.code("".join(last_lines), language="bash")
+                    
+                    # Move from temp to final location
+                    last_lines.append(f"\nMoving environment to final location...\n")
+                    output_placeholder.code("".join(last_lines), language="bash")
+                    shutil.move(temp_path, final_path)
+                    
+                    last_lines.append(f"\nEnvironment installation completed successfully!\n")
+                    output_placeholder.code("".join(last_lines), language="bash")
+                        
+                except Exception as e:
+                    if "current_process" in st.session_state and st.session_state["current_process"]:
+                        st.session_state["current_process"] = None
+                    last_lines.append(f"\nInstallation error: {e}\n")
+                    output_placeholder.code("".join(last_lines), language="bash")
+                    status_placeholder.error(f"Installation error: {e}")
+                    return
+    
+    # Success!
+    status_placeholder.success("Environment successfully installed!")
+    sleep_time.sleep(2)
+    st.session_state[cancel_key] = False
+    set_session_var("analyse_advanced", "show_modal_install_env", False)
+    st.rerun()
    
 def project_selector_widget():
 
