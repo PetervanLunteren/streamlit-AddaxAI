@@ -1,5 +1,12 @@
 
-# WAAR WAS IK? Ik heb de CLS modellen toegevoegd aan HF. NU moet ik nog even de nieuwe modellen toevoegen, zoals NZ species, en Gifu japan. Dan alle taxon-mappings.csv maken en erbij voegen. Dan alle readme's de license zetten etc.
+# WAAR WAS IK?
+# TODO: 
+# - Dan alle taxon-mappings.csv maken en bij HF voegen. 
+# - Alle readme's de license zetten etc.
+# - zorgen dat de code de classes van de taxon-mappings.csv gebruikt, en niet de hardcoded classes in de yaml
+# - de yaml opschonen, er staat een hoop onzin vars in.
+# - de envs reqs maken
+
 
 """
 AddaxAI Streamlit Application - Main Entry Point

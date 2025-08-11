@@ -840,7 +840,7 @@
             "model_fname": "tas_ens_mewc.keras",
             "description": "The MEWC model for Tasmania has been trained on 2.5 million labelled images from 96 classes. It is based on the EfficientNet v2 Small model architecture, initialised with pre-trained ImageNet base weights. The classes include all non-volant terrestrial mammals (native and introduced) that are found in Tasmania, along with over 50 of the most-commonly observed bird species seen on camera traps. Most classes represent species, but there are also some general classes like snake or insect, and an unknown/washed-out special class. Based on held-out test data, the overall classification accuracy and f1 scores are >99%, and for the common species, accuracy typically exceeds 99.5%. The results for the rarest taxa are worse, but still over 90% in almost all cases.",
             "developer": "Barry Brook",
-            "env": "tensorflow",
+            "env": "tensorflow-v2",
             "type": "mewc-keras",
             "download_info": [
                 [
