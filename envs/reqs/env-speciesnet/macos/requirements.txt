@@ -1,2 +1,0 @@
---use-pep517
-speciesnet==5.0.1
