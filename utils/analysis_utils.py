@@ -52,6 +52,7 @@ import subprocess
 import csv
 import string
 import math
+from collections import deque
 import time as sleep_time
 from datetime import datetime, time  
 import os
@@ -1003,69 +1004,188 @@ def download_model(
     else:
         status_placeholder.error(f"Download failed! Please try again later.")
 
-def install_env(
-    modal: Modal,
-    env_name: str,
-):
-    
-    # modal.close()
-    
-    info_box(
-        "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
-    )
-    
-    if st.button("Cancel", use_container_width=True):
-        st.warning("Installation cancelled. You can try again later.")
-        # Clear the session variable to prevent reopening the modal
-        set_session_var("analyse_advanced", "show_modal_install_env", False)
-        sleep_time.sleep(2)
-        modal.close()
+def run_commands_stream(commands, title):
+    """Run a list of commands (list[list[str]]) and stream only the last 10 lines into one code box."""
+    with st.spinner(title):
+        with st.expander("show details", expanded=False):
+            with st.container(border=True, height=300):
+                output_placeholder = st.empty()
+
+                # deque keeps only last 10 lines
+                last_lines = deque(maxlen=10)
+                last_lines.append("booting up micromamba installation...\n")
+
+                output_placeholder.code("".join(last_lines), language="bash")
+
+                for idx, cmd in enumerate(commands, start=1):
+                    last_lines.append(f"$ {' '.join(cmd)}\n")
+                    output_placeholder.code("".join(last_lines), language="bash")
+
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1,
+                        shell=False,
+                    )
+
+                    # stream current command output
+                    for line in process.stdout:
+                        last_lines.append(line)
+                        output_placeholder.code("".join(last_lines), language="bash")
+
+                    process.stdout.close()
+                    rc = process.wait()
+
+                    if rc != 0:
+                        last_lines.append(f"\ncommand {idx} failed with exit code {rc}\n")
+                        output_placeholder.code("".join(last_lines), language="bash")
+                        return rc  # stop on first failure
+
+                return 0  # all good
+
+def install_env(modal: Modal, env_name: str):
+    info_box("The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing.")
+
+    environment_file = os.path.join(ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
+    prefix_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
+
+    if not os.path.exists(environment_file):
+        st.error(f"environment.yml not found: {environment_file}")
         return
 
+    # build the command list
+    commands = [
+        [ 
+            MICROMAMBA, "-y",
+            "env", "create",
+            "-f", environment_file,
+            "-p", prefix_path,
+        ]
+    ]
 
-    command = (
-        f"{MICROMAMBA} create -p {ADDAXAI_FILES_ST}/envs/env-{env_name} python=3.11 -y && "
-        f"{MICROMAMBA} run -p {ADDAXAI_FILES_ST}/envs/env-{env_name} pip install -r {ADDAXAI_FILES_ST}/envs/reqs/env-{env_name}/macos/requirements.txt"
-    )
-    
-    
-    status_placeholder = st.empty()
-    
-    # st.write("Running MegaDetector...")
-    with st.spinner(f"Installing virtual environment '{env_name}'..."):
-        with st.expander("Show details", expanded=False):
-            with st.container(border=True, height=250):
-                process = subprocess.Popen(
-                    command,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1,
-                    shell=True,
-                    universal_newlines=True
-                )
+    # add post-step(s)
+    # for speciesnet on macos we need to use --use-pep517 and we can't assign it to an environment yml file
+    # so we run it as a separate command after the environment is created
+    if env_name == "megadetector":
+        commands.append([
+            MICROMAMBA, "run", "-p", prefix_path,
+            "pip", "install", "--use-pep517", "speciesnet==5.0.1",
+        ])
 
-                output_placeholder = st.empty()
-                output_lines = "Booting up micromamba installation...\n\n"
-                output_placeholder.code(output_lines, language="bash")
-                for line in process.stdout:
-                    output_lines += line
-                    output_placeholder.code(output_lines, language="bash")
+    rc = run_commands_stream(commands, f"installing virtual environment '{env_name}'...")
 
-                process.stdout.close()
-                process.wait()
+    if st.button("Cancel and close", use_container_width=True):
+        st.warning("Installation cancelled. Window closes in 2 seconds.")
+        set_session_var("analyse_advanced", "show_modal_install_env", False)
+        sleep_time.sleep(2)
+        st.rerun()
 
-    # ✅ Show result message above
-    if process.returncode == 0:
+    if rc != 0:
+        st.error(f"Installation failed with exit code {rc}. See details below.")
+        # if st.button("Close window", use_container_width=True):
+        #     # Clear the session variable to prevent reopening the modal
+        #     set_session_var("analyse_advanced", "show_modal_install_env", False)
+        #     # modal.close()
+        #     st.rerun()
+    else:
+        info_box(f"Environment succesfully installed! Window closes in 2 seconds.")
+        sleep_time.sleep(2)
         # Clear the session variable to prevent reopening the modal
         set_session_var("analyse_advanced", "show_modal_install_env", False)
-        modal.close()
-    else:
-        status_placeholder.error(f"Installation failed with exit code {process.returncode}.")
-        if st.button("Close window", use_container_width=True):
-            # Clear the session variable to prevent reopening the modal
-            set_session_var("analyse_advanced", "show_modal_install_env", False)
-            modal.close()
+        st.rerun()
+        
+        
+    # # Show result message above
+    # if rc == 0:
+    #     # Clear the session variable to prevent reopening the modal
+    #     set_session_var("analyse_advanced", "show_modal_install_env", False)
+    #     # modal.close()
+    # else:
+    #     st.error(f"Installation failed with exit code {process.returncode}.")
+    #     if st.button("Close window", use_container_width=True):
+    #         # Clear the session variable to prevent reopening the modal
+    #         set_session_var("analyse_advanced", "show_modal_install_env", False)
+    #         # modal.close()
+
+# def install_env(
+#     modal: Modal,
+#     env_name: str,
+# ):
+    
+#     # modal.close()
+    
+#     info_box(
+#         "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
+#     )
+    
+    # if st.button("Cancel", use_container_width=True):
+    #     st.warning("Installation cancelled. You can try again later.")
+    #     # Clear the session variable to prevent reopening the modal
+    #     set_session_var("analyse_advanced", "show_modal_install_env", False)
+    #     sleep_time.sleep(2)
+    #     modal.close()
+    #     return
+
+#     environment_file = os.path.join(ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
+#     prefix_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
+
+#     # sanity check helps a ton
+#     if not os.path.exists(environment_file):
+#         st.error(f"environment.yml not found: {environment_file}")
+#         return
+
+#     command = [
+#         MICROMAMBA,
+#         "-y",              # auto-yes (global flag) 
+#         "env", "create",
+#         "-f", environment_file,
+#         "-p", prefix_path,
+#     ]
+
+#     if env_name == "megadetector":
+#         command.extend([f"&& {MICROMAMBA} run -p {prefix_path} pip install speciesnet==5.0.1 --use-pep517"])
+
+#     with st.spinner(f"installing virtual environment '{env_name}'..."):
+#         with st.expander("show details", expanded=False):
+#             with st.container(border=True, height=250):
+#                 process = subprocess.Popen(
+#                     command,
+#                     stdout=subprocess.PIPE,
+#                     stderr=subprocess.STDOUT,
+#                     text=True,            # implies universal_newlines=True
+#                     bufsize=1,            # line-buffered
+#                     shell=False,          # <-- important
+#                 )
+
+#                 output_placeholder = st.empty()
+#                 output_lines = "booting up micromamba installation...\n\n"
+#                 output_placeholder.code(output_lines, language="bash")
+
+#                 for line in process.stdout:
+#                     output_lines += line
+#                     output_placeholder.code(output_lines, language="bash")
+
+#                 process.stdout.close()
+#                 rc = process.wait()
+
+#     if rc != 0:
+#         st.error(f"micromamba failed with exit code {rc}. see details above.")
+#     else:
+#         st.success(f"environment installed at: {prefix_path}")
+
+    # # ✅ Show result message above
+    # if process.returncode == 0:
+    #     # Clear the session variable to prevent reopening the modal
+    #     set_session_var("analyse_advanced", "show_modal_install_env", False)
+    #     modal.close()
+    # else:
+    #     status_placeholder.error(f"Installation failed with exit code {process.returncode}.")
+    #     if st.button("Close window", use_container_width=True):
+    #         # Clear the session variable to prevent reopening the modal
+    #         set_session_var("analyse_advanced", "show_modal_install_env", False)
+    #         modal.close()
         
    
 def project_selector_widget():

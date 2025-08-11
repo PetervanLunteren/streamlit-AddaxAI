@@ -482,3 +482,41 @@ def logged_callback(func):
             raise
     
     return wrapper
+
+# Simple filesystem checks for model and environment availability
+# Lightweight operations that run on every check - no caching complexity
+
+def check_model_availability(model_type, model_id, model_meta):
+    """
+    Check model and environment availability.
+    Simple filesystem checks - no caching complexity.
+    
+    Args: 
+        model_type: 'cls' or 'det'
+        model_id: Model identifier
+        model_meta: Model metadata dictionary
+    
+    Returns:
+        dict: {
+            'env_exists': bool,
+            'model_exists': bool,
+            'env_name': str,
+            'model_fname': str,
+            'friendly_name': str
+        }
+    """
+    model_info = model_meta[model_type][model_id]
+    env_name = model_info["env"]
+    model_fname = model_info["model_fname"]
+    friendly_name = model_info["friendly_name"]
+    
+    env_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
+    model_path = os.path.join(ADDAXAI_FILES_ST, "models", model_type, model_id, model_fname)
+    
+    return {
+        'env_exists': os.path.exists(env_path),
+        'model_exists': os.path.exists(model_path),
+        'env_name': env_name,
+        'model_fname': model_fname,
+        'friendly_name': friendly_name
+    }

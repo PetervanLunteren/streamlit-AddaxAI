@@ -51,7 +51,7 @@ def get_os_name():
         return "linux"
 
 # Global OS identifier used throughout the application
-os_name = get_os_name()
+OS_NAME = get_os_name()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CORE DIRECTORY STRUCTURE
@@ -67,7 +67,7 @@ ADDAXAI_FILES_ST = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI")
 
 # Platform-specific micromamba binary for conda environment management
 # Used by tools to create and activate conda environments for different AI models
-MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", os_name, "micromamba")
+MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", OS_NAME, "micromamba")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MEDIA FILE PROCESSING CONSTANTS
