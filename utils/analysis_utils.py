@@ -38,7 +38,7 @@ Cache keys stored in st.session_state:
 """
 
 
-from streamlit_tree_select import tree_select
+from streamlit_tree_select import tree_select # pip install st-checkbox-tree
 import os
 import json
 import streamlit as st
@@ -69,7 +69,7 @@ from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 import piexif
 from tqdm import tqdm
-from streamlit_modal import Modal
+from st_modal import Modal
 
 
 from utils.common import load_vars, update_vars, replace_vars, load_map, clear_vars, unique_animal_string, get_session_var, set_session_var, update_session_vars  # requires_addaxai_update, - UNUSED: Vulture detected unused import
@@ -434,8 +434,20 @@ def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
         status_placeholder.error(
             f"Failed with exit code {process.returncode}.")
 
+# due to a bug there is extra whitespace below the map, so we use a custom class to reduce the height
+# https://discuss.streamlit.io/t/folium-map-white-space-under-the-map-on-the-first-rendering/84363
+def render_map(m, height, width):
+    st.markdown(f"""
+    <style>
+    iframe[title="streamlit_folium.st_folium"] {{ 
+        height: {height}px; 
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+    map_data = st_folium(m, height=height, width=width)
+    return map_data
 
-def add_location_modal(modal: Modal):
+def add_location_modal():
     # init vars from session state instead of persistent storage
     selected_lat = get_session_var("analyse_advanced", "selected_lat", None)
     selected_lng = get_session_var("analyse_advanced", "selected_lng", None)
@@ -539,18 +551,9 @@ def add_location_modal(modal: Modal):
     m.add_child(fl.LatLngPopup())
 
     # render map
-    # due to a bug there is extra whitespace below the map, so we use a custom class to reduce the height
-    # https://discuss.streamlit.io/t/folium-map-white-space-under-the-map-on-the-first-rendering/84363
     _, col_map_view, _ = st.columns([0.1, 1, 0.1])
     with col_map_view:
-        st.markdown("""
-        <style>
-        iframe[title="streamlit_folium.st_folium"] { 
-            height: 280px; 
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        map_data = st_folium(m, width=600)  # Height parameter is set in CSS control above
+        map_data = render_map(height=280, width=600, m=m) 
 
     # update lat lng widgets when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
@@ -611,7 +614,7 @@ def add_location_modal(modal: Modal):
     )
     new_location_id = new_location_id.strip()
 
-    col1, col2 = st.columns([1, 1])
+    col2, col1 = st.columns([1, 1])
 
     # button to save location
     with col1:
@@ -620,15 +623,18 @@ def add_location_modal(modal: Modal):
             # check validity
             if new_location_id == "":
                 st.error("Location ID cannot be empty.")
+            elif not is_valid_path_name(new_location_id):
+                invalid_chars = get_invalid_chars(new_location_id)
+                if invalid_chars:
+                    st.error(f"Location ID contains invalid characters: {', '.join(set(invalid_chars))}. Only letters, numbers, hyphens, and underscores are allowed.")
+                else:
+                    st.error("Location ID format is invalid. It cannot start with '.', '-', or end with '.', and cannot be a reserved system name.")
             elif new_location_id in known_locations.keys():
-                st.error(
-                    f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
+                st.error(f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
             elif selected_lat == 0.0 and selected_lng == 0.0:
-                st.error(
-                    "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
+                st.error("Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
             elif selected_lat is None or selected_lng is None:
-                st.error(
-                    "Error: Latitude and Longitude cannot be empty. Please select a valid location.")
+                st.error("Error: Latitude and Longitude cannot be empty. Please select a valid location.")
             else:
 
                 # if all good, add location
@@ -651,35 +657,95 @@ def add_location_modal(modal: Modal):
             set_session_var("analyse_advanced", "show_modal_add_location", False)
             st.rerun()
 
-
-def show_none_model_info_modal(modal: Modal):
-    st.markdown(
-        """
-        **Generic animal detection (no identification)**
-
-        Selecting this option means the system will use a general-purpose detection model that locates and labels objects only as:
-        - *animal*
-        - *vehicle*
-        - *person*
-
-        No species-level identification will be performed.
-
-        This option is helpful if:
-        - There is no suitable species identification model available.
-        - You want to filter out empty images.
-        - You want to ID the animals manually without using a idnetification model.
+def is_valid_path_name(name):
+    """
+    Check if a string contains only characters that are safe for file/folder names
+    across Windows, macOS, and Linux systems.
+    
+    Args:
+        name (str): The string to validate
         
-        If you want to use a specific species identification model, please select one from the dropdown menu.
-        """
-    )
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    if not name or name.strip() == "":
+        return False
+    
+    # Remove leading/trailing whitespace for checking
+    name = name.strip()
+    
+    # Characters that are generally safe across all systems
+    safe_chars = string.ascii_letters + string.digits + '-_'
+    
+    # Check if all characters are safe
+    if not all(c in safe_chars for c in name):
+        return False
+    
+    # Additional checks
+    if name.startswith('.'):  # Hidden files/folders
+        return False
+    if name.startswith('-'):  # Can cause issues with some commands
+        return False
+    if name.endswith('.'):    # Trailing periods can cause issues
+        return False
+    
+    # Reserved names in Windows
+    reserved_names = {
+        'CON', 'PRN', 'AUX', 'NUL',
+        'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+        'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+    }
+    if name.upper() in reserved_names:
+        return False
+    
+    return True
 
-    if st.button(":material/close: Close", use_container_width=True):
-        # Close modal by setting session state flag to False
-        set_session_var("analyse_advanced", "show_modal_none_model_info", False)
-        st.rerun()
+def get_invalid_chars(name):
+    """
+    Get list of invalid characters in a string for path names.
+    
+    Args:
+        name (str): The string to check
+        
+    Returns:
+        list: List of invalid characters found
+    """
+    safe_chars = string.ascii_letters + string.digits + '-_'
+    return [c for c in name if c not in safe_chars]
 
 
-def species_selector_modal(modal: Modal, nodes, all_leaf_values):
+def show_none_model_info_modal():
+    
+    with st.container(border=True, height=400):
+        st.markdown(
+            """
+            **Generic animal detection (no identification)**
+
+            Selecting this option means the system will use a general-purpose detection model that locates and labels objects only as:
+            - *animal*
+            - *vehicle*
+            - *person*
+
+            No species-level identification will be performed.
+
+            This option is helpful if:
+            - There is no suitable species identification model available.
+            - You want to filter out empty images.
+            - You want to ID the animals manually without using a idnetification model.
+            
+            If you want to use a specific species identification model, please select one from the dropdown menu.
+            """
+        )
+        
+    col1, _ = st.columns([1, 1])
+    with col1:
+        if st.button(":material/close: Close", use_container_width=True):
+            # Close modal by setting session state flag to False
+            set_session_var("analyse_advanced", "show_modal_none_model_info", False)
+            st.rerun()
+
+
+def species_selector_modal(nodes, all_leaf_values):
     butn_col1, butn_col2 = st.columns([1, 1])
     with butn_col1:
         select_all_clicked = st.button(":material/select_check_box: Select all", key="modal_expand_all_button", use_container_width=True)
@@ -706,7 +772,8 @@ def species_selector_modal(modal: Modal, nodes, all_leaf_values):
         selected_nodes = []  # Update local variable
         expanded_nodes = []
             
-    with st.container(border=True):
+    with st.container(border=True, height=400):
+        # pip install st-checkbox-tree
         selected = tree_select(
             nodes,
             check_model="leaf",
@@ -716,7 +783,8 @@ def species_selector_modal(modal: Modal, nodes, all_leaf_values):
             half_check_color="#086164",
             check_color="#086164",
             key="modal_tree_select",
-            show_tree_lines=True
+            show_tree_lines=True,
+            tree_line_color = "#e9e9eb"
         )
 
     # Handle selection update
@@ -735,7 +803,7 @@ def species_selector_modal(modal: Modal, nodes, all_leaf_values):
             })
             st.rerun()  # Force rerun
 
-    col1, col2 = st.columns([1, 1])
+    col2, col1 = st.columns([1, 1])
     with col1:
         if st.button(":material/check: Apply Selection", use_container_width=True, type="primary"):
             # Close modal by setting session state flag to False
@@ -749,69 +817,71 @@ def species_selector_modal(modal: Modal, nodes, all_leaf_values):
             st.rerun()
 
 
-def show_cls_model_info_modal(modal: Modal, model_info):
-    friendly_name = model_info.get('friendly_name', None)
-    if friendly_name and friendly_name != "":
-        st.write("")
-        print_widget_label("Name", "rocket_launch")
-        st.write(friendly_name)
+def show_cls_model_info_modal(model_info):
+    
+    with st.container(border=True, height=400):
+        friendly_name = model_info.get('friendly_name', None)
+        if friendly_name and friendly_name != "":
+            st.write("")
+            print_widget_label("Name", "rocket_launch")
+            st.write(friendly_name)
 
-    description = model_info.get('description', None)
-    if description and description != "":
-        st.write("")
-        print_widget_label("Description", "history_edu")
-        st.write(description)
+        description = model_info.get('description', None)
+        if description and description != "":
+            st.write("")
+            print_widget_label("Description", "history_edu")
+            st.write(description)
 
-    all_classes = model_info.get('all_classes', None)
-    if all_classes and all_classes != []:
-        st.write("")
-        print_widget_label("Classes", "pets")
-        formatted_classes = [format_class_name(cls) for cls in all_classes]
-        if len(formatted_classes) == 1:
-            string = formatted_classes[0] + "."
-        else:
-            string = ', '.join(formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
-        st.write(string.capitalize())
+        all_classes = model_info.get('all_classes', None)
+        if all_classes and all_classes != []:
+            st.write("")
+            print_widget_label("Classes", "pets")
+            formatted_classes = [format_class_name(cls) for cls in all_classes]
+            if len(formatted_classes) == 1:
+                string = formatted_classes[0] + "."
+            else:
+                string = ', '.join(formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
+            st.write(string.capitalize())
 
-    developer = model_info.get('developer', None)
-    if developer and developer != "":
-        st.write("")
-        print_widget_label("Developer", "code")
-        st.write(developer)
+        developer = model_info.get('developer', None)
+        if developer and developer != "":
+            st.write("")
+            print_widget_label("Developer", "code")
+            st.write(developer)
 
-    owner = model_info.get('owner', None)
-    if owner and owner != "":
-        st.write("")
-        print_widget_label("Owner", "account_circle")
-        st.write(owner)
+        owner = model_info.get('owner', None)
+        if owner and owner != "":
+            st.write("")
+            print_widget_label("Owner", "account_circle")
+            st.write(owner)
 
-    info_url = model_info.get('info_url', None)
-    if info_url and info_url != "":
-        st.write("")
-        print_widget_label("More information", "info")
-        st.write(info_url)
+        info_url = model_info.get('info_url', None)
+        if info_url and info_url != "":
+            st.write("")
+            print_widget_label("More information", "info")
+            st.write(info_url)
 
-    citation = model_info.get('citation', None)
-    if citation and citation != "":
-        st.write("")
-        print_widget_label("Citation", "article")
-        st.write(citation)
+        citation = model_info.get('citation', None)
+        if citation and citation != "":
+            st.write("")
+            print_widget_label("Citation", "article")
+            st.write(citation)
 
-    license = model_info.get('license', None)
-    if license and license != "":
-        st.write("")
-        print_widget_label("License", "copyright")
-        st.write(license)
+        license = model_info.get('license', None)
+        if license and license != "":
+            st.write("")
+            print_widget_label("License", "copyright")
+            st.write(license)
+            
+    col1, _ = st.columns([1, 1])
+    with col1:
+        if st.button(":material/close: Close", use_container_width=True):
+            # Close modal by setting session state flag to False
+            set_session_var("analyse_advanced", "show_modal_cls_model_info", False)
+            st.rerun()
 
-    if st.button(":material/close: Close", use_container_width=True):
-        # Close modal by setting session state flag to False
-        set_session_var("analyse_advanced", "show_modal_cls_model_info", False)
-        st.rerun()
 
-
-def add_project_modal(
-    modal: Modal
-):
+def add_project_modal():
     # load known projects IDs
     known_projects, _ = load_known_projects()
 
@@ -829,7 +899,7 @@ def add_project_modal(
         "Comments", height=150, label_visibility="collapsed")
     comments = comments.strip()
 
-    col1, col2 = st.columns([1, 1])
+    col2, col1 = st.columns([1, 1])
 
     # button to save project
     with col1:

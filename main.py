@@ -15,7 +15,7 @@ Architecture:
 - Startup detection: if st.session_state == {} triggers initialization
 
 CLI to run:
-cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py >> assets/logs/log.txt 2>&1 &
+cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py
 
 TODOs:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py

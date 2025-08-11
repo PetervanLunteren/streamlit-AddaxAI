@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from streamlit_modal import Modal
+from st_modal import Modal
 
 from utils.config import *
 
@@ -30,6 +30,18 @@ from utils.analysis_utils import (browse_directory_widget,
                                         show_none_model_info_modal,
                                         species_selector_modal
                                         )
+
+
+
+modal = Modal("#### **Bold** *Markdown* Title", key="test-modal")
+
+if st.button("Open Modal"):
+    modal.open()
+
+if modal.is_open():
+    with modal.container():
+        st.write("Now you can see the markdown title!")
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -107,13 +119,13 @@ def check_model_availability(model_type, model_id, model_meta):
 
 # modal for installing environment - only create when needed
 if get_session_var("analyse_advanced", "show_modal_install_env", False):
-    modal_install_env = Modal(f"Installing virtual environment", key="installing-env", show_close_button=False)
+    modal_install_env = Modal(f"Installing virtual environment", key="installing-env", show_close_button=True)
     with modal_install_env.container():
         install_env(modal_install_env, get_session_var("analyse_advanced", "required_env_name"))
 
 # modal for processing queue - only create when needed
 if get_session_var("analyse_advanced", "show_modal_process_queue", False):
-    modal_process_queue = Modal(f"Processing queue...", key="process_queue", show_close_button=False)
+    modal_process_queue = Modal(f"Processing queue...", key="process_queue", show_close_button=True)
     with modal_process_queue.container():
         # Process queue should always be loaded from persistent storage
         process_queue = analyse_advanced_vars.get("process_queue", [])
@@ -121,7 +133,7 @@ if get_session_var("analyse_advanced", "show_modal_process_queue", False):
 
 # modal for downloading models - only create when needed
 if get_session_var("analyse_advanced", "show_modal_download_model", False):
-    modal_download_model = Modal(f"Downloading model...", key="download_model", show_close_button=False)
+    modal_download_model = Modal(f"Downloading model...", key="download_model", show_close_button=True)
     with modal_download_model.container():
         download_model(modal_download_model, get_session_var("analyse_advanced", "download_modelID"), model_meta)
 
@@ -133,38 +145,38 @@ if get_session_var("analyse_advanced", "show_modal_download_model", False):
 
 # modal for adding new project - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_project", False):
-    modal_add_project = Modal(f"Adding project...", key="add_project", show_close_button=False)
+    modal_add_project = Modal(title="#### Describe new project", key="add_project", show_close_button=False)
     with modal_add_project.container(): 
-        add_project_modal(modal_add_project)
+        add_project_modal()
 
 # modal for adding new location - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_location", False):
-    modal_add_location = Modal(f"Adding location...", key="add_location", show_close_button=False)
+    modal_add_location = Modal(f"#### Describe new location", key="add_location", show_close_button=False)
     with modal_add_location.container():
-        add_location_modal(modal_add_location)
+        add_location_modal()
 
 # modal for showing classification model info - only create when needed
 if get_session_var("analyse_advanced", "show_modal_cls_model_info", False):
-    modal_show_cls_model_info = Modal(f"Model information", key="show_cls_model_info", show_close_button=False)
+    modal_show_cls_model_info = Modal(f"#### Model information", key="show_cls_model_info", show_close_button=False)
     with modal_show_cls_model_info.container():
         # Get model info from session state when modal is open 
         model_info = get_session_var("analyse_advanced", "modal_cls_model_info_data", {})
-        show_cls_model_info_modal(modal_show_cls_model_info, model_info)
+        show_cls_model_info_modal(model_info)
 
 # modal for showing none model info - only create when needed
 if get_session_var("analyse_advanced", "show_modal_none_model_info", False):
-    modal_show_none_model_info = Modal(f"Model information", key="show_none_model_info", show_close_button=False)
+    modal_show_none_model_info = Modal(f"#### Model information", key="show_none_model_info", show_close_button=False)
     with modal_show_none_model_info.container():
-        show_none_model_info_modal(modal_show_none_model_info)
+        show_none_model_info_modal()
 
 # modal for species selector - only create when needed
 if get_session_var("analyse_advanced", "show_modal_species_selector", False):
-    modal_species_selector = Modal(f"Select species", key="species_selector", show_close_button=False)
+    modal_species_selector = Modal(f"#### Select species", key="species_selector", show_close_button=False)
     with modal_species_selector.container():
         # Get cached data from session state
         nodes = get_session_var("analyse_advanced", "modal_species_nodes", [])
         all_leaf_values = get_session_var("analyse_advanced", "modal_species_leaf_values", [])
-        species_selector_modal(modal_species_selector, nodes, all_leaf_values)
+        species_selector_modal(nodes, all_leaf_values)
         
 
 st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a task of rearrangin the previous code.*")
