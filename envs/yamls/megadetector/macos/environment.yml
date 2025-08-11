@@ -1,0 +1,12 @@
+name: env-megadetector
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - megadetector==10.0.3
+      - ultralytics==8.3.177
+      - "--use-pep517"
+      - speciesnet==5.0.1

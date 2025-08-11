@@ -4,6 +4,8 @@ envs/*
 # But do NOT ignore the envs/reqs/ directory and its contents
 !envs/reqs/
 !envs/reqs/**
+!envs/yamls/
+!envs/yamls/**
 
 # rest of the instructions (order matters!)
 **/.DS_Store

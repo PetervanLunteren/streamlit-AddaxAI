@@ -6,7 +6,7 @@
             "model_fname": "Global - SpeciesNet - Google",
             "description": "SpeciesNet is an image classifier designed to accelerate the review of images from motion-triggered wildlife cameras ('camera traps'). This classifier was trained at Google using a large dataset of camera trap images and an EfficientNet V2 M architecture (https://arxiv.org/abs/2104.00574). It is designed to classify images into one of more than 2000 labels, covering diverse animal species, higher-level taxa (like 'mammalia' or 'felidae'), and non-animal classes ('blank', 'vehicle'). The SpeciesNet classifier is typically run in an ensemble with MegaDetector (https://github.com/agentmorris/MegaDetector), an object detector that identifies the locations and types of objects present in camera trap images, categorizing them as animals, humans, or vehicles. The SpeciesNet ensemble combines these two models using a set of heuristics and, optionally, geofencing rules and taxonomic aggregation that take into account the geographical origin of the image to improve the reliability of its species classification. This ensemble is used for image classification in the Wildlife Insights platform (https://www.wildlifeinsights.org/).",
             "developer": "Google",
-            "env": "speciesnet",
+            "env": "megadetector",
             "type": "",
             "download_info": [],
             "citation": "https://doi.org/10.1049/cvi2.12318",
@@ -1129,7 +1129,7 @@
             "description": "This model was trained by Mathias Tobler from the San Diego Zoo Wildlife Alliance. Information about the source of the training dataset and model metrics is not available.",
             "developer": "San Diego Zoo Wildlife Alliance",
             "type": "sdzwa-peru-amazon",
-            "env": "tensorflow",
+            "env": "tensorflow-v1",
             "download_info": [
                 [
                     "https://huggingface.co/Addax-Data-Science/Peruvian_Amazon/resolve/main/Peru-Amazon_0.86.h5?download=true",
