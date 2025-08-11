@@ -1059,7 +1059,7 @@
             "min_version": "4.4"
         },
         "NZI-ADS-v1": {
-            "friendly_name": "New Zealand Invasives",
+            "friendly_name": "New Zealand invasives",
             "emoji": "\ud83c\uddf3\ud83c\uddff",
             "model_fname": "new_zealand_v1.pt",
             "description": "Model to identify 17 species or higher-level taxons present in New Zealand. The model was trained on a set of approximately 2 million camera trap images from various projects across the country. These projects were run by multiple organizations and took place in a diverse range of habitats, using a variety of trail camera brands and models. The model has an overall validation accuracy, precision, and recall of 98%. When tested on an out-of-sample test set, the model scored 95%, 96%, and 94%, respectively. The model was designed to expedite the monitoring of New Zealand's invasive species (deer, possum, pig, cat, rodent, and mustelid).",
