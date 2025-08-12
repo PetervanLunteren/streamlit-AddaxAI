@@ -1,10 +1,12 @@
 
-# WAAR WAS IK? 
+# WAAR WAS IK? ik heb net alle taxon-mappings gemaakt en op HF gezet. NU moet de species selection worden aangepast op unknown taxonomies waarbij er later taxons worde gemerged. Zie bijvoorbeeld de IRAN species selection. Vraag Calude om te helpen. Caprinae moet iets worden van Caprinae (sheep+goat, _unknown or merged taxonomy_)
 # TODO: 
-# - Dan alle taxon-mappings.csv maken en bij HF voegen. 
 # - Alle readme's de license zetten etc.
 # - zorgen dat alle classify detections de nieuwe format gebruikt. 
 # - zorgen dat de code de classes van de taxon-mappings.csv gebruikt, en niet de hardcoded classes in de yaml
+# - daarna testen met een fresh install en schone conda env
+# - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
+# - dan opschonen, commenten, teksten, readme, mds, etc. 
 
 
 
