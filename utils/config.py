@@ -69,6 +69,9 @@ ADDAXAI_FILES_ST = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI")
 # Used by tools to create and activate conda environments for different AI models
 MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", OS_NAME, "micromamba")
 
+# folder for storing temporary files, like inomplete downloads
+TEMP_DIR = os.path.join(ADDAXAI_FILES_ST, "assets", "temp")
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MEDIA FILE PROCESSING CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -107,7 +110,7 @@ def log(msg):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Default detection model ID
-DEFAULT_DETECTION_MODEL = "MD5A"
+DEFAULT_DETECTION_MODEL = "MD5A-0-0"
 
 # Default classification model ID (NONE means no classification)
 DEFAULT_CLASSIFICATION_MODEL = "NONE"

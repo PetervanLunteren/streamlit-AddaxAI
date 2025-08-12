@@ -1,11 +1,11 @@
 
-# WAAR WAS IK? Ik was bezig met de cancel button van de install envs modal.
+# WAAR WAS IK? 
 # TODO: 
 # - Dan alle taxon-mappings.csv maken en bij HF voegen. 
 # - Alle readme's de license zetten etc.
+# - zorgen dat alle classify detections de nieuwe format gebruikt. 
 # - zorgen dat de code de classes van de taxon-mappings.csv gebruikt, en niet de hardcoded classes in de yaml
-# - de yaml opschonen, er staat een hoop onzin vars in.
-# - de envs reqs maken
+
 
 
 """
@@ -13,7 +13,7 @@ AddaxAI Streamlit Application - Main Entry Point
 
 This is the main entry point for the AddaxAI wildlife camera trap analysis platform.
 The application uses an optimized startup/rerun pattern to minimize I/O operations:
-- On startup (empty session_state): Load all files, initialize caches
+- On startup (empty session_state): Load all files, initialize caches 
 - On reruns: Use cached data from session_state for maximum performance
 
 Architecture:
@@ -32,7 +32,7 @@ TODOs:
 - make it accessible for all models and envs
 - also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
 - add SpeciesNet
-- add video processing
+- add video processing 
 - reformat obj names, function names, and variable names, and classes, etc
 - add GPU / CPU icon to pbars 
 - do the loading squirell in a modal too, to you cant click anything else while loading
@@ -42,6 +42,8 @@ TODOs:
 - if no CLS is selected, it should skip species selection and the button should be add to queue. 
 - the license warning should be for all models, not just the yolov11 models. Where?
 - delete the all_classes from the variables json? It should probabaly take it from the taxon csv right? That is redundant and error prone.
+- open a modal that tells the user to select a folder in a new window. That wat the user cannot click anything else while the folder selection is happening.
+- browse folder must open last chosen folder, not the root of the filesystem
 """
 
 # Standard library imports
@@ -133,15 +135,11 @@ if st.session_state == {}:
     CONFIG_DIR = user_config_dir("AddaxAI")
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
-    TEMP_DIR = os.path.join(user_cache_dir("AddaxAI"), "temp")
-    os.makedirs(TEMP_DIR, exist_ok=True)
-    
     MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
     
     # Store paths in session state for access by all tools
     st.session_state["shared"] = {
         "CONFIG_DIR": CONFIG_DIR,
-        "TEMP_DIR": TEMP_DIR,
         "MAP_FILE_PATH": MAP_FILE_PATH
         }
     

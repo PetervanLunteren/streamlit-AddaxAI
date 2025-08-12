@@ -12,7 +12,7 @@ OPTIMIZATION SUMMARY:
    - Eliminates 12+ load_vars() calls per rerun (previously: 4-6 file reads per step)
    - Model metadata cached globally (large JSON file, ~50KB)
 
-2. SMART CACHE INVALIDATION:
+2. SMART CACHE INVALIDATION: 
    - Map cache invalidated after any map.json updates (lines 256, 1033, 1126)
 
 3. CONDITIONAL OPERATIONS:
@@ -38,7 +38,7 @@ Cache keys stored in st.session_state:
 """
 
 
-from streamlit_tree_select import tree_select # pip install st-checkbox-tree
+from streamlit_tree_select import tree_select  # pip install st-checkbox-tree
 import os
 import json
 import streamlit as st
@@ -51,30 +51,26 @@ import statistics
 import subprocess
 import csv
 import string
-import math 
+import math
 import shutil
 from collections import deque
-import time as sleep_time 
-from datetime import datetime, time  
+import time as sleep_time
+from datetime import datetime, time
 import os
 from pathlib import Path
 from utils.huggingface_downloader import HuggingFaceRepoDownloader
 
 from datetime import datetime
-# import tarfile  # UNUSED: Vulture detected unused import
-import requests
 
 from PIL import Image
-import random
-from PIL.ExifTags import TAGS 
+from PIL.ExifTags import TAGS
 from hachoir.metadata import extractMetadata
 from hachoir.parser import createParser
 import piexif
-from tqdm import tqdm
-from st_modal import Modal
 
 
-from utils.common import load_vars, update_vars, replace_vars, load_map, clear_vars, unique_animal_string, get_session_var, set_session_var, update_session_vars  # requires_addaxai_update, - UNUSED: Vulture detected unused import
+# requires_addaxai_update, - UNUSED: Vulture detected unused import
+from utils.common import load_vars, update_vars, replace_vars, load_map, clear_vars, unique_animal_string, get_session_var, set_session_var, update_session_vars
 from components import MultiProgressBars, print_widget_label, info_box
 
 
@@ -96,22 +92,22 @@ with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
 def get_cached_vars(section, key=None, default=None):
     """
     ✅ OPTIMIZATION: Get configuration values from session state cache instead of file I/O
-    
+
     Replaces expensive load_vars() calls that read JSON files from disk.
     Uses cached values from main.py startup initialization.
-    
+
     Args:
         section: Configuration section name
         key: Specific key within section (optional)
         default: Default value if key not found
-    
+
     Returns:
         Configuration value(s) from session state cache
     """
     # For persistent vars that need fresh data, fall back to file I/O
     if section == "analyse_advanced":
         return load_vars(section=section)
-    
+
     # Use cached session state values for general settings
     if section == "general_settings":
         cached_general = {
@@ -119,43 +115,46 @@ def get_cached_vars(section, key=None, default=None):
             "mode": st.session_state["shared"]["mode"],
             "selected_projectID": st.session_state["shared"].get("selected_projectID", None)
         }
-        
+
         if key is not None:
             return cached_general.get(key, default)
         return cached_general
-    
+
     # Fallback to file I/O for unknown sections
     result = load_vars(section=section)
     return result.get(key, default) if key is not None else result
 
+
 def get_cached_model_meta():
     """
     ✅ OPTIMIZATION: Get model metadata from session state cache
-    
+
     Replaces load_model_metadata() calls that read large JSON files from disk.
     Uses cached values from main.py startup initialization.
     """
     return st.session_state["model_meta"]
 
+
 def get_cached_map():
     """
     ✅ OPTIMIZATION: Get global map configuration with caching
-    
+
     Caches the global map.json file to avoid repeated disk reads.
     Invalidates cache when map is updated.
     """
     map_cache_key = "cached_global_map"
     map_file_path = st.session_state["shared"]["MAP_FILE_PATH"]
-    
+
     # Check if cached and if file hasn't changed
     if map_cache_key in st.session_state:
         return st.session_state[map_cache_key], map_file_path
-    
+
     # Load from disk and cache
     map_data, map_file = load_map()
     st.session_state[map_cache_key] = map_data
-    
+
     return map_data, map_file
+
 
 def load_known_projects():
     map, _ = get_cached_map()
@@ -165,78 +164,82 @@ def load_known_projects():
         "selected_projectID")
     return projects, selected_projectID
 
+
 def invalidate_map_cache():
     """
     ✅ OPTIMIZATION: Invalidate map cache when map is updated
-    
+
     Call this function after any map.json updates to ensure fresh data.
     """
     map_cache_key = "cached_global_map"
     if map_cache_key in st.session_state:
         del st.session_state[map_cache_key]
 
+
 def run_process_queue(
-    modal: Modal,
     process_queue: str,
 ):
+    # Initialize cancel state
+    cancel_key = "cancel_processing"
+    if cancel_key not in st.session_state:
+        st.session_state[cancel_key] = False
+
     info_box(
         "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
         "It is recommended to avoid using your computer for other tasks, as the processing requires significant system resources. It may take a minute to boot up the processing, so please be patient."
     )
 
-    _, cancel_col, _ = st.columns([1, 2, 1])
-
-    with cancel_col:
-        if st.button(":material/cancel: Cancel", use_container_width=True):
-            # Set a flag to cancel processing and close modal
-            st.session_state["cancel_processing"] = True
-            set_session_var("analyse_advanced", "show_modal_process_queue", False)
-            modal.close()
-            st.rerun()
-            return
+    # Show cancel button at the top
+    _, col_cancel, _ = st.columns([1, 2, 1])
+    with col_cancel:
+        if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+            cancel_processing(cancel_key)
+    st.divider()
 
     # overall_progress = st.empty()
-    pbars = MultiProgressBars(container_label="Processing queue...",)
-    
-    pbars.add_pbar(pbar_id="detector",
-                   wait_label="Waiting...",
-                   pre_label="Starting up...",
-                   active_prefix="Detecting...",
-                   done_label="Finished detection!")
-    pbars.add_pbar(pbar_id="classifier",
-                   wait_label="Waiting for detection to finish...",
-                   pre_label="Starting up...",
-                   active_prefix="Classifying...",
-                   done_label="Finished classification!")
+    pbars = MultiProgressBars(container_label="Processing...",)
+
+    pbars.add_pbar(label="Detection", show_device=True)
+    pbars.add_pbar(label="Classification", show_device=True)
 
     # calculate the total number of deployments to process
-    process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
+    process_queue = get_cached_vars(
+        section="analyse_advanced").get("process_queue", [])
     total_deployment_idx = len(process_queue)
     current_deployment_idx = 1
 
+    # Check if cancelled before starting
+    if st.session_state.get(cancel_key, False):
+        st.warning("Processing was cancelled by user.")
+        st.session_state[cancel_key] = False
+        set_session_var("analyse_advanced", "show_modal_process_queue", False)
+        if st.button("Close", use_container_width=True):
+            st.rerun()
+        return
+
     # Clear any existing cancel flag
-    st.session_state["cancel_processing"] = False
-    
+    st.session_state[cancel_key] = False
+
     while True:
-        
+
         # Check if processing was cancelled
-        if st.session_state.get("cancel_processing", False):
+        if st.session_state.get(cancel_key, False):
             st.warning("Processing was cancelled by user.")
             break
-        
+
         # update the queue from file
-        process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
-        
+        process_queue = get_cached_vars(
+            section="analyse_advanced").get("process_queue", [])
+
         # run it on the first element
         if not process_queue:
             st.success("All deployments have been processed!")
             break
-        
+
         deployment = process_queue[0]
-            
         
-        
-        
+        # reset the pbars to 0
+        pbars.reset_all_pbars()
 
         # for idx, deployment in enumerate(process_queue):
         selected_folder = deployment['selected_folder']
@@ -244,77 +247,88 @@ def run_process_queue(
         selected_locationID = deployment['selected_locationID']
         selected_min_datetime = deployment['selected_min_datetime']
         selected_det_modelID = deployment['selected_det_modelID']
-        selected_cls_modelID = deployment['selected_cls_modelID'] 
-        
-        temp_json_path = os.path.join(selected_folder, "addaxai-deployment-temp.json")
-        perm_json_path = os.path.join(selected_folder, "addaxai-deployment.json")
+        selected_cls_modelID = deployment['selected_cls_modelID']
+
+        # Create JSON file with in-progress suffix during processing
+        in_progress_json_path = os.path.join(
+            selected_folder, "addaxai-deployment-in-progress.json")
+        final_json_path = os.path.join(
+            selected_folder, "addaxai-deployment.json")
 
         # run the MegaDetector
-        pbars.update_label(f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
-        
+        pbars.update_label(
+            f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
+
         model_meta = get_cached_model_meta()  # ✅ OPTIMIZED: Uses session state cache
-        
+
         # Check for cancellation before starting detection
-        if st.session_state.get("cancel_processing", False):
+        if st.session_state.get(cancel_key, False):
             break
-            
-        detection_success = run_md(selected_det_modelID, model_meta["det"][selected_det_modelID], selected_folder, temp_json_path, pbars)
-        
+
+        detection_success = run_md(
+            selected_det_modelID, model_meta["det"][selected_det_modelID], selected_folder, in_progress_json_path, pbars)
+
         # If detection was cancelled or failed, skip to next iteration
         if detection_success is False:
             continue
 
         # run the classifier
         if selected_cls_modelID:
-            # Check for cancellation before starting classification  
-            if st.session_state.get("cancel_processing", False):
+            # Check for cancellation before starting classification
+            if st.session_state.get(cancel_key, False):
                 break
-                
-            pbars.update_label("Running classifier...")
-            classification_success = run_cls(selected_cls_modelID, temp_json_path, pbars)
-            
+
+            classification_success = run_cls(
+                selected_cls_modelID, in_progress_json_path, pbars)
+
             # If classification was cancelled or failed, skip to next iteration
             if classification_success is False:
                 continue
-        
-        # if all processes are done, update the map file
-        if os.path.exists(temp_json_path):
-            
+
+        # if all processes are done, update the map file and rename to final
+        if os.path.exists(in_progress_json_path):
+
             # first add the deployment info to the map file
             map, map_file = get_cached_map()
             deployment_id = f"dep-{unique_animal_string()}"
-            deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get("deployments", {})
+            deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get(
+                "deployments", {})
             deployments[deployment_id] = {
                 "folder": selected_folder,
                 "min_datetime": selected_min_datetime,
                 "det_modelID": selected_det_modelID,
                 "cls_modelID": selected_cls_modelID
             }
-            
+
             # write the updated map to the map file
             map["projects"][selected_projectID]["locations"][selected_locationID]["deployments"] = deployments
-            
+
             with open(map_file, "w") as file:
                 json.dump(map, file, indent=2)
             # Invalidate map cache after update
             invalidate_map_cache()
-            
-            
-            # once that is done, move the deployment info to the deployment folder
-            os.rename(temp_json_path, perm_json_path)
-            
-            # # once that is done, remove the deployment from the process queue, so that it resumes the next deployment if something happens 
-            replace_vars(section="analyse_advanced", new_vars = {"process_queue": process_queue[1:]})
+
+            # Move from in-progress to final location only after successful completion
+            if os.path.exists(final_json_path):
+                os.remove(final_json_path)  # Remove existing if any
+            os.rename(in_progress_json_path, final_json_path)
+
+            # # once that is done, remove the deployment from the process queue, so that it resumes the next deployment if something happens
+            replace_vars(section="analyse_advanced", new_vars={
+                         "process_queue": process_queue[1:]})
             current_deployment_idx += 1
+            
+
+            
 
     # Clear the cancel flag when processing ends (whether completed or cancelled)
-    st.session_state["cancel_processing"] = False
-    
+    st.session_state[cancel_key] = False
+
     # Close modal by setting session state flag to False
     set_session_var("analyse_advanced", "show_modal_process_queue", False)
-    modal.close()
     st.rerun()
-    
+
+
 def run_cls(cls_modelID, json_fpath, pbars):
     """
     Run the classifier on the given deployment folder using the specified model ID.
@@ -322,15 +336,17 @@ def run_cls(cls_modelID, json_fpath, pbars):
     # Skip classification if no model selected
     if cls_modelID == "NONE":
         return True
-    
+
     # cls_model_file = os.path.join(CLS_DIR, f"{cls_modelID}.pt")
-    
+
     model_meta = get_cached_model_meta()  # ✅ OPTIMIZED: Uses session state cache
     model_info = model_meta['cls'][cls_modelID]
-    
-    cls_model_fpath = os.path.join(ADDAXAI_FILES_ST, "models", "cls", cls_modelID, model_info["model_fname"])
+
+    cls_model_fpath = os.path.join(
+        ADDAXAI_FILES_ST, "models", "cls", cls_modelID, model_info["model_fname"])
     python_executable = f"{ADDAXAI_FILES_ST}/envs/env-{model_info['env']}/bin/python"
-    inference_script = os.path.join(ADDAXAI_FILES_ST, "classification", "model_types", model_info["type"], "classify_detections.py")
+    inference_script = os.path.join(
+        ADDAXAI_FILES_ST, "classification", "model_types", model_info["type"], "classify_detections.py")
     AddaxAI_files = ADDAXAI_FILES
     cls_detec_thresh = 0.01
     cls_class_thresh = 0.01
@@ -338,7 +354,6 @@ def run_cls(cls_modelID, json_fpath, pbars):
     temp_frame_folder = "None"
     cls_tax_fallback = False
     cls_tax_levels_idx = 0
-
 
     command_args = []
     command_args.append(python_executable)
@@ -353,11 +368,10 @@ def run_cls(cls_modelID, json_fpath, pbars):
     command_args.append(str(cls_tax_fallback))
     command_args.append(str(cls_tax_levels_idx))
 
-
     # Set environment variables for subprocess
     env = os.environ.copy()
     env['PYTHONPATH'] = ADDAXAI_FILES_ST
-    
+
     status_placeholder = st.empty()
     process = subprocess.Popen(
         command_args,
@@ -378,28 +392,27 @@ def run_cls(cls_modelID, json_fpath, pbars):
             process.terminate()
             process.wait()
             return False
-            
+
         line = line.strip()
         log(line)
         # st.code(line)
-        pbars.update_from_tqdm_string("classifier", line)
+        pbars.update_from_tqdm_string("Classification", line)
 
     process.stdout.close()
     process.wait()
 
-    if not process.returncode == 0: 
+    if not process.returncode == 0:
         status_placeholder.error(
             f"Failed with exit code {process.returncode}.")
-        
 
 
+def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
 
-def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
-
-    model_file = os.path.join(ADDAXAI_FILES_ST, "models", "det", det_modelID, model_meta["model_fname"])
+    model_file = os.path.join(
+        ADDAXAI_FILES_ST, "models", "det", det_modelID, model_meta["model_fname"])
     command = [
         f"{ADDAXAI_FILES_ST}/envs/env-megadetector/bin/python",
-        "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data", 
+        "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data",
         model_file,
         deployment_folder,
         output_file
@@ -424,10 +437,10 @@ def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
             process.terminate()
             process.wait()
             return False
-            
+
         line = line.strip()
         print(line)
-        pbars.update_from_tqdm_string("detector", line)
+        pbars.update_from_tqdm_string("Detection", line)
 
     process.stdout.close()
     process.wait()
@@ -438,6 +451,8 @@ def run_md(det_modelID, model_meta, deployment_folder,output_file, pbars):
 
 # due to a bug there is extra whitespace below the map, so we use a custom class to reduce the height
 # https://discuss.streamlit.io/t/folium-map-white-space-under-the-map-on-the-first-rendering/84363
+
+
 def render_map(m, height, width):
     st.markdown(f"""
     <style>
@@ -449,18 +464,20 @@ def render_map(m, height, width):
     map_data = st_folium(m, height=height, width=width)
     return map_data
 
+
 def add_location_modal():
     # init vars from session state instead of persistent storage
     selected_lat = get_session_var("analyse_advanced", "selected_lat", None)
     selected_lng = get_session_var("analyse_advanced", "selected_lng", None)
-    coords_found_in_exif = get_session_var("analyse_advanced", "coords_found_in_exif", False)
+    coords_found_in_exif = get_session_var(
+        "analyse_advanced", "coords_found_in_exif", False)
     exif_lat = get_session_var("analyse_advanced", "exif_lat", None)
     exif_lng = get_session_var("analyse_advanced", "exif_lng", None)
-    
+
     # update values if coordinates found in metadata
     if coords_found_in_exif and exif_lat is not None and exif_lng is not None:
         info_box(
-            f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}). Due to an unkown bug, there might be a large white space between the map and the other input widgets. This should happen only once per cache state. If you remove your cache, it will be back.")
+            f"Coordinates from metadata have been preselected ({exif_lat:.6f}, {exif_lng:.6f}).")
         # Always use EXIF coordinates if no coordinates are currently selected
         if selected_lat is None and selected_lng is None:
             # Update session state instead of persistent storage
@@ -555,13 +572,13 @@ def add_location_modal():
     # render map
     _, col_map_view, _ = st.columns([0.1, 1, 0.1])
     with col_map_view:
-        map_data = render_map(height=280, width=600, m=m) 
+        map_data = render_map(height=280, width=600, m=m)
 
     # update lat lng widgets when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
         selected_lat = map_data["last_clicked"]["lat"]
         selected_lng = map_data["last_clicked"]["lng"]
-        # Update session state instead of persistent storage  
+        # Update session state instead of persistent storage
         update_session_vars("analyse_advanced", {
             "selected_lat": selected_lat,
             "selected_lng": selected_lng,
@@ -569,7 +586,7 @@ def add_location_modal():
         st.rerun()
 
     # user input
-    col1, col2 = st.columns([1, 1]) 
+    col1, col2 = st.columns([1, 1])
 
     # lat
     with col1:
@@ -628,20 +645,25 @@ def add_location_modal():
             elif not is_valid_path_name(new_location_id):
                 invalid_chars = get_invalid_chars(new_location_id)
                 if invalid_chars:
-                    st.error(f"Location ID contains invalid characters: {', '.join(set(invalid_chars))}. Only letters, numbers, hyphens, and underscores are allowed.")
+                    st.error(
+                        f"Location ID contains invalid characters: {', '.join(set(invalid_chars))}. Only letters, numbers, hyphens, and underscores are allowed.")
                 else:
-                    st.error("Location ID format is invalid. It cannot start with '.', '-', or end with '.', and cannot be a reserved system name.")
+                    st.error(
+                        "Location ID format is invalid. It cannot start with '.', '-', or end with '.', and cannot be a reserved system name.")
             elif new_location_id in known_locations.keys():
-                st.error(f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
+                st.error(
+                    f"Error: The ID '{new_location_id}' is already taken. Please choose a unique ID or select the required location ID from the dropdown menu.")
             elif selected_lat == 0.0 and selected_lng == 0.0:
-                st.error("Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
+                st.error(
+                    "Error: Latitude and Longitude cannot be (0, 0). Please select a valid location.")
             elif selected_lat is None or selected_lng is None:
-                st.error("Error: Latitude and Longitude cannot be empty. Please select a valid location.")
+                st.error(
+                    "Error: Latitude and Longitude cannot be empty. Please select a valid location.")
             else:
 
                 # if all good, add location
                 add_location(new_location_id, selected_lat, selected_lng)
-                
+
                 # clear EXIF data since it's been used, reset selection variables, close modal
                 update_session_vars("analyse_advanced", {
                     "selected_lat": None,
@@ -656,33 +678,35 @@ def add_location_modal():
     with col2:
         if st.button(":material/cancel: Cancel", use_container_width=True):
             # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced", "show_modal_add_location", False)
+            set_session_var("analyse_advanced",
+                            "show_modal_add_location", False)
             st.rerun()
+
 
 def is_valid_path_name(name):
     """
     Check if a string contains only characters that are safe for file/folder names
     across Windows, macOS, and Linux systems.
-    
+
     Args:
         name (str): The string to validate
-        
+
     Returns:
         bool: True if valid, False otherwise
     """
     if not name or name.strip() == "":
         return False
-    
+
     # Remove leading/trailing whitespace for checking
     name = name.strip()
-    
+
     # Characters that are generally safe across all systems
     safe_chars = string.ascii_letters + string.digits + '-_'
-    
+
     # Check if all characters are safe
     if not all(c in safe_chars for c in name):
         return False
-    
+
     # Additional checks
     if name.startswith('.'):  # Hidden files/folders
         return False
@@ -690,7 +714,7 @@ def is_valid_path_name(name):
         return False
     if name.endswith('.'):    # Trailing periods can cause issues
         return False
-    
+
     # Reserved names in Windows
     reserved_names = {
         'CON', 'PRN', 'AUX', 'NUL',
@@ -699,16 +723,17 @@ def is_valid_path_name(name):
     }
     if name.upper() in reserved_names:
         return False
-    
+
     return True
+
 
 def get_invalid_chars(name):
     """
     Get list of invalid characters in a string for path names.
-    
+
     Args:
         name (str): The string to check
-        
+
     Returns:
         list: List of invalid characters found
     """
@@ -717,7 +742,7 @@ def get_invalid_chars(name):
 
 
 def show_none_model_info_modal():
-    
+
     with st.container(border=True, height=400):
         st.markdown(
             """
@@ -738,34 +763,38 @@ def show_none_model_info_modal():
             If you want to use a specific species identification model, please select one from the dropdown menu.
             """
         )
-        
+
     col1, _ = st.columns([1, 1])
     with col1:
         if st.button(":material/close: Close", use_container_width=True):
             # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced", "show_modal_none_model_info", False)
+            set_session_var("analyse_advanced",
+                            "show_modal_none_model_info", False)
             st.rerun()
 
 
 def species_selector_modal(nodes, all_leaf_values):
     butn_col1, butn_col2 = st.columns([1, 1])
     with butn_col1:
-        select_all_clicked = st.button(":material/select_check_box: Select all", key="modal_expand_all_button", use_container_width=True)
+        select_all_clicked = st.button(
+            ":material/select_check_box: Select all", key="modal_expand_all_button", use_container_width=True)
     with butn_col2:
-        select_none_clicked = st.button(":material/check_box_outline_blank: Select none", key="modal_collapse_all_button", use_container_width=True)
-    
+        select_none_clicked = st.button(
+            ":material/check_box_outline_blank: Select none", key="modal_collapse_all_button", use_container_width=True)
+
     # Get current state
     selected_nodes = get_session_var("analyse_advanced", "selected_nodes", [])
     expanded_nodes = get_session_var("analyse_advanced", "expanded_nodes", [])
     last_selected = get_session_var("analyse_advanced", "last_selected", {})
-    
+
     # Handle button clicks after the buttons are rendered
     if select_all_clicked:
         # Use cached leaf values for faster performance
         set_session_var("analyse_advanced", "selected_nodes", all_leaf_values)
-        set_session_var("analyse_advanced", "last_selected", {"checked": all_leaf_values, "expanded": expanded_nodes})
+        set_session_var("analyse_advanced", "last_selected", {
+                        "checked": all_leaf_values, "expanded": expanded_nodes})
         selected_nodes = all_leaf_values  # Update local variable
-        
+
     if select_none_clicked:
         # Clear selection and update structured session state
         set_session_var("analyse_advanced", "selected_nodes", [])
@@ -773,7 +802,7 @@ def species_selector_modal(nodes, all_leaf_values):
         set_session_var("analyse_advanced", "last_selected", {})
         selected_nodes = []  # Update local variable
         expanded_nodes = []
-            
+
     with st.container(border=True, height=400):
         # pip install st-checkbox-tree
         selected = tree_select(
@@ -786,7 +815,7 @@ def species_selector_modal(nodes, all_leaf_values):
             check_color="#086164",
             key="modal_tree_select",
             show_tree_lines=True,
-            tree_line_color = "#e9e9eb"
+            tree_line_color="#e9e9eb"
         )
 
     # Handle selection update
@@ -809,18 +838,20 @@ def species_selector_modal(nodes, all_leaf_values):
     with col1:
         if st.button(":material/check: Apply Selection", use_container_width=True, type="primary"):
             # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced", "show_modal_species_selector", False)
+            set_session_var("analyse_advanced",
+                            "show_modal_species_selector", False)
             st.rerun()
 
     with col2:
         if st.button(":material/cancel: Cancel", use_container_width=True):
             # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced", "show_modal_species_selector", False)
+            set_session_var("analyse_advanced",
+                            "show_modal_species_selector", False)
             st.rerun()
 
 
 def show_cls_model_info_modal(model_info):
-    
+
     with st.container(border=True, height=400):
         friendly_name = model_info.get('friendly_name', None)
         if friendly_name and friendly_name != "":
@@ -842,7 +873,8 @@ def show_cls_model_info_modal(model_info):
             if len(formatted_classes) == 1:
                 string = formatted_classes[0] + "."
             else:
-                string = ', '.join(formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
+                string = ', '.join(
+                    formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
             st.write(string.capitalize())
 
         developer = model_info.get('developer', None)
@@ -874,12 +906,13 @@ def show_cls_model_info_modal(model_info):
             st.write("")
             print_widget_label("License", "copyright")
             st.write(license)
-            
+
     col1, _ = st.columns([1, 1])
     with col1:
         if st.button(":material/close: Close", use_container_width=True):
             # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced", "show_modal_cls_model_info", False)
+            set_session_var("analyse_advanced",
+                            "show_modal_cls_model_info", False)
             st.rerun()
 
 
@@ -889,14 +922,14 @@ def add_project_modal():
 
     # input for project ID
     print_widget_label("Unique project ID",
-                        help_text="This ID will be used to identify the project in the system.")
+                       help_text="This ID will be used to identify the project in the system.")
     project_id = st.text_input(
         "project ID", max_chars=50, label_visibility="collapsed")
     project_id = project_id.strip()
 
     # input for optional comments
     print_widget_label("Optionally add any comments or notes",
-                        help_text="This is a free text field where you can add any comments or notes about the project.")
+                       help_text="This is a free text field where you can add any comments or notes about the project.")
     comments = st.text_area(
         "Comments", height=150, label_visibility="collapsed")
     comments = comments.strip()
@@ -905,7 +938,7 @@ def add_project_modal():
 
     # button to save project
     with col1:
-        if st.button(":material/save: Save project", use_container_width=True, type ="primary"):
+        if st.button(":material/save: Save project", use_container_width=True, type="primary"):
 
             # check validity
             if not project_id.strip():
@@ -917,53 +950,51 @@ def add_project_modal():
 
                 # if all good, add project
                 add_project(project_id, comments)
-                
+
                 # Close modal by setting session state flag to False
-                set_session_var("analyse_advanced", "show_modal_add_project", False)
+                set_session_var("analyse_advanced",
+                                "show_modal_add_project", False)
                 st.rerun()
 
     with col2:
         if st.button(":material/cancel: Cancel", use_container_width=True):
             # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced", "show_modal_add_project", False)
+            set_session_var("analyse_advanced",
+                            "show_modal_add_project", False)
             st.rerun()
 
+
 def download_model(
-    modal: Modal,
     download_modelID: str,
     model_meta: dict,
     # pabrs: MultiProgressBars,
 ):
-    
-    # modal.close()
-    
+    # Initialize cancel state
+    cancel_key = "cancel_model_download"
+    if cancel_key not in st.session_state:
+        st.session_state[cancel_key] = False
+
     # Check if download is already in progress to prevent multiple simultaneous downloads
     download_key = f"download_in_progress_{download_modelID}"
     if st.session_state.get(download_key, False):
         st.info("Download already in progress... Please wait.")
-        if st.button(":material/cancel: Cancel", use_container_width=True):
-            # Reset the download flag and close modal
-            st.session_state[download_key] = False
-            set_session_var("analyse_advanced", "show_modal_download_model", False)
-            modal.close()
-            st.rerun()
-            return
+        # Show cancel button at the top during ongoing download
+        _, col_cancel, _ = st.columns([1, 2, 1])
+        with col_cancel:
+            if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+                cancel_download(download_modelID, cancel_key)
         return
-    
+
     info_box(
         "The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing."
     )
-    
-    # button_placeholder = st.empty()
-    
-    if st.button(":material/cancel: Cancel", use_container_width=True):
-        set_session_var("analyse_advanced", "show_modal_download_model", False)
-        modal.close()
-        st.rerun()
-        return
 
-    # Set flag to indicate download is starting
-    st.session_state[download_key] = True
+    # Show cancel button at the top
+    _, col_cancel, _ = st.columns([1, 2, 1])
+    with col_cancel:
+        if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+            cancel_download(download_modelID, cancel_key)
+    st.divider()
 
     # check if it is an detection or classification model
     if download_modelID in model_meta['det']:
@@ -972,81 +1003,171 @@ def download_model(
     elif download_modelID in model_meta['cls']:
         download_model_info = model_meta['cls'][download_modelID]
         download_model_type = "cls"
-    
-    download_dir = os.path.join(ADDAXAI_FILES_ST, "models", download_model_type, download_modelID)
-    status_placeholder = st.empty()
-    
-    # Initialize your UI progress bars
-    ui_pbars = MultiProgressBars("Progress")
-    ui_pbars.add_pbar("download", "Preparing download...", "Downloading...", "Download complete!")
-    
-    downloader = HuggingFaceRepoDownloader()
-    success = downloader.download_repo(
-        model_ID=download_modelID,
-        local_dir=download_dir,
-        ui_pbars=ui_pbars,
-        pbar_id="download"
-    )
-    
-    # Save model metadata to JSON TODO dit moet via een andere functie die bij opening dat gaat checken
-    variables_path = os.path.join(download_dir, "variables.json")
-    with open(variables_path, "w") as f:
-        json.dump(download_model_info, f, indent=4)
 
-    # Reset the download flag when download completes
-    st.session_state[download_key] = False
-    
-    # Show result message above
-    if success:
+    final_dir = os.path.join(ADDAXAI_FILES_ST, "models",
+                             download_model_type, download_modelID)
+    temp_dir = os.path.join(TEMP_DIR, f"model-{download_modelID}")
+
+    # Check if cancelled before starting
+    if st.session_state.get(cancel_key, False):
+        st.warning("Download was cancelled by user.")
+        st.session_state[cancel_key] = False
+        set_session_var("analyse_advanced", "show_modal_download_model", False)
+        if st.button("Close", use_container_width=True):
+            st.rerun()
+        return
+
+    # Set flag to indicate download is starting
+    st.session_state[download_key] = True
+
+    status_placeholder = st.empty()
+
+    # Initialize your UI progress bars
+    ui_pbars = MultiProgressBars(container_label = None)
+    ui_pbars.add_pbar(label="Download")
+
+    try:
+        # Download to temp directory first
+        downloader = HuggingFaceRepoDownloader()
+        success = downloader.download_repo(
+            model_ID=download_modelID,
+            local_dir=temp_dir,
+            ui_pbars=ui_pbars,
+            pbar_id="Download"
+        )
+
+        if not success:
+            status_placeholder.error(
+                f"Download failed! Please try again later.")
+            st.session_state[download_key] = False
+            return
+
+        # Save model metadata to JSON in temp directory first
+        variables_path = os.path.join(temp_dir, "variables.json")
+        with open(variables_path, "w") as f:
+            json.dump(download_model_info, f, indent=4)
+
+        # Move from temp to final location only after successful completion
+        status_placeholder.info("Moving model to final location...")
+        if os.path.exists(final_dir):
+            shutil.rmtree(final_dir)  # Remove existing if any
+        shutil.move(temp_dir, final_dir)
+
+        # Reset the download flag when download completes
+        st.session_state[download_key] = False
+
+        # Show result message
+        status_placeholder.success("Model downloaded successfully!")
+        sleep_time.sleep(2)
+
         # Close modal by setting session state flag to False
         set_session_var("analyse_advanced", "show_modal_download_model", False)
-        modal.close()
         st.rerun()
-    else:
-        status_placeholder.error(f"Download failed! Please try again later.")
+
+    except Exception as e:
+        st.session_state[download_key] = False
+        status_placeholder.error(f"Download error: {e}")
+        # Clean up temp directory on error
+        if os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+
 
 def cancel_installation(env_name, cancel_key):
     """Helper function to handle cancellation logic"""
     st.session_state[cancel_key] = True
     st.warning("Installation cancelled by user.")
-    
+
     # Kill the current process and all children if running
     if st.session_state.get("current_process"):
         try:
             process = st.session_state["current_process"]
             import signal
             if os.name == 'nt':  # Windows
-                subprocess.Popen(f"TASKKILL /F /PID {process.pid} /T", shell=True)
+                subprocess.Popen(
+                    f"TASKKILL /F /PID {process.pid} /T", shell=True)
             else:  # Unix/Linux/macOS
                 os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             st.info("Process terminated.")
         except Exception as e:
             st.error(f"Could not kill process: {e}")
-    
+
     # Clean up temp directory
-    temp_path = os.path.join(st.session_state["shared"]["TEMP_DIR"], f"env-{env_name}")
+    temp_path = os.path.join(TEMP_DIR, f"env-{env_name}")
     try:
         if os.path.exists(temp_path):
             shutil.rmtree(temp_path)
             st.success("Cleaned up temporary files.")
     except Exception as e:
         st.error(f"Could not clean temp directory: {e}")
-    
+
     # Close the modal immediately
     set_session_var("analyse_advanced", "show_modal_install_env", False)
     st.session_state[cancel_key] = False
     st.session_state["current_process"] = None
     st.rerun()
 
-def install_env(modal: Modal, env_name: str):
+
+def cancel_download(download_modelID, cancel_key):
+    """Helper function to handle download cancellation logic"""
+    st.session_state[cancel_key] = True
+    st.warning("Download cancelled by user.")
+
+    # Clean up temp directory
+    temp_path = os.path.join(TEMP_DIR, f"model-{download_modelID}")
+    try:
+        if os.path.exists(temp_path):
+            shutil.rmtree(temp_path)
+            st.success("Cleaned up temporary files.")
+    except Exception as e:
+        st.error(f"Could not clean temp directory: {e}")
+
+    # Reset the download flag
+    download_key = f"download_in_progress_{download_modelID}"
+    st.session_state[download_key] = False
+
+    # Close the modal immediately
+    set_session_var("analyse_advanced", "show_modal_download_model", False)
+    st.session_state[cancel_key] = False
+    st.rerun()
+
+
+def cancel_processing(cancel_key):
+    """Helper function to handle processing cancellation logic"""
+    st.session_state[cancel_key] = True
+    st.warning("Processing cancelled by user.")
+
+    # Clean up in-progress JSON files from deployment folders
+    try:
+        process_queue = get_cached_vars(
+            section="analyse_advanced").get("process_queue", [])
+        for deployment in process_queue:
+            selected_folder = deployment['selected_folder']
+            in_progress_json_path = os.path.join(
+                selected_folder, "addaxai-deployment-in-progress.json")
+            if os.path.exists(in_progress_json_path):
+                os.remove(in_progress_json_path)
+        st.success("Cleaned up in-progress processing files.")
+    except Exception as e:
+        st.error(f"Could not clean files: {e}")
+
+    # Close the modal immediately
+    set_session_var("analyse_advanced", "show_modal_process_queue", False)
+    st.session_state[cancel_key] = False
+    st.rerun()
+
+
+def install_env(env_name: str):
     # Initialize cancel state
     cancel_key = "cancel_env_installation"
     if cancel_key not in st.session_state:
         st.session_state[cancel_key] = False
-        
+
     # info box
     info_box("The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing.")
-    
+
     # Show cancel button at the top
     _, col_cancel, _ = st.columns([1, 2, 1])
     with col_cancel:
@@ -1054,9 +1175,10 @@ def install_env(modal: Modal, env_name: str):
             cancel_installation(env_name, cancel_key)
     st.divider()
 
-    environment_file = os.path.join(ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
+    environment_file = os.path.join(
+        ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
     final_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
-    temp_path = os.path.join(st.session_state["shared"]["TEMP_DIR"], f"env-{env_name}")
+    temp_path = os.path.join(TEMP_DIR, f"env-{env_name}")
 
     if not os.path.exists(environment_file):
         st.error(f"environment.yml not found: {environment_file}")
@@ -1074,31 +1196,31 @@ def install_env(modal: Modal, env_name: str):
     # Install to temp directory first
     cmd = [
         MICROMAMBA, "-y",
-        "env", "create", 
+        "env", "create",
         "-f", environment_file,
         "-p", temp_path,
     ]
-    
+
     # Store process in session state so cancel button can access it
     if "current_process" not in st.session_state:
         st.session_state["current_process"] = None
-    
+
     # Placeholder for status messages above the expander
     status_placeholder = st.empty()
-    
+
     with st.spinner(f"Installing virtual environment '{env_name}'..."):
         with st.expander("show details", expanded=False):
             with st.container(border=True, height=300):
                 output_placeholder = st.empty()
-                
+
                 # deque keeps only last 10 lines
                 last_lines = deque(maxlen=10)
                 last_lines.append("booting up micromamba installation...\n")
                 output_placeholder.code("".join(last_lines), language="bash")
-                
+
                 last_lines.append(f"$ {' '.join(cmd)}\n")
                 output_placeholder.code("".join(last_lines), language="bash")
-                
+
                 try:
                     # Create process with new process group for proper killing
                     if os.name == 'nt':  # Windows
@@ -1119,65 +1241,85 @@ def install_env(modal: Modal, env_name: str):
                             bufsize=1,
                             preexec_fn=os.setsid
                         )
-                    
+
                     st.session_state["current_process"] = process
-                    
+
                     # Simple output reading - cancellation is handled by button killing process
                     for line in process.stdout:
                         last_lines.append(line)
-                        output_placeholder.code("".join(last_lines), language="bash")
-                    
+                        output_placeholder.code(
+                            "".join(last_lines), language="bash")
+
                     rc = process.wait()
                     st.session_state["current_process"] = None
-                    
+
                     if rc != 0:
-                        last_lines.append(f"\nInstallation failed with exit code {rc}\n")
-                        output_placeholder.code("".join(last_lines), language="bash")
-                        status_placeholder.error(f"Installation failed with exit code {rc}")
+                        last_lines.append(
+                            f"\nInstallation failed with exit code {rc}\n")
+                        output_placeholder.code(
+                            "".join(last_lines), language="bash")
+                        status_placeholder.error(
+                            f"Installation failed with exit code {rc}")
                         return
-                    
-                    # Success - run post-install command if needed
-                    if env_name == "megadetector": 
-                        last_lines.append(f"\nInstalling additional package: speciesnet...\n")
-                        output_placeholder.code("".join(last_lines), language="bash")
+
+                    # Success - run post-install command if env-megadetector
+                    # to install speciesnet on macos, we need the --use-pep517 flag
+                    # which cannot be added to the environment.yml file
+                    # hence a separate post-install command
+                    if env_name == "megadetector":
+                        last_lines.append(
+                            f"\nInstalling additional package: speciesnet...\n")
+                        output_placeholder.code(
+                            "".join(last_lines), language="bash")
                         post_cmd = [
                             MICROMAMBA, "run", "-p", temp_path,
                             "pip", "install", "--use-pep517", "speciesnet==5.0.1",
                         ]
-                        
-                        post_process = subprocess.run(post_cmd, capture_output=True, text=True)
+
+                        post_process = subprocess.run(
+                            post_cmd, capture_output=True, text=True)
                         if post_process.returncode != 0:
-                            last_lines.append(f"Post-install failed: {post_process.stderr}\n")
-                            output_placeholder.code("".join(last_lines), language="bash")
+                            last_lines.append(
+                                f"Post-install failed: {post_process.stderr}\n")
+                            output_placeholder.code(
+                                "".join(last_lines), language="bash")
                             status_placeholder.error("Post-install failed")
                             return
                         else:
-                            last_lines.append(f"speciesnet installed successfully!\n")
-                            output_placeholder.code("".join(last_lines), language="bash")
-                    
+                            last_lines.append(
+                                f"speciesnet installed successfully!\n")
+                            output_placeholder.code(
+                                "".join(last_lines), language="bash")
+
                     # Move from temp to final location
-                    last_lines.append(f"\nMoving environment to final location...\n")
-                    output_placeholder.code("".join(last_lines), language="bash")
+                    last_lines.append(
+                        f"\nMoving environment to final location...\n")
+                    output_placeholder.code(
+                        "".join(last_lines), language="bash")
                     shutil.move(temp_path, final_path)
-                    
-                    last_lines.append(f"\nEnvironment installation completed successfully!\n")
-                    output_placeholder.code("".join(last_lines), language="bash")
-                        
+
+                    last_lines.append(
+                        f"\nEnvironment installation completed successfully!\n")
+                    output_placeholder.code(
+                        "".join(last_lines), language="bash")
+
                 except Exception as e:
                     if "current_process" in st.session_state and st.session_state["current_process"]:
                         st.session_state["current_process"] = None
                     last_lines.append(f"\nInstallation error: {e}\n")
-                    output_placeholder.code("".join(last_lines), language="bash")
+                    output_placeholder.code(
+                        "".join(last_lines), language="bash")
                     status_placeholder.error(f"Installation error: {e}")
                     return
-    
+
     # Success!
     status_placeholder.success("Environment successfully installed!")
     sleep_time.sleep(2)
     st.session_state[cancel_key] = False
     set_session_var("analyse_advanced", "show_modal_install_env", False)
     st.rerun()
-   
+
+
 def project_selector_widget():
 
     # check what is already known and selected
@@ -1210,9 +1352,10 @@ def project_selector_widget():
 
         # button to add a new project
         with col2:
-            if st.button(":material/add_circle: New", use_container_width=True, help = "Add a new project"):
+            if st.button(":material/add_circle: New", use_container_width=True, help="Add a new project"):
                 # Set session state flag to show modal on next rerun
-                set_session_var("analyse_advanced", "show_modal_add_project", True)
+                set_session_var("analyse_advanced",
+                                "show_modal_add_project", True)
                 st.rerun()
 
         # adjust the selected project
@@ -1231,8 +1374,9 @@ def project_selector_widget():
             st.rerun()
 
         # Store current project selection in session state for deployment workflow
-        set_session_var("analyse_advanced", "selected_projectID", selected_projectID)
-        
+        set_session_var("analyse_advanced",
+                        "selected_projectID", selected_projectID)
+
         # return
         return selected_projectID
 
@@ -1240,7 +1384,8 @@ def project_selector_widget():
 def location_selector_widget():
 
     # load settings from session state instead of persistent storage
-    coords_found_in_exif = get_session_var("analyse_advanced", "coords_found_in_exif", False)
+    coords_found_in_exif = get_session_var(
+        "analyse_advanced", "coords_found_in_exif", False)
     exif_lat = get_session_var("analyse_advanced", "exif_lat", 0.0)
     exif_lng = get_session_var("analyse_advanced", "exif_lng", 0.0)
 
@@ -1255,7 +1400,8 @@ def location_selector_widget():
     if locations == {}:
         if st.button(":material/add_circle: Define your first location", use_container_width=True):
             # Set session state flag to show modal on next rerun
-            set_session_var("analyse_advanced", "show_modal_add_location", True)
+            set_session_var("analyse_advanced",
+                            "show_modal_add_location", True)
             st.rerun()
 
         # # show info box if coordinates are found in metadata
@@ -1290,15 +1436,17 @@ def location_selector_widget():
                 index=selected_index,
                 label_visibility="collapsed"
             )
-            
+
             # Store selection in session state
-            set_session_var("analyse_advanced", "selected_locationID", location)
+            set_session_var("analyse_advanced",
+                            "selected_locationID", location)
 
         # popover to add a new location
         with col2:
             if st.button(":material/add_circle: New", use_container_width=True, help="Add a new location"):
                 # Set session state flag to show modal on next rerun
-                set_session_var("analyse_advanced", "show_modal_add_location", True)
+                set_session_var("analyse_advanced",
+                                "show_modal_add_location", True)
                 st.rerun()
 
         # # info box if coordinates are found in metadata
@@ -1369,8 +1517,9 @@ def match_locations(known_point, locations, max_distance_meters=50):
 def datetime_selector_widget():
 
     # init vars from session state instead of persistent storage
-    exif_min_datetime_str = get_session_var("analyse_advanced", "exif_min_datetime", None)
-    
+    exif_min_datetime_str = get_session_var(
+        "analyse_advanced", "exif_min_datetime", None)
+
     # Convert ISO string back to datetime object if present
     exif_min_datetime = (
         datetime.fromisoformat(exif_min_datetime_str)
@@ -1414,7 +1563,7 @@ def datetime_selector_widget():
 
     with col4:
         selected_second = st.selectbox(
-            "Second", options=second_options, index=second_options.index(default_second)) 
+            "Second", options=second_options, index=second_options.index(default_second))
 
     if exif_min_datetime:
         info_box(
@@ -1435,22 +1584,25 @@ def datetime_selector_widget():
         )
         selected_datetime = datetime.combine(selected_date, selected_time)
         # st.write("Selected datetime:", selected_datetime)
-        
+
         # Store selection in session state
-        set_session_var("analyse_advanced", "selected_min_datetime", selected_datetime.isoformat())
+        set_session_var("analyse_advanced", "selected_min_datetime",
+                        selected_datetime.isoformat())
 
         # deployment will only be added once the user has pressed the "ANALYSE" button
 
         return selected_datetime
+
 
 def load_known_locations():
     map, _ = get_cached_map()
     general_settings_vars = get_cached_vars(section="general_settings")
     selected_projectID = general_settings_vars.get("selected_projectID")
     project = map["projects"][selected_projectID]
-    
+
     # Get selected location from session state instead of persistent storage
-    selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
+    selected_locationID = get_session_var(
+        "analyse_advanced", "selected_locationID")
     locations = project["locations"]
     return locations, selected_locationID
 
@@ -1461,7 +1613,7 @@ def load_known_locations():
 #     general_settings_vars = get_cached_vars(section="general_settings")
 #     selected_projectID = general_settings_vars.get("selected_projectID")
 #     project = settings["projects"][selected_projectID]
-#     
+#
 #     # Get selections from session state instead of persistent storage
 #     selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
 #     location = project["locations"][selected_locationID]
@@ -1471,23 +1623,23 @@ def load_known_locations():
 
 # UNUSED FUNCTION - Vulture detected unused function
 # def generate_deployment_id():
-# 
+#
 #     # Create a consistent 5-char hash from the datetime and some randomness
 #     rand_str_1 = ''.join(random.choices(
 #         string.ascii_uppercase + string.digits, k=5))
 #     rand_str_2 = ''.join(random.choices(
 #         string.ascii_uppercase + string.digits, k=5))
-# 
-# 
-# 
+#
+#
+#
 #     # Combine into deployment ID
 #     return f"dep-{rand_str_1}-{rand_str_2}"
 
 
 # UNUSED FUNCTION - Vulture detected unused function
 # def add_deployment(selected_min_datetime):
-# 
-# 
+#
+#
 #     map, _ = get_cached_map()
 #     analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
 #     general_settings_vars = get_cached_vars(section="general_settings")
@@ -1500,7 +1652,7 @@ def load_known_locations():
 #         "selected_locationID")
 #     location = project["locations"][selected_locationID]
 #     deployments = location["deployments"]
-# 
+#
 #     # check what the exif datetime is
 #     exif_min_datetime_str = analyse_advanced_vars.get(
 #         "exif_min_datetime", None)
@@ -1516,20 +1668,20 @@ def load_known_locations():
 #         if exif_max_datetime_str is not None
 #         else None
 #     )
-# 
+#
 #     # then calculate the difference between the selected datetime and the exif datetime
 #     diff_min_datetime = selected_min_datetime - exif_min_datetime
 #     # TODO: if the exif_min_datetime is None, it errors. fix that.
-# 
+#
 #     # Adjust exif_max_datetime if selected_min_datetime is later than exif_min_datetime
 #     selected_max_datetime = exif_max_datetime + diff_min_datetime
-# 
+#
 #     # generate a unique deployment ID
 #     deployment_id = f"dep-{unique_animal_string()}"
-# 
+#
 #     # Store deployment selection in session state instead of persistent vars
 #     set_session_var("analyse_advanced", "selected_deploymentID", deployment_id)
-# 
+#
 #     # Add new deployment # TODO: i want to have this information at the end, right? When the deploymeny is processed?
 #     deployments[deployment_id] = {
 #         "deploymentStart": datetime.isoformat(selected_min_datetime),
@@ -1538,17 +1690,17 @@ def load_known_locations():
 #         "path": selected_folder,
 #         "datetimeDiffSeconds": diff_min_datetime.total_seconds()
 #     }
-# 
+#
 #     # Save updated settings
 #     with open(map_file, "w") as file:
 #         json.dump(map, file, indent=2)
 #     # Invalidate map cache after update
 #     invalidate_map_cache()
-# 
+#
 #     # Return list of deployments and index of the new one
 #     deployment_list = list(deployments.values())
 #     selected_index = deployment_list.index(deployments[deployment_id])
-# 
+#
 #     return selected_index, deployment_list
 
 
@@ -1596,7 +1748,6 @@ def add_project(projectID, comments):
     projects = map["projects"]
     projectIDs = projects.keys()
 
-
     # Check if project_id is unique
     if projectID in projectIDs:
         raise ValueError(
@@ -1618,16 +1769,16 @@ def add_project(projectID, comments):
         "selected_locationID": None,  # reset location selection
         "selected_deploymentID": None,  # reset deployment selection
     })
-    
+
     # update the session state variable for selected project ID
     set_session_var("shared", "selected_projectID", projectID)
-    
+
     # map["vars"]["analyse_advanced"]["selected_projectID"] = projectID
 
     # Save updated settings
     with open(map_file, "w") as file:
         json.dump(map, file, indent=2)
-        
+
     # Invalidate map cache after update
     invalidate_map_cache()
 
@@ -1637,13 +1788,14 @@ def add_project(projectID, comments):
 
     return selected_index, project_list
 
+
 def browse_directory_widget():
     # Get selected folder from session state instead of persistent storage
     selected_folder = get_session_var("analyse_advanced", "selected_folder")
-    
+
     # st.write(st.session_state)
 
-    col1, col2 = st.columns([1, 3])#, vertical_alignment="center")
+    col1, col2 = st.columns([1, 3])  # , vertical_alignment="center")
     with col1:
         if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
             selected_folder = select_folder()
@@ -1651,7 +1803,8 @@ def browse_directory_widget():
             if selected_folder:
                 # Clear session state and set new folder selection
                 clear_vars(section="analyse_advanced")
-                set_session_var("analyse_advanced", "selected_folder", selected_folder)
+                set_session_var("analyse_advanced",
+                                "selected_folder", selected_folder)
                 # st.success(f"Selected folder: {selected_folder}")
             else:
                 st.error("No folder selected or dialog was cancelled.")
@@ -1679,7 +1832,7 @@ def browse_directory_widget():
                     selected_folder) > 45 else selected_folder
             # st.markdown(
             #     f'Selected folder <code style="color:#086164; font-family:monospace;">{folder_short}</code>', unsafe_allow_html=True)
-            
+
             text = f"Selected &nbsp;&nbsp;<code style='color:#086164; font-family:monospace;'>{folder_short}</code>"
             st.markdown(
                 f"""
@@ -1732,16 +1885,17 @@ def det_model_selector_widget(model_meta):
     # Load previously selected model ID from current project
     general_settings_vars = get_cached_vars(section="general_settings")
     selected_projectID = general_settings_vars.get("selected_projectID")
-    
+
     # Default detection model
     previously_selected_det_modelID = DEFAULT_DETECTION_MODEL
-    
+
     if selected_projectID:
         # Load project-specific preferred detection model
         map_data, _ = get_cached_map()
         project_data = map_data["projects"].get(selected_projectID, {})
         preferred_models = project_data.get("preferred_models", {})
-        previously_selected_det_modelID = preferred_models.get("det_model", DEFAULT_DETECTION_MODEL)
+        previously_selected_det_modelID = preferred_models.get(
+            "det_model", DEFAULT_DETECTION_MODEL)
     else:
         # Fallback to global setting if no project selected
         previously_selected_det_modelID = general_settings_vars.get(
@@ -1759,15 +1913,17 @@ def det_model_selector_widget(model_meta):
         selected_display_name = st.selectbox(
             "Select a model for detection",
             options=display_names,
-            index=display_names.index(previously_selected_display_name) if previously_selected_display_name != None else 0,
+            index=display_names.index(
+                previously_selected_display_name) if previously_selected_display_name != None else 0,
             label_visibility="collapsed"
         )
 
         selected_modelID = modelID_lookup[selected_display_name]
-        
+
         # Store selection in session state
-        set_session_var("analyse_advanced", "selected_det_modelID", selected_modelID)
-        
+        set_session_var("analyse_advanced",
+                        "selected_det_modelID", selected_modelID)
+
         # Save selection to persistent storage if it changed
         if selected_modelID != previously_selected_det_modelID:
             if selected_projectID:
@@ -1777,25 +1933,28 @@ def det_model_selector_widget(model_meta):
                     map_data["projects"][selected_projectID] = {}
                 if "preferred_models" not in map_data["projects"][selected_projectID]:
                     map_data["projects"][selected_projectID]["preferred_models"] = {}
-                
+
                 map_data["projects"][selected_projectID]["preferred_models"]["det_model"] = selected_modelID
-                
+
                 # Save updated map
                 with open(map_file_path, 'w') as f:
                     json.dump(map_data, f, indent=2)
-                
+
                 # Invalidate cache so next read gets fresh data
                 invalidate_map_cache()
             else:
                 # Fallback to global setting if no project selected
-                update_vars("general_settings", {"previously_selected_det_modelID": selected_modelID})
+                update_vars("general_settings", {
+                            "previously_selected_det_modelID": selected_modelID})
 
     with col2:
-        if st.button(":material/info: Info", use_container_width=True, help="Model information", key = "det_model_info_button"):
+        if st.button(":material/info: Info", use_container_width=True, help="Model information", key="det_model_info_button"):
             # Store model info in session state for modal access
-            set_session_var("analyse_advanced", "modal_cls_model_info_data", det_model_meta[selected_modelID])
+            set_session_var(
+                "analyse_advanced", "modal_cls_model_info_data", det_model_meta[selected_modelID])
             # Set session state flag to show modal on next rerun
-            set_session_var("analyse_advanced", "show_modal_cls_model_info", True)
+            set_session_var("analyse_advanced",
+                            "show_modal_cls_model_info", True)
             st.rerun()
 
     # Show AGPL license warning for YOLOv11 models
@@ -1832,16 +1991,17 @@ def cls_model_selector_widget(model_meta):
     # Load previously selected model ID from current project
     general_settings_vars = get_cached_vars(section="general_settings")
     selected_projectID = general_settings_vars.get("selected_projectID")
-    
+
     # Default classification model
     previously_selected_modelID = DEFAULT_CLASSIFICATION_MODEL
-    
+
     if selected_projectID:
         # Load project-specific preferred classification model
         map_data, _ = get_cached_map()
         project_data = map_data["projects"].get(selected_projectID, {})
         preferred_models = project_data.get("preferred_models", {})
-        previously_selected_modelID = preferred_models.get("cls_model", DEFAULT_CLASSIFICATION_MODEL)
+        previously_selected_modelID = preferred_models.get(
+            "cls_model", DEFAULT_CLASSIFICATION_MODEL)
     else:
         # Fallback to global setting if no project selected
         previously_selected_modelID = general_settings_vars.get(
@@ -1864,10 +2024,11 @@ def cls_model_selector_widget(model_meta):
         )
 
         selected_modelID = modelID_lookup[selected_display_name]
-        
+
         # Store selection in session state
-        set_session_var("analyse_advanced", "selected_cls_modelID", selected_modelID)
-        
+        set_session_var("analyse_advanced",
+                        "selected_cls_modelID", selected_modelID)
+
         # Save selection to persistent storage if it changed
         if selected_modelID != previously_selected_modelID:
             if selected_projectID:
@@ -1877,31 +2038,35 @@ def cls_model_selector_widget(model_meta):
                     map_data["projects"][selected_projectID] = {}
                 if "preferred_models" not in map_data["projects"][selected_projectID]:
                     map_data["projects"][selected_projectID]["preferred_models"] = {}
-                
+
                 map_data["projects"][selected_projectID]["preferred_models"]["cls_model"] = selected_modelID
-                
+
                 # Save updated map
                 with open(map_file_path, 'w') as f:
                     json.dump(map_data, f, indent=2)
-                
+
                 # Invalidate cache so next read gets fresh data
                 invalidate_map_cache()
             else:
                 # Fallback to global setting if no project selected
-                update_vars("general_settings", {"selected_modelID": selected_modelID})
+                update_vars("general_settings", {
+                            "selected_modelID": selected_modelID})
 
     with col2:
         if selected_modelID != "NONE":
-            if st.button(":material/info: Info", use_container_width=True, help="Model information", key = "cls_model_info_button"):
+            if st.button(":material/info: Info", use_container_width=True, help="Model information", key="cls_model_info_button"):
                 # Store model info in session state for modal access
-                set_session_var("analyse_advanced", "modal_cls_model_info_data", cls_model_meta[selected_modelID])
+                set_session_var(
+                    "analyse_advanced", "modal_cls_model_info_data", cls_model_meta[selected_modelID])
                 # Set session state flag to show modal on next rerun
-                set_session_var("analyse_advanced", "show_modal_cls_model_info", True)
+                set_session_var("analyse_advanced",
+                                "show_modal_cls_model_info", True)
                 st.rerun()
         else:
-            if st.button(":material/info: Info", use_container_width=True, help="Model information", key = "none_model_info_button"):
+            if st.button(":material/info: Info", use_container_width=True, help="Model information", key="none_model_info_button"):
                 # Set session state flag to show modal on next rerun
-                set_session_var("analyse_advanced", "show_modal_none_model_info", True)
+                set_session_var("analyse_advanced",
+                                "show_modal_none_model_info", True)
                 st.rerun()
 
     return selected_modelID
@@ -1922,12 +2087,12 @@ def cls_model_selector_widget(model_meta):
 #         key=f"{model_type}_model",
 #         scrollable=True,
 #         default_option=prev_selected_model)
-# 
+#
 #     # more info button
 #     friendly_name = model_info[selected_model]["friendly_name"]
 #     if st.button(f":material/info: More info about :grey-background[{friendly_name}]", key=f"{model_type}_model_info_button"):
 #         show_model_info(model_info[selected_model])
-# 
+#
 #     return selected_model
 
 
@@ -1989,13 +2154,13 @@ def get_video_datetime(file_path):
 #         dt = get_image_datetime(file_path)
 #         if dt:
 #             return dt
-# 
+#
 #     # Try video metadata
 #     if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
 #         dt = get_video_datetime(file_path)
 #         if dt:
 #             return dt
-# 
+#
 #     # Fallback: file modified time
 #     return datetime.fromtimestamp(file_path.stat().st_mtime)
 
@@ -2062,15 +2227,15 @@ def get_video_gps(file_path):
 # UNUSED FUNCTION - Vulture detected unused function
 # def get_file_gps(file_path):
 #     suffix = file_path.suffix.lower()
-# 
+#
 #     # Image formats
 #     if suffix in ['.jpg', '.jpeg', '.png']:
 #         return get_image_gps(file_path)
-# 
+#
 #     # Video formats
 #     if suffix in ['.mp4', '.avi', '.mov', '.mkv']:
 #         return get_video_gps(file_path)
-# 
+#
 #     return None
 
 
@@ -2080,10 +2245,11 @@ def check_folder_metadata():
     Simple function that processes the folder and stores results in session state.
     """
     # Get selected folder from session state
-    selected_folder_path = get_session_var("analyse_advanced", "selected_folder")
+    selected_folder_path = get_session_var(
+        "analyse_advanced", "selected_folder")
     if not selected_folder_path:
         return
-    
+
     # Process folder metadata
     with st.spinner("Checking data..."):
         selected_folder = Path(selected_folder_path)
@@ -2197,7 +2363,7 @@ def format_class_name(s):
 #     with open(model_info_json, "r") as file:
 #         model_info = json.load(file)
 #     model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
-# 
+#
 #     # save
 #     with open(model_info_json, "w") as file:
 #         json.dump(model_info, file, indent=4)
@@ -2216,6 +2382,7 @@ def load_taxon_mapping(cls_model_ID):
 
     return taxon_mapping
 
+
 def load_taxon_mapping_cached(cls_model_ID):
     """
     Optimized taxon mapping loader with session state caching.
@@ -2224,15 +2391,16 @@ def load_taxon_mapping_cached(cls_model_ID):
     # Return empty list for NONE model (no classification)
     if cls_model_ID == "NONE":
         return []
-        
+
     cache_key = f"taxon_mapping_{cls_model_ID}"
-    
+
     # Check if already cached in session state
     if cache_key not in st.session_state:
         # Load and cache the taxon mapping
         st.session_state[cache_key] = load_taxon_mapping(cls_model_ID)
-    
+
     return st.session_state[cache_key]
+
 
 def sort_leaf_first(nodes):
     leaves = []
@@ -2252,6 +2420,7 @@ def sort_leaf_first(nodes):
     parents.sort(key=lambda x: x["label"].lower())
 
     return leaves + parents
+
 
 def merge_single_redundant_nodes(nodes):
     merged = []
@@ -2282,13 +2451,14 @@ def merge_single_redundant_nodes(nodes):
         merged.append(node)
     return merged
 
+
 def build_taxon_tree(taxon_mapping):
     root = {}
     levels = ["level_class", "level_order",
               "level_family", "level_genus", "level_species"]
 
     for entry in taxon_mapping:
-        
+
         # If no proper class level, place under "Unknown taxonomy"
         if not entry.get("level_class", "").startswith("class "):
             unknown_key = "<i>Unknown taxonomy</i>"
@@ -2310,7 +2480,7 @@ def build_taxon_tree(taxon_mapping):
                     "children": {}
                 }
             continue  # Skip the normal taxonomic loop
-        
+
         current_level = root
         last_taxon_name = None
         for i, level in enumerate(levels):
@@ -2340,7 +2510,7 @@ def build_taxon_tree(taxon_mapping):
                 if taxon_name.startswith("class ") or \
                     taxon_name.startswith("order ") or \
                         taxon_name.startswith("family ") or \
-                            taxon_name.startswith("genus "):
+                taxon_name.startswith("genus "):
                     label = f"{taxon_name} (<b>{model_class}</b>, <i>unspecified)</i>"
                 else:
                     label = f"{taxon_name} (<b>{model_class}</b>)"
@@ -2372,6 +2542,7 @@ def build_taxon_tree(taxon_mapping):
     sorted_tree = sort_leaf_first(merged_tree)
     return sorted_tree
 
+
 def get_all_leaf_values(nodes):
     leaf_values = []
     for node in nodes:
@@ -2384,23 +2555,27 @@ def get_all_leaf_values(nodes):
     return leaf_values
 
 
-
 def add_deployment_to_queue():
-    
+
     # Load persistent queue from file
     analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
     general_settings_vars = get_cached_vars(section="general_settings")
     process_queue = analyse_advanced_vars.get("process_queue", [])
-    
+
     # Get temporary selections from session state (they become persistent when added to queue)
     selected_folder = get_session_var("analyse_advanced", "selected_folder")
-    selected_projectID = get_session_var("analyse_advanced", "selected_projectID")
-    selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
-    selected_min_datetime = get_session_var("analyse_advanced", "selected_min_datetime")
-    selected_det_modelID = get_session_var("analyse_advanced", "selected_det_modelID")
-    selected_cls_modelID = get_session_var("analyse_advanced", "selected_cls_modelID")
+    selected_projectID = get_session_var(
+        "analyse_advanced", "selected_projectID")
+    selected_locationID = get_session_var(
+        "analyse_advanced", "selected_locationID")
+    selected_min_datetime = get_session_var(
+        "analyse_advanced", "selected_min_datetime")
+    selected_det_modelID = get_session_var(
+        "analyse_advanced", "selected_det_modelID")
+    selected_cls_modelID = get_session_var(
+        "analyse_advanced", "selected_cls_modelID")
     selected_species = get_session_var("analyse_advanced", "selected_species")
-    
+
     # Create a new deployment entry
     new_deployment = {
         "selected_folder": selected_folder,
@@ -2411,64 +2586,67 @@ def add_deployment_to_queue():
         "selected_cls_modelID": selected_cls_modelID,
         "selected_species": selected_species
     }
-    
+
     # Add the new deployment to the queue
-    
+
     process_queue.append(new_deployment)
 
     # write back to the vars file
-    replace_vars(section="analyse_advanced", new_vars = {"process_queue": process_queue})
-    
+    replace_vars(section="analyse_advanced", new_vars={
+                 "process_queue": process_queue})
+
     # Save the selected species back to the model's variables.json file
     if selected_cls_modelID and selected_cls_modelID != "NONE" and selected_species:
         write_selected_species(selected_species, selected_cls_modelID)
-    
-    # Clear session state selections after successful queue addition  
+
+    # Clear session state selections after successful queue addition
     clear_vars("analyse_advanced")
-    
+
     # return
-     
-    
+
+
 def read_selected_species(cls_model_ID):
     """
     Read the selected_classes from the model's variables.json file.
-    
+
     Args:
         cls_model_ID: The classification model ID
-        
+
     Returns:
         list: The selected_classes list from the model's variables.json, 
               empty list if file doesn't exist or has no selected_classes
     """
     try:
-        json_path = os.path.join(ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "variables.json")
-        
+        json_path = os.path.join(
+            ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "variables.json")
+
         if not os.path.exists(json_path):
             return []
-            
+
         with open(json_path, "r") as f:
             data = json.load(f)
-            
+
         return data.get("selected_classes", [])
-        
+
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return []
 
+
 def write_selected_species(selected_species, cls_model_ID):
     # Construct the path to the JSON file
-    json_path = os.path.join(ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "variables.json")
-    
+    json_path = os.path.join(ADDAXAI_FILES_ST, "models",
+                             "cls", cls_model_ID, "variables.json")
+
     # Load the existing JSON content
     with open(json_path, "r") as f:
         data = json.load(f)
-    
+
     # Update the selected_classes field
     data["selected_classes"] = selected_species
-    
+
     # Write the updated content back to the file
     with open(json_path, "w") as f:
         json.dump(data, f, indent=4)
-
 
 
 def species_selector_widget(taxon_mapping, cls_model_ID):
@@ -2483,21 +2661,21 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
     # Initialize state in structured session state
     # First check if we need to initialize from model's variables.json
     selected_nodes = get_session_var("analyse_advanced", "selected_nodes", [])
-    species_initialized = get_session_var("analyse_advanced", "species_initialized", False)
-    
+    species_initialized = get_session_var(
+        "analyse_advanced", "species_initialized", False)
+
     # Only initialize from model's variables.json if we haven't initialized yet
     if not species_initialized:
         model_selected_classes = read_selected_species(cls_model_ID)
         if model_selected_classes:
             # Only set if we got valid classes from the model
             selected_nodes = model_selected_classes
-            set_session_var("analyse_advanced", "selected_nodes", selected_nodes)
+            set_session_var("analyse_advanced",
+                            "selected_nodes", selected_nodes)
         # Mark as initialized regardless of whether we found classes
         set_session_var("analyse_advanced", "species_initialized", True)
     expanded_nodes = get_session_var("analyse_advanced", "expanded_nodes", [])
     last_selected = get_session_var("analyse_advanced", "last_selected", {})
-
-
 
     col1, col2 = st.columns([1, 3])
     with col1:
@@ -2505,9 +2683,11 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
         if st.button(":material/pets: Select", use_container_width=True):
             # Store modal data in session state
             set_session_var("analyse_advanced", "modal_species_nodes", nodes)
-            set_session_var("analyse_advanced", "modal_species_leaf_values", all_leaf_values)
+            set_session_var("analyse_advanced",
+                            "modal_species_leaf_values", all_leaf_values)
             # Set session state flag to show modal on next rerun
-            set_session_var("analyse_advanced", "show_modal_species_selector", True)
+            set_session_var("analyse_advanced",
+                            "show_modal_species_selector", True)
             st.rerun()
 
     # Count leaf nodes
@@ -2523,7 +2703,8 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
     with col2:
         leaf_count = count_leaf_nodes(nodes)
         # Get current selected nodes from session state
-        current_selected = get_session_var("analyse_advanced", "selected_nodes", [])
+        current_selected = get_session_var(
+            "analyse_advanced", "selected_nodes", [])
         text = f"You have selected <code style='color:#086164; font-family:monospace;'>{len(current_selected)}</code> of <code style='color:#086164; font-family:monospace;'>{leaf_count}</code> classes. "
         st.markdown(
             f"""
@@ -2533,11 +2714,11 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
                 """,
             unsafe_allow_html=True
         )
-    
+
     # Store selection in the proper session state structure for deployment workflow
-    current_selected = get_session_var("analyse_advanced", "selected_nodes", [])
+    current_selected = get_session_var(
+        "analyse_advanced", "selected_nodes", [])
     set_session_var("analyse_advanced", "selected_species", current_selected)
-    
+
     return current_selected
     # st.write("Selected nodes:", current_selected)
-

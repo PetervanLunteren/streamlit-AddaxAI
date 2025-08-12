@@ -26,7 +26,9 @@ class MultiProgressBars:
         self.pre_labels = {}
         self.done_labels = {}
         self.statuses = {}
-        self.label_divider = " \u00A0\u00A0\u00A0 | \u00A0\u00A0\u00A0 "
+        self.show_device = {}
+        self.device_info = {}
+        self.label_divider = " \u00A0\u00A0 | \u00A0\u00A0 "
 
     def update_label(self, new_label):
         """Update the container label dynamically."""
@@ -35,19 +37,42 @@ class MultiProgressBars:
         else:
             self.label_placeholder.empty()
 
-    def add_pbar(self, pbar_id, pre_label, active_prefix, done_label, wait_label=None, max_value=None):
+    def add_pbar(self, label, max_value=None, show_device=False):
         """Add a new progress bar to the container."""
         container = self.container.container()
+        pbar_id = label
+        
         self.states[pbar_id] = 0
         self.max_values[pbar_id] = max_value or 1  # temporary placeholder
+        self.show_device[pbar_id] = show_device
+        self.device_info[pbar_id] = None
+        
+        # Generate phase labels from base label
+        wait_label = f"**{label}**{self.label_divider}waiting..."
+        pre_label = f"**{label}**{self.label_divider}starting..."
+        active_prefix = f"**{label}**{self.label_divider}running..."
+        done_label = f"**{label}**{self.label_divider}complete"
+        
         self.active_prefixes[pbar_id] = active_prefix
         self.wait_labels[pbar_id] = wait_label
         self.pre_labels[pbar_id] = pre_label
         self.done_labels[pbar_id] = done_label
         
-        # Show wait_label if provided, otherwise show pre_label
-        initial_label = wait_label if wait_label else pre_label
-        self.bars[pbar_id] = container.progress(0, text=initial_label)
+        # Show wait_label initially
+        self.bars[pbar_id] = container.progress(0, text=wait_label)
+
+    def reset_pbar(self, pbar_id):
+        """Reset a progress bar to 0 and show wait_label."""
+        if pbar_id not in self.bars:
+            raise ValueError(f"Progress bar '{pbar_id}' not found.")
+        
+        self.states[pbar_id] = 0
+        self.bars[pbar_id].progress(0, text=self.wait_labels[pbar_id])
+
+    def reset_all_pbars(self):
+        """Reset all progress bars to 0 and show wait_labels."""
+        for pbar_id in self.bars:
+            self.reset_pbar(pbar_id)
 
     def start_pbar(self, pbar_id):
         """Transition from wait_label to pre_label state."""
@@ -90,6 +115,13 @@ class MultiProgressBars:
         
     def update_from_tqdm_string(self, pbar_id, tqdm_line: str):
         """Parse a tqdm output string and update the corresponding Streamlit progress bar, including ETA."""
+        # Check for GPU availability info if show_device is enabled
+        if pbar_id in self.show_device and self.show_device[pbar_id] and self.device_info[pbar_id] is None:
+            if "GPU available: True" in tqdm_line:
+                self.device_info[pbar_id] = "GPU"
+            elif "GPU available: False" in tqdm_line:
+                self.device_info[pbar_id] = "CPU"
+        
         tqdm_pattern = r"(\d+)%\|.*\|\s*(\d+)/(\d+).*?\[(.*?)<([^,]+),\s*([\d.]+)\s*(\S+)?/s\]"
         match = re.search(tqdm_pattern, tqdm_line)
 
@@ -107,14 +139,22 @@ class MultiProgressBars:
         self.set_max_value(pbar_id, total)
         self.states[pbar_id] = n  # Sync directly to avoid increment error
 
-        label = (
-            f"{self.label_divider}"
-            f":material/clock_loader_40: {percent}%{self.label_divider}"
-            f":material/laps: {n} {unit} / {total} {unit}{self.label_divider}"
-            f":material/speed: {rate:.2f} {unit}/s{self.label_divider}"
-            f":material/timer: {elapsed_str}{self.label_divider}"
+        # Build label components
+        label_parts = [
+            f":material/clock_loader_40: {percent}%",
+            f":material/laps: {n} {unit} / {total} {unit}",
+            f":material/speed: {rate:.2f} {unit}/s",
+            f":material/timer: {elapsed_str}",
             f":material/sports_score: {eta_str}"
-        )
+        ]
+        
+        # Add device info if available and enabled
+        if (pbar_id in self.show_device and self.show_device[pbar_id] and 
+            pbar_id in self.device_info and self.device_info[pbar_id]):
+            device_label = f":material/memory: {self.device_info[pbar_id]}"
+            label_parts.insert(0, device_label)
+        
+        label = self.label_divider + self.label_divider.join(label_parts)
 
         self.update(pbar_id, n - self.states[pbar_id], text=label)
 

@@ -15,7 +15,7 @@ from utils.analysis_utils import (browse_directory_widget,
                                   check_folder_metadata,
                                   project_selector_widget,
                                   datetime_selector_widget,
-                                  location_selector_widget,
+                                  location_selector_widget, 
                                   cls_model_selector_widget,
                                   det_model_selector_widget,
                                   species_selector_widget,
@@ -61,27 +61,27 @@ step = get_session_var("analyse_advanced", "step", 0)
 # modal for installing environment - only create when needed
 if get_session_var("analyse_advanced", "show_modal_install_env", False):
     modal_install_env = Modal(
-        f"Installing virtual environment", key="installing-env", show_close_button=True)
+        f"#### Installing virtual environment", key="installing-env", show_close_button=False)
     with modal_install_env.container():
-        install_env(modal_install_env, get_session_var(
+        install_env(get_session_var(
             "analyse_advanced", "required_env_name"))
-
-# modal for processing queue - only create when needed
-if get_session_var("analyse_advanced", "show_modal_process_queue", False):
-    modal_process_queue = Modal(
-        f"Processing queue...", key="process_queue", show_close_button=True)
-    with modal_process_queue.container():
-        # Process queue should always be loaded from persistent storage
-        process_queue = analyse_advanced_vars.get("process_queue", [])
-        run_process_queue(modal_process_queue, process_queue)
 
 # modal for downloading models - only create when needed
 if get_session_var("analyse_advanced", "show_modal_download_model", False):
     modal_download_model = Modal(
-        f"Downloading model...", key="download_model", show_close_button=True)
+        f"#### Downloading model...", key="download_model", show_close_button=False)
     with modal_download_model.container():
-        download_model(modal_download_model, get_session_var(
+        download_model(get_session_var(
             "analyse_advanced", "download_modelID"), model_meta)
+
+# modal for processing queue - only create when needed
+if get_session_var("analyse_advanced", "show_modal_process_queue", False):
+    modal_process_queue = Modal(
+        f"#### Processing deployments...", key="process_queue", show_close_button=False)
+    with modal_process_queue.container():
+        # Process queue should always be loaded from persistent storage
+        process_queue = analyse_advanced_vars.get("process_queue", [])
+        run_process_queue(process_queue)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # OPTIMIZED MODAL MANAGEMENT - Only create modals when needed using session state
