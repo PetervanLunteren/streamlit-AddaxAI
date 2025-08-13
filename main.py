@@ -4,8 +4,6 @@
 # - daarna testen met een fresh install en schone conda env
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
-# - zorgen dat de view en remove buttons van de queue deployments werken
-
 
 
 """
