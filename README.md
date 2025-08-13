@@ -17,49 +17,43 @@ A modern, multi-page Streamlit application for camera trap image analysis using 
 
 ## 📋 Prerequisites
 
-1. **Conda Distribution**: Install [Miniforge](https://github.com/conda-forge/miniforge) or similar
-2. **AddaxAI Core**: Install the base AddaxAI system from [addaxdatascience.com](https://addaxdatascience.com/addaxai/#install)
+No external dependencies required! The application includes its own micromamba binary for managing Python environments.
 
 ## 🛠️ Installation
 
-### 1. Create Conda Environment
+### 1. Clone Repository
 
 ```bash
-conda create -n env-streamlit-addaxai python=3.11 -y
-conda activate env-streamlit-addaxai
-```
-
-### 2. Install Required Packages
-
-```bash
-pip install streamlit streamlit-extras streamlit-aggrid
-pip install folium streamlit-folium streamlit-tree-select
-pip install streamlit-antd-components st-flexible-callout-elements
-pip install exifread piexif gpsphoto hachoir
-pip install appdirs requests pillow
-pip install streamlit-modal
-```
-
-### 3. Clone Repository
-
-Navigate to your AddaxAI installation directory:
-
-```bash
-# macOS
-cd /Applications/AddaxAI_files/AddaxAI
-
-# Linux  
-cd ~/AddaxAI_files/AddaxAI
-
-# Clone this repository
+# Clone this repository to your desired location
 git clone https://github.com/PetervanLunteren/streamlit-AddaxAI.git
+cd streamlit-AddaxAI
 ```
 
-### 4. Launch Application
+### 2. Create Environment and Install Packages
+
+The application includes its own micromamba binary, so no external conda installation is needed:
 
 ```bash
-cd streamlit-AddaxAI
-conda activate env-streamlit-addaxai
+# Create environment using included micromamba
+./bin/macos/micromamba env create -f envs/ymls/addaxai-base/environment.yml
+
+# Activate environment
+./bin/macos/micromamba activate addaxai-base
+```
+
+**For Linux users**: Replace `macos` with `linux` in the commands above:
+```bash
+./bin/linux/micromamba env create -f envs/ymls/addaxai-base/environment.yml
+./bin/linux/micromamba activate addaxai-base
+```
+
+### 3. Launch Application
+
+```bash
+# Make sure environment is activated
+./bin/macos/micromamba activate addaxai-base  # or ./bin/linux/micromamba for Linux
+
+# Run the application
 streamlit run main.py
 ```
 
@@ -180,3 +174,9 @@ This project is part of the AddaxAI ecosystem. Please refer to the main AddaxAI 
 ---
 
 **Note**: This Streamlit application is designed to eventually replace the legacy tkinter version, providing a more modern, web-based interface for camera trap analysis workflows.
+
+## 💡 Tips
+
+- **No conda required**: The application includes its own micromamba binary
+- **Cross-platform**: Works on macOS and Linux with the appropriate binary
+- **Self-contained**: All dependencies are managed within the project

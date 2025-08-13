@@ -61,9 +61,9 @@ OS_NAME = get_os_name()
 # Path calculation: utils/config.py -> utils -> streamlit-AddaxAI -> AddaxAI -> AddaxAI_files
 ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 
-# Streamlit application directory (temporary during migration from tkinter)
-# Structure: AddaxAI_files/AddaxAI/streamlit-AddaxAI/
-ADDAXAI_FILES_ST = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI")
+# Streamlit application directory - points directly to the streamlit app root
+# Path calculation: utils/config.py -> utils -> streamlit-AddaxAI/
+ADDAXAI_FILES_ST = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 # Platform-specific micromamba binary for conda environment management
 # Used by tools to create and activate conda environments for different AI models

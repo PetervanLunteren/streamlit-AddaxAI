@@ -256,8 +256,7 @@ def load_vars(section):
 
 
 def load_lang_txts():
-    txts_fpath = os.path.join(ADDAXAI_FILES, "AddaxAI",
-                              "streamlit-AddaxAI", "assets", "language", "lang.json")
+    txts_fpath = os.path.join(ADDAXAI_FILES_ST, "assets", "language", "lang.json")
     with open(txts_fpath, "r", encoding="utf-8") as file:
         txts = json.load(file)
     return txts
@@ -286,8 +285,8 @@ def fetch_latest_model_info():
     
     # Define paths using the global ADDAXAI_FILES_ST from config
     model_meta_url = "https://raw.githubusercontent.com/PetervanLunteren/streamlit-AddaxAI/refs/heads/main/assets/model_meta/model_meta.json"
-    model_meta_local = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "assets", "model_meta", "model_meta.json")
-    models_dir = os.path.join(ADDAXAI_FILES, "AddaxAI", "streamlit-AddaxAI", "models")
+    model_meta_local = os.path.join(ADDAXAI_FILES_ST, "assets", "model_meta", "model_meta.json")
+    models_dir = os.path.join(ADDAXAI_FILES_ST, "models")
     
     try:
         log("Starting model metadata download...")

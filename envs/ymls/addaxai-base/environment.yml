@@ -1,0 +1,37 @@
+name: addaxai-base
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    # Core Streamlit packages
+    - streamlit
+    - streamlit-extras
+    - streamlit-aggrid
+    
+    # Map and visualization components
+    - folium
+    - streamlit-folium
+    - streamlit-tree-select
+    
+    # UI components
+    - streamlit-antd-components
+    - st-flexible-callout-elements
+    - streamlit-modal
+    - streamlit-lottie
+    
+    # Image processing and metadata
+    - exifread
+    - piexif
+    - gpsphoto
+    - hachoir
+    
+    # Utility packages
+    - appdirs
+    - requests
+    - pillow
+    - tqdm
+    - huggingface_hub
+    - st-modal

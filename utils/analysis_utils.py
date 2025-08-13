@@ -81,7 +81,7 @@ config_dir = user_config_dir("AddaxAI")
 map_file = os.path.join(config_dir, "map.json")
 
 # set versions
-with open(os.path.join(ADDAXAI_FILES, 'AddaxAI', 'version.txt'), 'r') as file:
+with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
 
