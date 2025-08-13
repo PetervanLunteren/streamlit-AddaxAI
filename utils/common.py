@@ -262,73 +262,6 @@ def load_lang_txts():
         txts = json.load(file)
     return txts
 
-#########################
-### GENERAL UTILITIES ###
-#########################
-
-# UNUSED FUNCTION - Vulture detected unused function
-# def multiselect_checkboxes(classes, preselected):
-# 
-#     # select all or none buttons
-#     col1, col2 = st.columns(2)
-#     with col1:
-#         if st.button(":material/check_box: Select all", use_container_width=True):
-#             for species in classes:
-#                 st.session_state[f"species_{species}"] = True
-#     with col2:
-#         if st.button(":material/check_box_outline_blank: Select none", use_container_width=True):
-#             for species in classes:
-#                 st.session_state[f"species_{species}"] = False
-# 
-#     # checkboxes in a scrollable container
-#     selected_species = []
-#     with st.container(border=True, height=300):
-#         for species in classes:
-#             key = f"species_{species}"
-#             checked = st.session_state.get(
-#                 key, True if species in preselected else False)
-#             if st.checkbox(species, value=checked, key=key):
-#                 selected_species.append(species)
-# 
-#     # log selected species
-#     st.markdown(
-#         f'&nbsp; You selected the presence of <code style="color:#086164; font-family:monospace;">{len(selected_species)}</code> classes', unsafe_allow_html=True)
-# 
-#     # return list
-#     return selected_species
-
-
-
-
-
-
-# check if the user needs an update
-# UNUSED FUNCTION - Vulture detected unused function
-# def requires_addaxai_update(required_version):
-#     current_parts = list(map(int, current_AA_version.split('.')))
-#     required_parts = list(map(int, required_version.split('.')))
-# 
-#     # Pad the shorter version with zeros
-#     while len(current_parts) < len(required_parts):
-#         current_parts.append(0)
-#     while len(required_parts) < len(current_parts):
-#         required_parts.append(0)
-# 
-#     # Compare each part of the version
-#     for current, required in zip(current_parts, required_parts):
-#         if current < required:
-#             return True  # current_version is lower than required_version
-#         elif current > required:
-#             return False  # current_version is higher than required_version
-# 
-#     # All parts are equal, consider versions equal
-#     return False
-
-
-
-# import streamlit as st
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODEL METADATA MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -425,6 +358,24 @@ def fetch_latest_model_info():
                         variables_file = os.path.join(model_dir, "variables.json")
                         with open(variables_file, 'w') as f:
                             json.dump(model_info, f, indent=4)
+                        
+                        # Download taxon-mapping.csv for classification models
+                        if model_type == "cls":
+                            try:
+                                taxon_mapping_url = f"https://huggingface.co/Addax-Data-Science/{model_id}/resolve/main/taxon-mapping.csv?download=true"
+                                taxon_mapping_file = os.path.join(model_dir, "taxon-mapping.csv")
+                                
+                                log(f"Downloading taxon-mapping.csv for {model_id} from: {taxon_mapping_url}")
+                                taxon_response = requests.get(taxon_mapping_url, timeout=15, headers=headers)
+                                
+                                if taxon_response.status_code == 200:
+                                    with open(taxon_mapping_file, 'wb') as f:
+                                        f.write(taxon_response.content)
+                                    log(f"Downloaded taxon-mapping.csv for {model_id}")
+                                else:
+                                    log(f"Failed to download taxon-mapping.csv for {model_id}. Status: {taxon_response.status_code}")
+                            except Exception as e:
+                                log(f"Error downloading taxon-mapping.csv for {model_id}: {e}")
                         
                         log(f"Created directory and variables.json for new {model_type} model: {model_id}")
                         

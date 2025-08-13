@@ -64,37 +64,20 @@ def warning_box(msg, title=None, icon=":material/warning:"):
                      font_color="#936b0c",
                      icon_size=23)
 
-
-def radio_buttons_with_captions(option_caption_dict, key, scrollable, default_option):
+def success_box(msg, title=None, icon=":material/check_circle:"):
     """
-    Create radio buttons with captions from a dictionary structure.
+    Display a success callout box.
     
     Args:
-        option_caption_dict: Dict with format {key: {"option": "label", "caption": "description"}}
-        key: Streamlit component key
-        scrollable: If True, puts radio buttons in scrollable container
-        default_option: The default key to select
-        
-    Returns:
-        The selected key from the option_caption_dict
+        msg: The message to display
+        title: Optional title (will be bold)
+        icon: Icon to display (default: check_circle icon)
     """
-    # Extract option labels and captions from the dictionary
-    options = [v["option"] for v in option_caption_dict.values()]
-    captions = [v["caption"] for v in option_caption_dict.values()]
-    key_map = {v["option"]: k for k, v in option_caption_dict.items()}
-
-    # Get default index based on default_key
-    default_index = list(option_caption_dict.keys()).index(default_option)
-
-    # Create a radio button selection with captions
-    with st.container(border=True, height=275 if scrollable else None):
-        selected_option = st.radio(
-            label=key,
-            options=options,
-            index=default_index,
-            label_visibility="collapsed",
-            captions=captions
-        )
-
-    # Return the corresponding key
-    return key_map[selected_option]
+    if title:
+        msg = f'<span style="font-weight: bold;">{title}</span><br>{msg}'
+    
+    flexible_callout(msg,
+                     icon=icon,
+                     background_color="#d9e3e7af",
+                     font_color="#086164",
+                     icon_size=23)

@@ -76,7 +76,16 @@ if formatted_int_label:
 # output: unsorted classifications formatted as [['aardwolf', 2.3025326090220233e-09], ['african wild cat', 5.658252888451898e-08], ... ]
 # no need to remove forbidden classes from the predictions, that will happen in infrence_lib.py
 def get_classification(PIL_crop):
+    if PIL_crop is None:
+        print("WARNING: No crop provided, skipping classification")
+        return []
+    
     img = np.array(PIL_crop)
+    
+    if img.size == 0:
+        print("WARNING: Empty image detected, skipping classification")
+        return []
+    
     img = cv2.resize(img, (img_size, img_size))
     img = np.expand_dims(img, axis=0)
     pred = animal_model.predict(img, verbose=0)[0]
@@ -96,6 +105,12 @@ def get_classification(PIL_crop):
 # the function below is rewritten for a single image input without expansion
 def get_crop(image, bbox): 
     x1, y1, w_box, h_box = bbox
+    
+    # Check for invalid bounding boxes (zero or negative dimensions)
+    if w_box <= 0 or h_box <= 0:
+        print(f"WARNING: Invalid bbox dimensions - width: {w_box}, height: {h_box}")
+        return None
+    
     ymin,xmin,ymax,xmax = y1, x1, y1 + h_box, x1 + w_box
     im_width, im_height = image.size
     (left, right, top, bottom) = (xmin * im_width, xmax * im_width,
@@ -104,8 +119,15 @@ def get_crop(image, bbox):
     top = max(top,0); bottom = max(bottom,0)
     left = min(left,im_width-1); right = min(right,im_width-1)
     top = min(top,im_height-1); bottom = min(bottom,im_height-1)
+    
+    # Final check - ensure crop has valid dimensions
+    crop_width = right - left
+    crop_height = bottom - top
+    if crop_width <= 0 or crop_height <= 0:
+        print(f"WARNING: Invalid crop dimensions - width: {crop_width}, height: {crop_height}")
+        return None
+    
     image_cropped = image.crop((left, top, right, bottom))
-    # resizing will be done in get_classification()
     return image_cropped
 
 

@@ -12,7 +12,6 @@
 #############################################
 
 # import packages
-import AddaxAI.classification_utils.inference_lib as ea
 import platform
 import pathlib
 from torchvision.models import resnet

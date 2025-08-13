@@ -152,9 +152,13 @@ def create_raw_classifications(json_path,
                         # Sort classifications by confidence (highest first)
                         idx_classifications = sorted(idx_classifications, key=lambda x:x[1], reverse=True)
                         
-                        # Keep only the top classification result
-                        only_top_classification = [idx_classifications[0]]
-                        detection['classifications'] = only_top_classification
+                        # Keep only the top classification result (if any classifications exist)
+                        if idx_classifications:
+                            only_top_classification = [idx_classifications[0]]
+                            detection['classifications'] = only_top_classification
+                        else:
+                            # No valid classifications for this detection (e.g., invalid bounding box)
+                            detection['classifications'] = []
 
                         # Update progress bar
                         pbar.update(1)

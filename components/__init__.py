@@ -6,7 +6,7 @@ This package contains reusable UI components that can be used across different t
 
 from .progress import MultiProgressBars
 from .stepper import StepperBar
-from .ui_helpers import print_widget_label, info_box, warning_box, radio_buttons_with_captions
+from .ui_helpers import print_widget_label, info_box, warning_box, success_box
 
 __all__ = [
     'MultiProgressBars',
@@ -14,5 +14,5 @@ __all__ = [
     'print_widget_label',
     'info_box',
     'warning_box',
-    'radio_buttons_with_captions'
+    'success_box'
 ]

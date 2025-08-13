@@ -48,10 +48,10 @@ class MultiProgressBars:
         self.device_info[pbar_id] = None
         
         # Generate phase labels from base label
-        wait_label = f"**{label}**{self.label_divider}waiting..."
-        pre_label = f"**{label}**{self.label_divider}starting..."
-        active_prefix = f"**{label}**{self.label_divider}running..."
-        done_label = f"**{label}**{self.label_divider}complete"
+        wait_label = f"**{label}**{self.label_divider}Waiting..."
+        pre_label = f"**{label}**{self.label_divider}Starting..."
+        active_prefix = f"**{label}**{self.label_divider}Running..."
+        done_label = f"**{label}**{self.label_divider}Done"
         
         self.active_prefixes[pbar_id] = active_prefix
         self.wait_labels[pbar_id] = wait_label

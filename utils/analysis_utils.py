@@ -71,7 +71,7 @@ import piexif
 
 # requires_addaxai_update, - UNUSED: Vulture detected unused import
 from utils.common import load_vars, update_vars, replace_vars, load_map, clear_vars, unique_animal_string, get_session_var, set_session_var, update_session_vars
-from components import MultiProgressBars, print_widget_label, info_box
+from components import MultiProgressBars, print_widget_label, info_box, success_box
 
 
 from utils.config import *
@@ -233,7 +233,7 @@ def run_process_queue(
 
         # run it on the first element
         if not process_queue:
-            st.success("All deployments have been processed!")
+            success_box("All deployments have been processed!")
             break
 
         deployment = process_queue[0]
@@ -365,6 +365,10 @@ def run_cls(cls_modelID, json_fpath, pbars):
     # Set environment variables for subprocess
     env = os.environ.copy()
     env['PYTHONPATH'] = ADDAXAI_FILES_ST
+    
+    # Fix MPS device issue on macOS by enabling CPU fallback
+    if OS_NAME == 'macos':
+        env['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
 
     status_placeholder = st.empty()
     process = subprocess.Popen(
@@ -859,17 +863,34 @@ def show_cls_model_info_modal(model_info):
             print_widget_label("Description", "history_edu")
             st.write(description)
 
-        all_classes = model_info.get('all_classes', None)
-        if all_classes and all_classes != []:
-            st.write("")
-            print_widget_label("Classes", "pets")
-            formatted_classes = [format_class_name(cls) for cls in all_classes]
-            if len(formatted_classes) == 1:
-                string = formatted_classes[0] + "."
-            else:
-                string = ', '.join(
-                    formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
-            st.write(string.capitalize())
+        # Get model ID to fetch classes from taxon mapping instead of variables.json
+        model_id = model_info.get('id', None)
+        if model_id:
+            try:
+                all_classes = get_all_classes_from_taxon_mapping(model_id)
+                if all_classes and all_classes != []:
+                    st.write("")
+                    print_widget_label("Classes", "pets")
+                    formatted_classes = [format_class_name(cls) for cls in all_classes]
+                    if len(formatted_classes) == 1:
+                        string = formatted_classes[0] + "."
+                    else:
+                        string = ', '.join(
+                            formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
+                    st.write(string.capitalize())
+            except Exception:
+                # Fallback to old behavior if taxon mapping fails
+                all_classes = model_info.get('all_classes', None)
+                if all_classes and all_classes != []:
+                    st.write("")
+                    print_widget_label("Classes", "pets")
+                    formatted_classes = [format_class_name(cls) for cls in all_classes]
+                    if len(formatted_classes) == 1:
+                        string = formatted_classes[0] + "."
+                    else:
+                        string = ', '.join(
+                            formatted_classes[:-1]) + ', and ' + formatted_classes[-1] + "."
+                    st.write(string.capitalize())
 
         developer = model_info.get('developer', None)
         if developer and developer != "":
@@ -988,7 +1009,7 @@ def download_model(
     with col_cancel:
         if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
             cancel_download(download_modelID, cancel_key)
-    st.divider()
+    # st.divider()
 
     # check if it is an detection or classification model
     if download_modelID in model_meta['det']:
@@ -1093,7 +1114,7 @@ def cancel_installation(env_name, cancel_key):
     try:
         if os.path.exists(temp_path):
             shutil.rmtree(temp_path)
-            st.success("Cleaned up temporary files.")
+            success_box("Cleaned up temporary files.")
     except Exception as e:
         st.error(f"Could not clean temp directory: {e}")
 
@@ -1114,7 +1135,7 @@ def cancel_download(download_modelID, cancel_key):
     try:
         if os.path.exists(temp_path):
             shutil.rmtree(temp_path)
-            st.success("Cleaned up temporary files.")
+            success_box("Cleaned up temporary files.")
     except Exception as e:
         st.error(f"Could not clean temp directory: {e}")
 
@@ -1143,7 +1164,7 @@ def cancel_processing(cancel_key):
                 selected_folder, "addaxai-deployment-in-progress.json")
             if os.path.exists(in_progress_json_path):
                 os.remove(in_progress_json_path)
-        st.success("Cleaned up in-progress processing files.")
+        success_box("Cleaned up in-progress processing files.")
     except Exception as e:
         st.error(f"Could not clean files: {e}")
 
@@ -1167,7 +1188,7 @@ def install_env(env_name: str):
     with col_cancel:
         if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
             cancel_installation(env_name, cancel_key)
-    st.divider()
+    # st.divider()
 
     environment_file = os.path.join(
         ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
@@ -1201,110 +1222,110 @@ def install_env(env_name: str):
 
     # Placeholder for status messages above the expander
     status_placeholder = st.empty()
+    with st.container(border=True):
+        with st.spinner(f"Installing virtual environment '{env_name}'..."):
+            with st.expander("Show details", expanded=False):
+                with st.container(border=True, height=300):
+                    output_placeholder = st.empty()
 
-    with st.spinner(f"Installing virtual environment '{env_name}'..."):
-        with st.expander("show details", expanded=False):
-            with st.container(border=True, height=300):
-                output_placeholder = st.empty()
+                    # deque keeps only last 10 lines
+                    last_lines = deque(maxlen=10)
+                    last_lines.append("booting up micromamba installation...\n")
+                    output_placeholder.code("".join(last_lines), language="bash")
 
-                # deque keeps only last 10 lines
-                last_lines = deque(maxlen=10)
-                last_lines.append("booting up micromamba installation...\n")
-                output_placeholder.code("".join(last_lines), language="bash")
+                    last_lines.append(f"$ {' '.join(cmd)}\n")
+                    output_placeholder.code("".join(last_lines), language="bash")
 
-                last_lines.append(f"$ {' '.join(cmd)}\n")
-                output_placeholder.code("".join(last_lines), language="bash")
+                    try:
+                        # Create process with new process group for proper killing
+                        if os.name == 'nt':  # Windows
+                            process = subprocess.Popen(
+                                cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                bufsize=1,
+                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+                            )
+                        else:  # Unix/Linux/macOS
+                            process = subprocess.Popen(
+                                cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                bufsize=1,
+                                preexec_fn=os.setsid
+                            )
 
-                try:
-                    # Create process with new process group for proper killing
-                    if os.name == 'nt':  # Windows
-                        process = subprocess.Popen(
-                            cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
-                            text=True,
-                            bufsize=1,
-                            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-                        )
-                    else:  # Unix/Linux/macOS
-                        process = subprocess.Popen(
-                            cmd,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
-                            text=True,
-                            bufsize=1,
-                            preexec_fn=os.setsid
-                        )
+                        st.session_state["current_process"] = process
 
-                    st.session_state["current_process"] = process
-
-                    # Simple output reading - cancellation is handled by button killing process
-                    for line in process.stdout:
-                        last_lines.append(line)
-                        output_placeholder.code(
-                            "".join(last_lines), language="bash")
-
-                    rc = process.wait()
-                    st.session_state["current_process"] = None
-
-                    if rc != 0:
-                        last_lines.append(
-                            f"\nInstallation failed with exit code {rc}\n")
-                        output_placeholder.code(
-                            "".join(last_lines), language="bash")
-                        status_placeholder.error(
-                            f"Installation failed with exit code {rc}")
-                        return
-
-                    # Success - run post-install command if env-megadetector
-                    # to install speciesnet on macos, we need the --use-pep517 flag
-                    # which cannot be added to the environment.yml file
-                    # hence a separate post-install command
-                    if env_name == "megadetector":
-                        last_lines.append(
-                            f"\nInstalling additional package: speciesnet...\n")
-                        output_placeholder.code(
-                            "".join(last_lines), language="bash")
-                        post_cmd = [
-                            MICROMAMBA, "run", "-p", temp_path,
-                            "pip", "install", "--use-pep517", "speciesnet==5.0.1",
-                        ]
-
-                        post_process = subprocess.run(
-                            post_cmd, capture_output=True, text=True)
-                        if post_process.returncode != 0:
-                            last_lines.append(
-                                f"Post-install failed: {post_process.stderr}\n")
-                            output_placeholder.code(
-                                "".join(last_lines), language="bash")
-                            status_placeholder.error("Post-install failed")
-                            return
-                        else:
-                            last_lines.append(
-                                f"speciesnet installed successfully!\n")
+                        # Simple output reading - cancellation is handled by button killing process
+                        for line in process.stdout:
+                            last_lines.append(line)
                             output_placeholder.code(
                                 "".join(last_lines), language="bash")
 
-                    # Move from temp to final location
-                    last_lines.append(
-                        f"\nMoving environment to final location...\n")
-                    output_placeholder.code(
-                        "".join(last_lines), language="bash")
-                    shutil.move(temp_path, final_path)
-
-                    last_lines.append(
-                        f"\nEnvironment installation completed successfully!\n")
-                    output_placeholder.code(
-                        "".join(last_lines), language="bash")
-
-                except Exception as e:
-                    if "current_process" in st.session_state and st.session_state["current_process"]:
+                        rc = process.wait()
                         st.session_state["current_process"] = None
-                    last_lines.append(f"\nInstallation error: {e}\n")
-                    output_placeholder.code(
-                        "".join(last_lines), language="bash")
-                    status_placeholder.error(f"Installation error: {e}")
-                    return
+
+                        if rc != 0:
+                            last_lines.append(
+                                f"\nInstallation failed with exit code {rc}\n")
+                            output_placeholder.code(
+                                "".join(last_lines), language="bash")
+                            status_placeholder.error(
+                                f"Installation failed with exit code {rc}")
+                            return
+
+                        # Success - run post-install command if env-megadetector
+                        # to install speciesnet on macos, we need the --use-pep517 flag
+                        # which cannot be added to the environment.yml file
+                        # hence a separate post-install command
+                        if env_name == "megadetector":
+                            last_lines.append(
+                                f"\nInstalling additional package: speciesnet...\n")
+                            output_placeholder.code(
+                                "".join(last_lines), language="bash")
+                            post_cmd = [
+                                MICROMAMBA, "run", "-p", temp_path,
+                                "pip", "install", "--use-pep517", "speciesnet==5.0.1",
+                            ]
+
+                            post_process = subprocess.run(
+                                post_cmd, capture_output=True, text=True)
+                            if post_process.returncode != 0:
+                                last_lines.append(
+                                    f"Post-install failed: {post_process.stderr}\n")
+                                output_placeholder.code(
+                                    "".join(last_lines), language="bash")
+                                status_placeholder.error("Post-install failed")
+                                return
+                            else:
+                                last_lines.append(
+                                    f"speciesnet installed successfully!\n")
+                                output_placeholder.code(
+                                    "".join(last_lines), language="bash")
+
+                        # Move from temp to final location
+                        last_lines.append(
+                            f"\nMoving environment to final location...\n")
+                        output_placeholder.code(
+                            "".join(last_lines), language="bash")
+                        shutil.move(temp_path, final_path)
+
+                        last_lines.append(
+                            f"\nEnvironment installation completed successfully!\n")
+                        output_placeholder.code(
+                            "".join(last_lines), language="bash")
+
+                    except Exception as e:
+                        if "current_process" in st.session_state and st.session_state["current_process"]:
+                            st.session_state["current_process"] = None
+                        last_lines.append(f"\nInstallation error: {e}\n")
+                        output_placeholder.code(
+                            "".join(last_lines), language="bash")
+                        status_placeholder.error(f"Installation error: {e}")
+                        return
 
     # Success!
     status_placeholder.success("Environment successfully installed!")
@@ -2432,6 +2453,26 @@ def load_taxon_mapping_cached(cls_model_ID):
     return st.session_state[cache_key]
 
 
+def get_all_classes_from_taxon_mapping(cls_model_ID):
+    """
+    Extract all unique model_class values from the cached taxon_mapping.
+    
+    Args:
+        cls_model_ID: The classification model ID
+        
+    Returns:
+        list: Unique sorted list of all classes from taxon-mapping.csv
+    """
+    # Get cached taxon mapping
+    taxon_mapping = load_taxon_mapping_cached(cls_model_ID)
+    
+    # Extract all unique model_class values
+    all_classes = list(set(row['model_class'] for row in taxon_mapping if 'model_class' in row))
+    
+    # Return sorted list for consistency
+    return sorted(all_classes)
+
+
 def sort_leaf_first(nodes):
     leaves = []
     parents = []
@@ -2650,28 +2691,35 @@ def add_deployment_to_queue():
 def read_selected_species(cls_model_ID):
     """
     Read the selected_classes from the model's variables.json file.
+    If selected_classes is not present, returns all classes from taxon-mapping.csv.
 
     Args:
         cls_model_ID: The classification model ID
 
     Returns:
         list: The selected_classes list from the model's variables.json, 
-              empty list if file doesn't exist or has no selected_classes
+              or all classes from taxon-mapping.csv if selected_classes not present
     """
     try:
         json_path = os.path.join(
             ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "variables.json")
 
         if not os.path.exists(json_path):
-            return []
+            # No variables.json file, return all classes from taxon mapping
+            return get_all_classes_from_taxon_mapping(cls_model_ID)
 
         with open(json_path, "r") as f:
             data = json.load(f)
 
-        return data.get("selected_classes", [])
+        # If selected_classes key exists, return it; otherwise return all classes
+        if "selected_classes" in data:
+            return data["selected_classes"]
+        else:
+            return get_all_classes_from_taxon_mapping(cls_model_ID)
 
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
-        return []
+        # On any error, return all classes from taxon mapping
+        return get_all_classes_from_taxon_mapping(cls_model_ID)
 
 
 def write_selected_species(selected_species, cls_model_ID):
