@@ -11,17 +11,16 @@
 #############################################
 ############### MODEL GENERIC ###############
 #############################################
-# catch shell arguments
-import sys
-AddaxAI_files = str(sys.argv[1])
-cls_model_fpath = str(sys.argv[2])
-cls_detec_thresh = float(sys.argv[3])
-cls_class_thresh = float(sys.argv[4])
-smooth_bool = True if sys.argv[5] == 'True' else False
-json_path = str(sys.argv[6])
-temp_frame_folder =  None if str(sys.argv[7]) == 'None' else str(sys.argv[7])
-cls_tax_fallback = True if sys.argv[8] == 'True' else False
-cls_tax_levels_idx = int(sys.argv[9])
+# Parse command line arguments
+import argparse
+
+parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
+parser.add_argument('--model-path', required=True, help='Path to the classification model file')
+parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
+
+args = parser.parse_args()
+cls_model_fpath = args.model_path
+json_path = args.json_path
 
 # lets not freak out over truncated images
 from PIL import ImageFile
@@ -246,15 +245,9 @@ def get_crop(image, bbox):
 ############### MODEL GENERIC ###############
 #############################################
 # run main function
-import AddaxAI.classification_utils.inference_lib as ea
-ea.classify_MD_json(json_path = json_path,
-                    GPU_availability = GPU_availability,
-                    cls_detec_thresh = cls_detec_thresh,
-                    cls_class_thresh = cls_class_thresh,
-                    smooth_bool = smooth_bool,
-                    crop_function = get_crop,
-                    inference_function = get_classification,
-                    temp_frame_folder = temp_frame_folder,
-                    cls_model_fpath = cls_model_fpath,
-                    cls_tax_fallback = cls_tax_fallback,
-                    cls_tax_levels_idx = cls_tax_levels_idx)
+import classification.cls_inference as ea
+
+ea.create_raw_classifications(json_path= json_path,
+                               GPU_availability= GPU_availability,
+                               crop_function=get_crop,
+                               inference_function=get_classification,)

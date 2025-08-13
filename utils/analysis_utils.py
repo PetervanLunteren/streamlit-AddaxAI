@@ -194,7 +194,7 @@ def run_process_queue(
     with col_cancel:
         if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
             cancel_processing(cancel_key)
-    st.divider()
+    # st.divider()
 
     # overall_progress = st.empty()
     pbars = MultiProgressBars(container_label="Processing...",)
@@ -347,26 +347,20 @@ def run_cls(cls_modelID, json_fpath, pbars):
     python_executable = f"{ADDAXAI_FILES_ST}/envs/env-{model_info['env']}/bin/python"
     inference_script = os.path.join(
         ADDAXAI_FILES_ST, "classification", "model_types", model_info["type"], "classify_detections.py")
-    AddaxAI_files = ADDAXAI_FILES
-    cls_detec_thresh = 0.01
-    cls_class_thresh = 0.01
-    cls_animal_smooth = False
-    temp_frame_folder = "None"
-    cls_tax_fallback = False
-    cls_tax_levels_idx = 0
+    # AddaxAI_files = ADDAXAI_FILES
+    # cls_detec_thresh = 0.01
+    # cls_class_thresh = 0.01
+    # cls_animal_smooth = False
+    # temp_frame_folder = "None"
+    # cls_tax_fallback = False
+    # cls_tax_levels_idx = 0
 
-    command_args = []
-    command_args.append(python_executable)
-    command_args.append(inference_script)
-    command_args.append(AddaxAI_files)
-    command_args.append(cls_model_fpath)
-    command_args.append(str(cls_detec_thresh))
-    command_args.append(str(cls_class_thresh))
-    command_args.append(str(cls_animal_smooth))
-    command_args.append(json_fpath)
-    command_args.append(temp_frame_folder)
-    command_args.append(str(cls_tax_fallback))
-    command_args.append(str(cls_tax_levels_idx))
+    command_args = [
+        python_executable,
+        inference_script,
+        '--model-path', cls_model_fpath,
+        '--json-path', json_fpath
+    ]
 
     # Set environment variables for subprocess
     env = os.environ.copy()
@@ -2379,7 +2373,7 @@ def load_taxon_mapping(cls_model_ID):
         reader = csv.DictReader(f)
         for row in reader:
             taxon_mapping.append(row)
-
+ 
     return taxon_mapping
 
 
@@ -2458,60 +2452,73 @@ def build_taxon_tree(taxon_mapping):
               "level_family", "level_genus", "level_species"]
 
     for entry in taxon_mapping:
-
-        # If no proper class level, place under "Unknown taxonomy"
+        model_class = entry["model_class"].strip()
+        
+        # If no proper class level, place at root level with unknown taxonomy format
         if not entry.get("level_class", "").startswith("class "):
-            unknown_key = "<i>Unknown taxonomy</i>"
-            if unknown_key not in root:
-                root[unknown_key] = {
-                    "label": unknown_key,
-                    "value": unknown_key,
-                    "children": {}
-                }
-            current_level = root[unknown_key]["children"]
-
-            model_class = entry["model_class"].strip()
-            label = f"<b>{model_class}</b>"
+            taxonomic_value = entry.get("level_class", "").strip()
+            if not taxonomic_value:
+                taxonomic_value = model_class
+            label = f"{taxonomic_value} (<b>{model_class}</b>, <i>unknown taxonomy</i>)"
             value = model_class
-            if value not in current_level:
-                current_level[value] = {
+            if value not in root:
+                root[value] = {
                     "label": label,
                     "value": value,
                     "children": {}
                 }
-            continue  # Skip the normal taxonomic loop
+            continue
 
         current_level = root
         last_taxon_name = None
+        last_valid_taxonomic_level = None
+        
         for i, level in enumerate(levels):
             taxon_name = entry.get(level)
             if not taxon_name or taxon_name == "":
                 continue
 
             is_last_level = (i == len(levels) - 1)
+            has_taxonomic_prefix = (taxon_name.startswith("class ") or 
+                                  taxon_name.startswith("order ") or 
+                                  taxon_name.startswith("family ") or 
+                                  taxon_name.startswith("genus ") or 
+                                  taxon_name.startswith("species "))
 
             if not is_last_level:
-                if taxon_name == last_taxon_name:
-                    continue
-                label = taxon_name
-                value = taxon_name
+                # Check if this level has proper taxonomic information
+                if has_taxonomic_prefix:
+                    if taxon_name == last_taxon_name:
+                        continue
+                    label = taxon_name
+                    value = taxon_name
+                    last_valid_taxonomic_level = taxon_name
 
-                if value not in current_level:
-                    current_level[value] = {
-                        "label": label,
-                        "value": value,
-                        "children": {}
-                    }
-                current_level = current_level[value]["children"]
-                last_taxon_name = taxon_name
+                    if value not in current_level:
+                        current_level[value] = {
+                            "label": label,
+                            "value": value,
+                            "children": {}
+                        }
+                    current_level = current_level[value]["children"]
+                    last_taxon_name = taxon_name
+                else:
+                    # This level lacks taxonomic prefix - create entry with unknown taxonomy
+                    label = f"{taxon_name} (<b>{model_class}</b>, <i>unknown taxonomy</i>)"
+                    value = model_class
+                    if value not in current_level:
+                        current_level[value] = {
+                            "label": label,
+                            "value": value,
+                            "children": {}
+                        }
+                    break  # Stop processing further levels
 
-            else:
-                model_class = entry["model_class"].strip()
-                if taxon_name.startswith("class ") or \
-                    taxon_name.startswith("order ") or \
-                        taxon_name.startswith("family ") or \
-                taxon_name.startswith("genus "):
-                    label = f"{taxon_name} (<b>{model_class}</b>, <i>unspecified)</i>"
+            else:  # is_last_level
+                if taxon_name.startswith("species "):
+                    label = f"{taxon_name} (<b>{model_class}</b>)"
+                elif has_taxonomic_prefix:
+                    label = f"{taxon_name} (<b>{model_class}</b>, <i>unspecified</i>)"
                 else:
                     label = f"{taxon_name} (<b>{model_class}</b>)"
                 value = model_class
@@ -2521,7 +2528,6 @@ def build_taxon_tree(taxon_mapping):
                         "value": value,
                         "children": {}
                     }
-                # species is a leaf: do not update current_level
 
     def dict_to_list(d):
         result = []
