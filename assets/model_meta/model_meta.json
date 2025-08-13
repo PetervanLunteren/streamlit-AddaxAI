@@ -16,7 +16,7 @@
             "all_classes-KANWEG": [
                 "SpeciesNet is trained on over 2000 categories; a full list of categories is available in the model card: https://github.com/google/cameratrapai/blob/main/model_cards/v4.0.0a.md"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "SpeciesNet is trained on over 2000 categories; a full list of categories is available in the model card: https://github.com/google/cameratrapai/blob/main/model_cards/v4.0.0a.md"
             ],
             "var_cls_detec_thresh": "0.20",
@@ -62,7 +62,7 @@
                 "rhino",
                 "elephant"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "tiger",
                 "bird",
                 "leopard",
@@ -433,7 +433,7 @@
                 "yellow-whiskered greenbul",
                 "zorilla"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "aardvark",
                 "aardwolf",
                 "abbotts duiker",
@@ -824,7 +824,7 @@
                 "wild boar",
                 "cow"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "red deer"
             ],
             "var_cls_detec_thresh": "0.35",
@@ -954,7 +954,7 @@
                 "yellow_tailed_black_cockatoo",
                 "yellow_throated_honeyeater"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "bait",
                 "australian_pipit",
                 "australian_magpie",
@@ -1019,7 +1019,7 @@
                 "steenbok",
                 "zebra"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "aardwolf",
                 "african wild cat",
                 "baboon",
@@ -1096,7 +1096,7 @@
                 "wallaby",
                 "weka"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "caprid",
                 "cat",
                 "cow",
@@ -1187,7 +1187,7 @@
                 "White-lipped peccary",
                 "Yellow-foot tortoise"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "Coati"
             ],
             "var_cls_detec_thresh": "0.40",
@@ -1277,7 +1277,7 @@
                 "white-lipped peccary",
                 "white-tailed deer"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "andean bear",
                 "andean fox",
                 "andean guan",
@@ -1372,7 +1372,7 @@
                 "porcupine",
                 "wolf+jackal"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "antilope",
                 "bird",
                 "camel",
@@ -1430,7 +1430,7 @@
                 "muridae",
                 "leporidae"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "panthera_uncia",
                 "canidae",
                 "ochotonidae",
@@ -1504,7 +1504,7 @@
                 "vehicle",
                 "weasel"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "badger",
                 "beaver",
                 "bird",
@@ -1565,7 +1565,7 @@
                 "serow",
                 "squirrel"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "bear",
                 "bird",
                 "boar",
@@ -1693,7 +1693,7 @@
                 "yellow_eyed_penguin",
                 "yellowhammer"
             ],
-            "selected_classes": [
+            "selected_classes-KANWEG": [
                 "banded_dotterel",
                 "banded_rail",
                 "bellbird",

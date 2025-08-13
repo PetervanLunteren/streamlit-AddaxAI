@@ -2000,9 +2000,11 @@ def det_model_selector_widget(model_meta):
 
     with col2:
         if st.button(":material/info: Info", use_container_width=True, help="Model information", key="det_model_info_button"):
-            # Store model info in session state for modal access
+            # Store model info in session state for modal access, including the model ID
+            model_info_with_id = det_model_meta[selected_modelID].copy()
+            model_info_with_id['id'] = selected_modelID
             set_session_var(
-                "analyse_advanced", "modal_cls_model_info_data", det_model_meta[selected_modelID])
+                "analyse_advanced", "modal_cls_model_info_data", model_info_with_id)
             # Set session state flag to show modal on next rerun
             set_session_var("analyse_advanced",
                             "show_modal_cls_model_info", True)
@@ -2106,9 +2108,11 @@ def cls_model_selector_widget(model_meta):
     with col2:
         if selected_modelID != "NONE":
             if st.button(":material/info: Info", use_container_width=True, help="Model information", key="cls_model_info_button"):
-                # Store model info in session state for modal access
+                # Store model info in session state for modal access, including the model ID
+                model_info_with_id = cls_model_meta[selected_modelID].copy()
+                model_info_with_id['id'] = selected_modelID
                 set_session_var(
-                    "analyse_advanced", "modal_cls_model_info_data", cls_model_meta[selected_modelID])
+                    "analyse_advanced", "modal_cls_model_info_data", model_info_with_id)
                 # Set session state flag to show modal on next rerun
                 set_session_var("analyse_advanced",
                                 "show_modal_cls_model_info", True)
@@ -2456,6 +2460,7 @@ def load_taxon_mapping_cached(cls_model_ID):
 def get_all_classes_from_taxon_mapping(cls_model_ID):
     """
     Extract all unique model_class values from the cached taxon_mapping.
+    Falls back to reading directly from file if not in session state.
     
     Args:
         cls_model_ID: The classification model ID
@@ -2463,8 +2468,19 @@ def get_all_classes_from_taxon_mapping(cls_model_ID):
     Returns:
         list: Unique sorted list of all classes from taxon-mapping.csv
     """
-    # Get cached taxon mapping
-    taxon_mapping = load_taxon_mapping_cached(cls_model_ID)
+    # First try to get from cached session state
+    cache_key = f"taxon_mapping_{cls_model_ID}"
+    
+    if cache_key in st.session_state:
+        # Use cached version
+        taxon_mapping = st.session_state[cache_key]
+    else:
+        # Fallback: read directly from file (for cases like model info modal before download)
+        try:
+            taxon_mapping = load_taxon_mapping(cls_model_ID)
+        except (FileNotFoundError, Exception):
+            # If file doesn't exist or can't be read, return empty list
+            return []
     
     # Extract all unique model_class values
     all_classes = list(set(row['model_class'] for row in taxon_mapping if 'model_class' in row))
@@ -2474,7 +2490,7 @@ def get_all_classes_from_taxon_mapping(cls_model_ID):
 
 
 def sort_leaf_first(nodes):
-    leaves = []
+    leaves = [] 
     parents = []
 
     for node in nodes:

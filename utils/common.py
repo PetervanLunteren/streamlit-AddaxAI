@@ -366,11 +366,27 @@ def fetch_latest_model_info():
                                 taxon_mapping_file = os.path.join(model_dir, "taxon-mapping.csv")
                                 
                                 log(f"Downloading taxon-mapping.csv for {model_id} from: {taxon_mapping_url}")
-                                taxon_response = requests.get(taxon_mapping_url, timeout=15, headers=headers)
+                                # Don't use gzip encoding in headers to avoid compression issues
+                                taxon_headers = headers.copy()
+                                taxon_headers["Accept-Encoding"] = "identity"  # Request uncompressed content
+                                
+                                taxon_response = requests.get(taxon_mapping_url, timeout=15, headers=taxon_headers)
                                 
                                 if taxon_response.status_code == 200:
-                                    with open(taxon_mapping_file, 'wb') as f:
-                                        f.write(taxon_response.content)
+                                    # Check if content might be compressed by looking at the raw bytes
+                                    content = taxon_response.content
+                                    
+                                    # Try to detect if it's gzipped content
+                                    if content.startswith(b'\x1f\x8b'):  # Gzip magic number
+                                        import gzip
+                                        content = gzip.decompress(content)
+                                        log(f"Decompressed gzipped content for {model_id}")
+                                    
+                                    # Decode to text with UTF-8
+                                    text_content = content.decode('utf-8')
+                                    
+                                    with open(taxon_mapping_file, 'w', encoding='utf-8', newline='') as f:
+                                        f.write(text_content)
                                     log(f"Downloaded taxon-mapping.csv for {model_id}")
                                 else:
                                     log(f"Failed to download taxon-mapping.csv for {model_id}. Status: {taxon_response.status_code}")
