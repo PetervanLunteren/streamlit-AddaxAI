@@ -1,16 +1,25 @@
 import tkinter as tk
 from tkinter import filedialog
 import sys
+import os
 
-def select_folder():
+def select_folder(initial_dir=None):
     root = tk.Tk()
     root.withdraw()  # Hide the main tkinter window
-    folder_path = filedialog.askdirectory(master=root)
+    
+    # Use initial_dir if provided and exists, otherwise use system default
+    if initial_dir and os.path.exists(initial_dir):
+        folder_path = filedialog.askdirectory(master=root, initialdir=initial_dir)
+    else:
+        folder_path = filedialog.askdirectory(master=root)
+    
     root.destroy()
     return folder_path
 
 if __name__ == "__main__":
-    folder_path = select_folder()
+    # Accept initial directory as command line argument
+    initial_dir = sys.argv[1] if len(sys.argv) > 1 else None
+    folder_path = select_folder(initial_dir)
     if folder_path:
         print(folder_path)  # Return the folder path to stdout
     else:

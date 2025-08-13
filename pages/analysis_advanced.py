@@ -28,7 +28,8 @@ from utils.analysis_utils import (browse_directory_widget,
                                   add_location_modal,
                                   show_cls_model_info_modal,
                                   show_none_model_info_modal,
-                                  species_selector_modal
+                                  species_selector_modal,
+                                  folder_selector_modal
                                   )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -120,6 +121,13 @@ if get_session_var("analyse_advanced", "show_modal_none_model_info", False):
     with modal_show_none_model_info.container():
         show_none_model_info_modal()
  
+# modal for folder selector - only create when needed
+if get_session_var("analyse_advanced", "show_folder_selector_modal", False):
+    modal_folder_selector = Modal(
+        title="#### Folder selection", key="folder_selector", show_close_button=False)
+    with modal_folder_selector.container():
+        folder_selector_modal()
+
 # modal for species selector - only create when needed
 if get_session_var("analyse_advanced", "show_modal_species_selector", False):
     modal_species_selector = Modal(
@@ -155,7 +163,7 @@ st.write("Current step:", step)
 stepper = StepperBar(
     steps=["Folder", "Deployment", "Model", "Species"],
     orientation="horizontal",
-    active_color="#086164",
+    active_color="#086164", 
     completed_color="#0861647D",
     inactive_color="#dadfeb"
 )

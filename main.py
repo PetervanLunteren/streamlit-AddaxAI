@@ -19,7 +19,7 @@ The application uses an optimized startup/rerun pattern to minimize I/O operatio
 
 Architecture:
 - Three-tier variable storage: session_state (temp) → vars/*.json (persistent) → ~/.config/AddaxAI/map.json (global)
-- Write-through caching: Changes update both persistent storage and session_state
+- Write-through caching: Changes update both persistent storage and session_state 
 - Startup detection: if st.session_state == {} triggers initialization
 
 CLI to run:

@@ -1752,6 +1752,7 @@ def add_project(projectID, comments):
         "comments": comments,
         "locations": {},
     }
+    
 
     map["projects"] = projects  # add project
     # update selected project in general_settings and reset other selections in analyse_advanced
@@ -1787,29 +1788,15 @@ def browse_directory_widget():
     # Get selected folder from session state instead of persistent storage
     selected_folder = get_session_var("analyse_advanced", "selected_folder")
 
-    # st.write(st.session_state)
-
     col1, col2 = st.columns([1, 3])  # , vertical_alignment="center")
     with col1:
         if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
-            selected_folder = select_folder()
-            # Only update session state if a folder was actually selected
-            if selected_folder:
-                # Clear session state and set new folder selection
-                clear_vars(section="analyse_advanced")
-                set_session_var("analyse_advanced",
-                                "selected_folder", selected_folder)
-                # st.success(f"Selected folder: {selected_folder}")
-            else:
-                st.error("No folder selected or dialog was cancelled.")
-
-            # # reset session state variables
-            # st.session_state.clear()
+            # Set flag to show folder selection modal
+            set_session_var("analyse_advanced", "show_folder_selector_modal", True)
+            st.rerun()
 
     if not selected_folder:
         with col2:
-            # st.write('<span style="color: grey;"> None selected...</span>',
-            #          unsafe_allow_html=True)
             text = f'<span style="color: grey;"> None selected...</span>'
             st.markdown(
                 f"""
@@ -1824,8 +1811,6 @@ def browse_directory_widget():
             folder_short = "..." + \
                 selected_folder[-45:] if len(
                     selected_folder) > 45 else selected_folder
-            # st.markdown(
-            #     f'Selected folder <code style="color:#086164; font-family:monospace;">{folder_short}</code>', unsafe_allow_html=True)
 
             text = f"Selected &nbsp;&nbsp;<code style='color:#086164; font-family:monospace;'>{folder_short}</code>"
             st.markdown(
@@ -1839,11 +1824,62 @@ def browse_directory_widget():
     return selected_folder
 
 
+def folder_selector_modal():
+    """Handle the folder selection inside a modal"""
+    info_box("Folder selection dialog is open in a separate window. Please select your folder there (or press cancel in that window) to continue with AddaxAI.")
+    
+    # Trigger folder selection directly
+    selected_folder = select_folder()
+    
+    # Process result and close modal
+    if selected_folder:
+        # Clear session state and set new folder selection
+        clear_vars(section="analyse_advanced")
+        set_session_var("analyse_advanced", "selected_folder", selected_folder)
+    
+    # Always close modal after folder selection attempt
+    set_session_var("analyse_advanced", "show_folder_selector_modal", False)
+    st.rerun()
+
+
 def select_folder():
-    result = subprocess.run([sys.executable, os.path.join(
-        ADDAXAI_FILES_ST, "utils", "folder_selector.py")], capture_output=True, text=True)
+    # Get previously browsed folder from global config file
+    import json
+    config_file = os.path.join(os.getcwd(), "config", "general_settings.json")
+    initial_dir = None
+    
+    try:
+        with open(config_file, 'r') as f:
+            config = json.load(f)
+            previously_browsed_folder = config.get("previously_browsed_folder", None)
+            if previously_browsed_folder and os.path.exists(previously_browsed_folder):
+                initial_dir = previously_browsed_folder
+    except:
+        pass
+    
+    # Run folder selector with initial directory
+    cmd = [sys.executable, os.path.join(ADDAXAI_FILES_ST, "utils", "folder_selector.py")]
+    if initial_dir:
+        cmd.append(initial_dir)
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
     folder_path = result.stdout.strip()
+    
     if folder_path != "" and result.returncode == 0:
+        # Save parent directory of selected folder to global config
+        parent_dir = os.path.dirname(folder_path)
+        
+        if parent_dir:
+            # Save to global config file
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                config["previously_browsed_folder"] = parent_dir
+                with open(config_file, 'w') as f:
+                    json.dump(config, f, indent=2)
+            except:
+                pass
+        
         return folder_path
     else:
         return None

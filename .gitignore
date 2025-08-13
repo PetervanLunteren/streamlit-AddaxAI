@@ -2,8 +2,11 @@
 envs/*
 
 # But do NOT ignore the envs/reqs/ directory and its contents
-!envs/yamls/
-!envs/yamls/**
+!envs/ymls/
+!envs/ymls/**
+
+# Ignore mamba temp files inside envs/ymls/
+envs/ymls/**/mamba*
 
 # rest of the instructions (order matters!)
 **/.DS_Store
@@ -21,3 +24,6 @@ data/test-images/*
 
 # dont do config files
 config/*
+
+# dont commit claude stuff in any subfolder 
+**/.claude/
