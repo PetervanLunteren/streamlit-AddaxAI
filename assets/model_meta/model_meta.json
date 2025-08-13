@@ -13,7 +13,7 @@
             "license": "https://github.com/google/cameratrapai/blob/main/LICENSE",
             "total_download_size": "",
             "info_url": "https://github.com/google/cameratrapai/?tab=readme-ov-file#speciesnet",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "SpeciesNet is trained on over 2000 categories; a full list of categories is available in the model card: https://github.com/google/cameratrapai/blob/main/model_cards/v4.0.0a.md"
             ],
             "selected_classes": [
@@ -50,7 +50,7 @@
             "license": "https://opensource.org/license/mit",
             "total_download_size": "215 MB",
             "info_url": "https://alexvmt.github.io/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "tiger",
                 "bird",
                 "leopard",
@@ -105,7 +105,7 @@
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "total_download_size": "215 MB",
             "info_url": "https://addaxdatascience.com/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "aardvark",
                 "aardwolf",
                 "abbotts duiker",
@@ -788,7 +788,7 @@
             "license": "https://creativecommons.org/licenses/by-sa/4.0/",
             "total_download_size": "1.1 GB",
             "info_url": "https://www.deepfaune.cnrs.fr/en/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "bison",
                 "badger",
                 "ibex",
@@ -856,7 +856,7 @@
             "license": "https://creativecommons.org/licenses/by/4.0/",
             "total_download_size": "86 MB",
             "info_url": "https://github.com/zaandahl/mewc",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "antechinus",
                 "australian_fur_seal",
                 "australian_magpie",
@@ -987,7 +987,7 @@
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "total_download_size": "107 MB",
             "info_url": "https://addaxdatascience.com/projects/2023-01-dlc/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "aardwolf",
                 "african wild cat",
                 "baboon",
@@ -1077,7 +1077,7 @@
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "total_download_size": "32 MB",
             "info_url": "https://www.doc.govt.nz/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "caprid",
                 "cat",
                 "cow",
@@ -1143,7 +1143,7 @@
             "total_download_size": "247 MB",
             "info_url": "https://github.com/conservationtechlab",
             "license": "https://opensource.org/license/mit",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "Black-headed squirrel monkey",
                 "Brazilian rabbit",
                 "Brown agouti",
@@ -1222,7 +1222,7 @@
             "license": "https://opensource.org/license/mit",
             "total_download_size": "431 MB",
             "info_url": "https://github.com/conservationtechlab",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "andean bear",
                 "andean fox",
                 "andean guan",
@@ -1357,7 +1357,7 @@
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "total_download_size": "32 MB",
             "info_url": "https://addaxdatascience.com/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "antilope",
                 "bird",
                 "camel",
@@ -1417,7 +1417,7 @@
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "total_download_size": "472 MB",
             "info_url": "https://www.osi-panthera.org/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "panthera_uncia",
                 "canidae",
                 "ochotonidae",
@@ -1475,7 +1475,7 @@
             "license": "https://opensource.org/license/mit",
             "total_download_size": "431 MB",
             "info_url": "https://github.com/conservationtechlab",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "badger",
                 "beaver",
                 "bird",
@@ -1550,7 +1550,7 @@
             "license": "https://github.com/gifu-wildlife/MDetToolsForJCameraTraps?tab=MIT-1-ov-file",
             "total_download_size": "386 MB",
             "info_url": "https://github.com/gifu-wildlife/TrainingMdetClassifire",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "bear",
                 "bird",
                 "boar",
@@ -1614,7 +1614,7 @@
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "total_download_size": "85 MB",
             "info_url": "https://wekaresearch.com/",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "banded_dotterel",
                 "banded_rail",
                 "bellbird",
@@ -1795,7 +1795,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "animal",
                 "person",
                 "vehicle"
@@ -1812,7 +1812,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "animal",
                 "person",
                 "vehicle"
@@ -1829,7 +1829,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "animal",
                 "person",
                 "vehicle"
@@ -1846,7 +1846,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "animal",
                 "person",
                 "vehicle"
@@ -1863,7 +1863,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "animal",
                 "person",
                 "vehicle"
@@ -1880,7 +1880,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "animal",
                 "person",
                 "vehicle"
@@ -1897,7 +1897,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "all_classes": [
+            "all_classes-KANWEG": [
                 "animal",
                 "person",
                 "vehicle"
