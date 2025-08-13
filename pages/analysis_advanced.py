@@ -424,14 +424,21 @@ with st.container(border=True):
 
         with col_btn_next:
             if st.button(":material/playlist_add: Add to queue", use_container_width=True, type="primary"):
-                # Store selected species temporarily, then commit all to queue
-                set_session_var("analyse_advanced",
-                                "selected_species", selected_species)
-                # Reset step to beginning
-                set_session_var("analyse_advanced", "step", 0)
-                # Add deployment to persistent queue
-                add_deployment_to_queue()
-                st.rerun()
+                # Validation: Check if at least one species is selected for classification models
+                if selected_cls_modelID and selected_cls_modelID != "NONE" and not selected_species:
+                    warning_box(
+                        msg="At least one species must be selected for species classification.",
+                        title="Species selection required"
+                    )
+                else:
+                    # Store selected species temporarily, then commit all to queue
+                    set_session_var("analyse_advanced",
+                                    "selected_species", selected_species)
+                    # Reset step to beginning
+                    set_session_var("analyse_advanced", "step", 0)
+                    # Add deployment to persistent queue
+                    add_deployment_to_queue()
+                    st.rerun()
 
 
 # TODO: this shouldnt be in the same var as the other step vars etc., but step etc should be in the session state

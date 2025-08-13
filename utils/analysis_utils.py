@@ -71,7 +71,7 @@ import piexif
 
 # requires_addaxai_update, - UNUSED: Vulture detected unused import
 from utils.common import load_vars, update_vars, replace_vars, load_map, clear_vars, unique_animal_string, get_session_var, set_session_var, update_session_vars
-from components import MultiProgressBars, print_widget_label, info_box, success_box
+from components import MultiProgressBars, print_widget_label, info_box, success_box, warning_box
 
 
 from utils.config import *
