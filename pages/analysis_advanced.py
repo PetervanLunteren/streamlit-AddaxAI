@@ -29,7 +29,8 @@ from utils.analysis_utils import (browse_directory_widget,
                                   show_cls_model_info_modal,
                                   show_none_model_info_modal,
                                   species_selector_modal,
-                                  folder_selector_modal
+                                  folder_selector_modal,
+                                  check_selected_models_version_compatibility
                                   )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -372,13 +373,25 @@ with st.container(border=True):
                     (selected_cls_modelID == "NONE" and selected_det_modelID):
                 if not needs_installing:
                     if st.button(":material/arrow_forward: Next", use_container_width=True):
-                        # Store model selections temporarily and advance step
-                        update_session_vars("analyse_advanced", {
-                            "step": 3,
-                            "selected_cls_modelID": selected_cls_modelID,
-                            "selected_det_modelID": selected_det_modelID
-                        })
-                        st.rerun()
+                        # Check version compatibility before advancing
+                        is_compatible, incompatible_models = check_selected_models_version_compatibility(
+                            selected_cls_modelID, selected_det_modelID, model_meta)
+                        
+                        if is_compatible:
+                            # Store model selections temporarily and advance step
+                            update_session_vars("analyse_advanced", {
+                                "step": 3,
+                                "selected_cls_modelID": selected_cls_modelID,
+                                "selected_det_modelID": selected_det_modelID
+                            })
+                            st.rerun()
+                        else:
+                            # Show warning without rerunning
+                            for model in incompatible_models:
+                                warning_box(
+                                    title=f"Update required for {model['name']}",
+                                    msg=f"Minimum version <code style='color:#086164; font-family:monospace;'>v{model['required_version']}</code> required, but you have <code style='color:#086164; font-family:monospace;'>v{model['current_version']}</code>. Please visit https://addaxdatascience.com/addaxai/#install to update."
+                                )
                 else:
                     st.button(":material/arrow_forward: Next",
                               use_container_width=True, disabled=True,

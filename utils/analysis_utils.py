@@ -922,6 +922,46 @@ def show_cls_model_info_modal(model_info):
             print_widget_label("License", "copyright")
             st.write(license)
 
+        # Version check
+        min_version = model_info.get('min_version', None)
+        if min_version:
+            st.write("")
+            print_widget_label("Version requirement", "system_update")
+            
+            try:
+                # Read current AddaxAI version
+                with open('assets/version.txt', 'r') as file:
+                    current_AA_version = file.read().strip()
+                
+                # Parse version numbers (major.minor.patch)
+                def parse_version(version_str):
+                    return list(map(int, version_str.split('.')))
+                
+                current_version_parts = parse_version(current_AA_version)
+                min_version_parts = parse_version(min_version)
+                
+                # Compare versions
+                version_sufficient = True
+                for i in range(max(len(current_version_parts), len(min_version_parts))):
+                    current_part = current_version_parts[i] if i < len(current_version_parts) else 0
+                    min_part = min_version_parts[i] if i < len(min_version_parts) else 0
+                    
+                    if current_part < min_part:
+                        version_sufficient = False
+                        break
+                    elif current_part > min_part:
+                        break
+                
+                if version_sufficient:
+                    st.markdown(f"Minimum AddaxAI version required is <code style='color:#086164; font-family:monospace;'>v{min_version}</code>, while your current version is <code style='color:#086164; font-family:monospace;'>v{current_AA_version}</code>. You're good to go.", unsafe_allow_html=True)
+                else:
+                    model_name = model_info.get('friendly_name', 'this model')
+                    st.markdown(f"Update required for {model_name}. Minimum version <code style='color:#086164; font-family:monospace;'>v{min_version}</code> required, but you have <code style='color:#086164; font-family:monospace;'>v{current_AA_version}</code>.", unsafe_allow_html=True)
+                    st.write("Please visit https://addaxdatascience.com/addaxai/#install to update.")
+                    
+            except Exception as e:
+                st.write("Unable to verify version compatibility.")
+
     col1, _ = st.columns([1, 1])
     with col1:
         if st.button(":material/close: Close", use_container_width=True):
@@ -1828,10 +1868,10 @@ def browse_directory_widget():
                 unsafe_allow_html=True
             )
     else:
-        with col2:
+        with col2: 
             folder_short = "..." + \
                 selected_folder[-45:] if len(
-                    selected_folder) > 45 else selected_folder
+                    selected_folder) > 45 else selected_folder 
 
             text = f"Selected &nbsp;&nbsp;<code style='color:#086164; font-family:monospace;'>{folder_short}</code>"
             st.markdown(
@@ -2828,3 +2868,69 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
 
     return current_selected
     # st.write("Selected nodes:", current_selected)
+
+
+def check_selected_models_version_compatibility(selected_cls_modelID, selected_det_modelID, model_meta):
+    """
+    Check if selected models meet minimum version requirements.
+    
+    Args:
+        selected_cls_modelID: ID of selected classification model
+        selected_det_modelID: ID of selected detection model  
+        model_meta: Model metadata dictionary
+        
+    Returns:
+        tuple: (is_compatible, incompatible_models_list)
+    """
+    incompatible_models = []
+    
+    try:
+        # Read current AddaxAI version
+        with open('assets/version.txt', 'r') as file:
+            current_AA_version = file.read().strip()
+        
+        # Parse version numbers (major.minor.patch)
+        def parse_version(version_str):
+            return list(map(int, version_str.split('.')))
+        
+        def check_model_version(model_id, model_type):
+            if not model_id or model_id == "NONE":
+                return
+                
+            model_info = model_meta.get(model_type, {}).get(model_id, {})
+            min_version = model_info.get('min_version', None)
+            
+            if min_version:
+                current_version_parts = parse_version(current_AA_version)
+                min_version_parts = parse_version(min_version)
+                
+                # Compare versions
+                version_sufficient = True
+                for i in range(max(len(current_version_parts), len(min_version_parts))):
+                    current_part = current_version_parts[i] if i < len(current_version_parts) else 0
+                    min_part = min_version_parts[i] if i < len(min_version_parts) else 0
+                    
+                    if current_part < min_part:
+                        version_sufficient = False
+                        break
+                    elif current_part > min_part:
+                        break
+                
+                if not version_sufficient:
+                    model_name = model_info.get('friendly_name', model_id)
+                    incompatible_models.append({
+                        'name': model_name,
+                        'id': model_id,
+                        'required_version': min_version,
+                        'current_version': current_AA_version
+                    })
+        
+        # Check both models
+        check_model_version(selected_cls_modelID, 'cls')
+        check_model_version(selected_det_modelID, 'det')
+        
+        return len(incompatible_models) == 0, incompatible_models
+        
+    except Exception as e:
+        # If there's any error, assume compatibility to not block users
+        return True, []

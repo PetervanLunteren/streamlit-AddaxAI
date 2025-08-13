@@ -1,7 +1,6 @@
 
 # WAAR WAS IK? 
 # TODO: 
-# - zorgen dat de code de classes van de taxon-mappings.csv gebruikt, en niet de hardcoded classes in de yaml
 # - daarna testen met een fresh install en schone conda env
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
