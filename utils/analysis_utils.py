@@ -1376,34 +1376,44 @@ def install_env(env_name: str):
 
 
 def project_selector_widget():
+    # load persisted projects and (optionally) a remembered selection
+    projects, remembered_project_id = load_known_projects()
 
-    # check what is already known and selected
-    projects, selected_projectID = load_known_projects()
-
-    # if first project, show only button and no dropdown
-    if projects == {}:
+    if not projects:
         if st.button(":material/add_circle: Define your first project", use_container_width=True):
-            # Set session state flag to show modal on next rerun
             set_session_var("analyse_advanced", "show_modal_add_project", True)
             st.rerun()
+        return None
 
-    # if there are projects, show dropdown and button
-    else:
-        col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([3, 1])
 
-        # dropdown for existing projects
-        with col1:
-            options = list(projects.keys())
-            selected_index = options.index(
-                selected_projectID) if selected_projectID in options else 0
+    with col1:
+        # make option order stable
+        options = list(projects.keys())  # or sorted(projects.keys()) if order doesn't matter
 
-            # overwrite selected_projectID if user has selected a different project
-            selected_projectID = st.selectbox(
-                "Existing projects",
-                options=options,
-                index=selected_index,
-                label_visibility="collapsed"
-            )
+        ss_key = "selected_project_id"
+        widget_key = "project_selector"
+
+        # initialize session state once, or repair if invalid
+        if ss_key not in st.session_state or st.session_state[ss_key] not in options:
+            st.session_state[ss_key] = remembered_project_id if remembered_project_id in options else options[0]
+
+        # keep index in sync with session state, don't recompute from old vars
+        cur_idx = options.index(st.session_state[ss_key])
+
+        def on_change():
+            # streamlit stores the current widget value under `widget_key`
+            st.session_state[ss_key] = st.session_state[widget_key]
+            # optionally persist this choice here if you like (e.g., write to disk/db)
+
+        st.selectbox(
+            "Existing projects",
+            options=options,
+            index=cur_idx,
+            key=widget_key,                 # <<< unique, stable key
+            label_visibility="collapsed",
+            on_change=on_change
+        )
 
         # button to add a new project
         with col2:
@@ -1413,6 +1423,9 @@ def project_selector_widget():
                                 "show_modal_add_project", True)
                 st.rerun()
 
+        # Get the current selection from session state
+        selected_projectID = st.session_state[ss_key]
+        
         # adjust the selected project
         # map, _ = load_map()
         general_settings_vars = get_cached_vars(section="general_settings")
@@ -1992,24 +2005,40 @@ def det_model_selector_widget(model_meta):
         previously_selected_det_modelID = general_settings_vars.get(
             "previously_selected_det_modelID", DEFAULT_DETECTION_MODEL)
 
-    # Resolve previously selected modelID to display name
+    # Use session state as single source of truth
+    ss_key = "selected_det_model_display_name"
+    widget_key = "det_model_selectbox"
+
+    # Resolve previously selected modelID to display name for initialization
     previously_selected_display_name = next(
         (name for name, ID in modelID_lookup.items()
          if ID == previously_selected_det_modelID),
-        None
+        display_names[0] if display_names else None
     )
+
+    # Initialize session state once, or repair if invalid
+    if ss_key not in st.session_state or st.session_state[ss_key] not in display_names:
+        st.session_state[ss_key] = previously_selected_display_name or display_names[0]
+
+    # Keep index in sync with session state, don't recompute from old vars
+    cur_idx = display_names.index(st.session_state[ss_key])
+
+    def on_det_change():
+        # Update session state from widget value
+        st.session_state[ss_key] = st.session_state[widget_key]
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        selected_display_name = st.selectbox(
+        st.selectbox(
             "Select a model for detection",
             options=display_names,
-            index=display_names.index(
-                previously_selected_display_name) if previously_selected_display_name != None else 0,
-            label_visibility="collapsed"
+            index=cur_idx,
+            key=widget_key,
+            label_visibility="collapsed",
+            on_change=on_det_change
         )
 
-        selected_modelID = modelID_lookup[selected_display_name]
+        selected_modelID = modelID_lookup[st.session_state[ss_key]]
 
         # Store selection in session state
         set_session_var("analyse_advanced",
@@ -2100,23 +2129,40 @@ def cls_model_selector_widget(model_meta):
         previously_selected_modelID = general_settings_vars.get(
             "selected_modelID", DEFAULT_CLASSIFICATION_MODEL)
 
-    # Resolve previously selected modelID to display name
+    # Use session state as single source of truth
+    ss_key = "selected_cls_model_display_name"
+    widget_key = "cls_model_selectbox"
+
+    # Resolve previously selected modelID to display name for initialization
     previously_selected_display_name = next(
         (name for name, ID in modelID_lookup.items()
          if ID == previously_selected_modelID),
-        "NONE"
+        display_names[0] if display_names else none_display
     )
+
+    # Initialize session state once, or repair if invalid
+    if ss_key not in st.session_state or st.session_state[ss_key] not in display_names:
+        st.session_state[ss_key] = previously_selected_display_name
+
+    # Keep index in sync with session state, don't recompute from old vars
+    cur_idx = display_names.index(st.session_state[ss_key])
+
+    def on_cls_change():
+        # Update session state from widget value
+        st.session_state[ss_key] = st.session_state[widget_key]
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        selected_display_name = st.selectbox(
+        st.selectbox(
             "Select a model for classification",
             options=display_names,
-            index=display_names.index(previously_selected_display_name),
-            label_visibility="collapsed"
+            index=cur_idx,
+            key=widget_key,
+            label_visibility="collapsed",
+            on_change=on_cls_change
         )
 
-        selected_modelID = modelID_lookup[selected_display_name]
+        selected_modelID = modelID_lookup[st.session_state[ss_key]]
 
         # Store selection in session state
         set_session_var("analyse_advanced",
