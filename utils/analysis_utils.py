@@ -1826,7 +1826,7 @@ def browse_directory_widget():
 
 def folder_selector_modal():
     """Handle the folder selection inside a modal"""
-    info_box("Folder selection dialog is open in a separate window. Please select your folder there (or press cancel in that window) to continue with AddaxAI.")
+    info_box("Folder selection dialog is open in a separate window. Please select your folder there to continue with AddaxAI (or cancel in that window).")
     
     # Trigger folder selection directly
     selected_folder = select_folder()
