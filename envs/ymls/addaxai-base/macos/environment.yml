@@ -1,4 +1,4 @@
-name: addaxai-base
+name: env-addaxai-base
 channels:
   - conda-forge
   - defaults

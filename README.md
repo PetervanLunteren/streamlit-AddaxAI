@@ -4,6 +4,8 @@ A temporary repository to buid a new AddaxAI version. Completely separate from i
 
 ## Prerequisites
 
+**macOS Only**: This application is currently designed for macOS systems only.
+
 No external dependencies required! The application includes its own micromamba binary for managing Python environments.
 
 ## Installation
@@ -21,21 +23,15 @@ cd streamlit-AddaxAI
 The application includes its own micromamba binary, so no external conda installation is needed:
 
 ```bash
-# Create environment using included micromamba
-./bin/macos/micromamba env create -f envs/ymls/addaxai-base/environment.yml
-
-# Activate environment
-./bin/macos/micromamba activate addaxai-base
+# Create environment using included micromamba (installs in ./envs/env-addaxai-base)
+./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base
 ```
 
 ### 3. Launch Application
 
 ```bash
-# Make sure environment is activated
-./bin/macos/micromamba activate addaxai-base
-
-# Run the application
-streamlit run main.py
+# Run the application using the created environment
+./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 ```
 
 The application will open in your default web browser at `http://localhost:8501`.
