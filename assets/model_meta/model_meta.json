@@ -11,7 +11,7 @@
             "citation": "https://doi.org/10.1049/cvi2.12318",
             "license": "https://github.com/google/cameratrapai/blob/main/LICENSE",
             "info_url": "https://github.com/google/cameratrapai/?tab=readme-ov-file#speciesnet",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "TERRAI-NEP-v1": {
             "friendly_name": "Terai region Nepal",
@@ -24,7 +24,7 @@
             "citation": "",
             "license": "https://opensource.org/license/mit",
             "info_url": "https://alexvmt.github.io/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "SAH-DRY-ADS-v1": {
             "friendly_name": "Sub-Saharan Drylands",
@@ -37,7 +37,7 @@
             "citation": "https://joss.theoj.org/papers/10.21105/joss.05581",
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "info_url": "https://addaxdatascience.com/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "EUR-DF-v1-3": {
             "friendly_name": "Europe (Deepfaune v1.3)",
@@ -50,7 +50,7 @@
             "citation": "https://doi.org/10.1007/s10344-023-01742-7",
             "license": "https://creativecommons.org/licenses/by-sa/4.0/",
             "info_url": "https://www.deepfaune.cnrs.fr/en/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "TAS-BB-v1": {
             "friendly_name": "Tasmania",
@@ -63,7 +63,7 @@
             "citation": "https://ecoevorxiv.org/repository/view/6405/",
             "license": "https://creativecommons.org/licenses/by/4.0/",
             "info_url": "https://github.com/zaandahl/mewc",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "NAM-ADS-v1": {
             "friendly_name": "Namibian Desert",
@@ -76,7 +76,7 @@
             "citation": "https://joss.theoj.org/papers/10.21105/joss.05581",
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "info_url": "https://addaxdatascience.com/projects/2023-01-dlc/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "NZI-ADS-v1": {
             "friendly_name": "New Zealand invasives",
@@ -90,7 +90,7 @@
             "citation": "",
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "info_url": "https://www.doc.govt.nz/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "PAM-SDZWA-v1": {
             "friendly_name": "Peruvian Amazon",
@@ -102,7 +102,7 @@
             "env": "tensorflow-v1",
             "info_url": "https://github.com/conservationtechlab",
             "license": "https://opensource.org/license/mit",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "PAN-SDZWA-v1": {
             "friendly_name": "Perivuan Andes",
@@ -127,7 +127,7 @@
             "citation": "https://joss.theoj.org/papers/10.21105/joss.05581",
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "info_url": "https://addaxdatascience.com/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "KIR-HEX-v1": {
             "friendly_name": "Kirghizistan (Manas v1)",
@@ -141,7 +141,7 @@
             "citation": "",
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "info_url": "https://www.osi-panthera.org/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "SWUSA-SDZWA-v3": {
             "friendly_name": "Southwest USA v3",
@@ -153,7 +153,7 @@
             "type": "sdzwa-pt",
             "license": "https://opensource.org/license/mit",
             "info_url": "https://github.com/conservationtechlab",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "GIF-JAP-v0-2": {
             "friendly_name": "Gifu region Japan",
@@ -167,7 +167,7 @@
             "citation": "https://jglobal.jst.go.jp/en/detail?JGLOBAL_ID=201902236803626745",
             "license": "https://github.com/gifu-wildlife/MDetToolsForJCameraTraps?tab=MIT-1-ov-file",
             "info_url": "https://github.com/gifu-wildlife/TrainingMdetClassifire",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "NZS-WEK-v1": {
             "friendly_name": "New Zealand species (Alita v1)",
@@ -181,7 +181,7 @@
             "citation": "",
             "license": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
             "info_url": "https://wekaresearch.com/",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         }
     },
     "det": {
@@ -194,7 +194,7 @@
             "developer": "Dan Morris",
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "MD5B-0-0": {
             "friendly_name": "MegaDetector 5b",
@@ -206,7 +206,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "MD1000-REDWOOD-0-0": {
             "friendly_name": "MegaDetector 1000 Redwood",
@@ -218,7 +218,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "MD1000-SPRUCE-0-0": {
             "friendly_name": "MegaDetector 1000 Spruce",
@@ -230,7 +230,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "MD1000-CEDAR-0-0": {
             "friendly_name": "MegaDetector 1000 Cedar",
@@ -242,7 +242,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "MD1000-LARCH-0-0": {
             "friendly_name": "MegaDetector 1000 Larch",
@@ -254,7 +254,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         },
         "MD1000-SORREL-0-0": {
             "friendly_name": "MegaDetector 1000 Sorrel",
@@ -266,7 +266,7 @@
             "type": "base",
             "info_url": "https://github.com/agentmorris/MegaDetector",
             "citation": "https://arxiv.org/abs/1907.06772",
-            "min_version": "7.00.00"
+            "min_version": "17.00.00"
         }
     }
 }
