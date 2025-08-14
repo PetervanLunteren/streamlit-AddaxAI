@@ -17,7 +17,6 @@ dependencies:
     - st-checkbox-tree
     - streamlit-antd-components
     - st-flexible-callout-elements
-    - streamlit-modal
     - streamlit-lottie
     
     # Image processing and metadata
