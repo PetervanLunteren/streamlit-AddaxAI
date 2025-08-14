@@ -25,7 +25,6 @@ class MultiProgressBars:
         self.wait_labels = {}
         self.pre_labels = {}
         self.done_labels = {}
-        self.statuses = {}
         self.show_device = {}
         self.device_info = {}
         self.label_divider = " \u00A0\u00A0 | \u00A0\u00A0 "
@@ -37,7 +36,7 @@ class MultiProgressBars:
         else:
             self.label_placeholder.empty()
 
-    def add_pbar(self, label, max_value=None, show_device=False):
+    def add_pbar(self, label, max_value=None, show_device=False, wait_text="Waiting...", pre_text="Starting...", running_text="Running...", done_text="Done"):
         """Add a new progress bar to the container."""
         container = self.container.container()
         pbar_id = label
@@ -47,11 +46,11 @@ class MultiProgressBars:
         self.show_device[pbar_id] = show_device
         self.device_info[pbar_id] = None
         
-        # Generate phase labels from base label
-        wait_label = f"**{label}**{self.label_divider}Waiting..."
-        pre_label = f"**{label}**{self.label_divider}Starting..."
-        active_prefix = f"**{label}**{self.label_divider}Running..."
-        done_label = f"**{label}**{self.label_divider}Done"
+        # Generate phase labels from base label with custom text
+        wait_label = f"**{label}**{self.label_divider}{wait_text}"
+        pre_label = f"**{label}**{self.label_divider}{pre_text}"
+        active_prefix = f"**{label}**{self.label_divider}{running_text}"
+        done_label = f"**{label}**{self.label_divider}{done_text}"
         
         self.active_prefixes[pbar_id] = active_prefix
         self.wait_labels[pbar_id] = wait_label
@@ -222,3 +221,4 @@ class MultiProgressBars:
         
         # Update the progress bar
         self.update(pbar_id, n - self.states[pbar_id], text=label)
+

@@ -59,6 +59,7 @@ from datetime import datetime, time
 import os
 from pathlib import Path
 from utils.huggingface_downloader import HuggingFaceRepoDownloader
+from utils.config import log
 
 from datetime import datetime
 
@@ -199,11 +200,10 @@ def run_process_queue(
     pbars = MultiProgressBars(container_label="Processing...",)
 
     pbars.add_pbar(label="Detection", show_device=True)
-    pbars.add_pbar(label="Classification", show_device=True)
+    pbars.add_pbar(label="Classification", show_device=True, done_text="Finalizing...")
 
     # calculate the total number of deployments to process
-    process_queue = get_cached_vars(
-        section="analyse_advanced").get("process_queue", [])
+    process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
     total_deployment_idx = len(process_queue)
     current_deployment_idx = 1
 
@@ -247,6 +247,9 @@ def run_process_queue(
         selected_min_datetime = deployment['selected_min_datetime']
         selected_det_modelID = deployment['selected_det_modelID']
         selected_cls_modelID = deployment['selected_cls_modelID']
+        selected_country = deployment.get('selected_country', None)
+        selected_state = deployment.get('selected_state', None)
+
 
         # Create JSON file with in-progress suffix during processing
         in_progress_json_path = os.path.join(
@@ -277,8 +280,12 @@ def run_process_queue(
             if st.session_state.get(cancel_key, False):
                 break
 
-            classification_success = run_cls(
-                selected_cls_modelID, in_progress_json_path, pbars)
+            if selected_cls_modelID.startswith("SPECIESNET"):
+                classification_success = run_speciesnet(
+                    selected_cls_modelID, in_progress_json_path, pbars, selected_country, selected_state)
+            else:
+                classification_success = run_cls(
+                    selected_cls_modelID, in_progress_json_path, pbars)
 
             # If classification was cancelled or failed, skip to next iteration
             if classification_success is False:
@@ -296,7 +303,9 @@ def run_process_queue(
                 "folder": selected_folder,
                 "min_datetime": selected_min_datetime,
                 "det_modelID": selected_det_modelID,
-                "cls_modelID": selected_cls_modelID
+                "cls_modelID": selected_cls_modelID,
+                "country": selected_country,
+                "state": selected_state
             }
 
             # write the updated map to the map file
@@ -369,6 +378,9 @@ def run_cls(cls_modelID, json_fpath, pbars):
     if OS_NAME == 'macos':
         env['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
 
+    # Log the command for debugging/audit purposes
+    log(f"\n\nRunning classification command:\n{' '.join(command_args)}\n")
+
     status_placeholder = st.empty()
     process = subprocess.Popen(
         command_args,
@@ -403,6 +415,102 @@ def run_cls(cls_modelID, json_fpath, pbars):
             f"Failed with exit code {process.returncode}.")
 
 
+def run_speciesnet(cls_modelID, json_fpath, pbars, country=None, state=None):
+    """
+    Run SpeciesNet classifier on the given deployment using the MegaDetector + SpeciesNet script.
+    
+    Args:
+        cls_modelID (str): SpeciesNet model ID (e.g., "SPECIESNET-v4-0-1-A-v1")
+        json_fpath (str): Path to MegaDetector JSON results file
+        pbars: Progress bar manager for UI updates
+        country (str, optional): Country code for geofencing (e.g., "USA", "KEN")
+        state (str, optional): State code for geofencing (e.g., "CA", "TX" - US only)
+    
+    Returns:
+        bool: True if successful, False if cancelled or failed
+    """
+    # Skip classification if no model selected
+    if cls_modelID == "NONE":
+        return True
+
+    # Construct model path
+    cls_model_dir = os.path.join(ADDAXAI_ROOT, "models", "cls", cls_modelID)
+    
+    # Create output file path (replace input file with speciesnet output)
+    output_file = json_fpath.replace("-in-progress.json", "-speciesnet-output.json")
+    
+    # Get the folder containing images (parent of the json file)
+    deployment_folder = os.path.dirname(json_fpath)
+    
+    # Build command for run_md_and_speciesnet
+    command = [
+        f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python",
+        "-m", "megadetector.detection.run_md_and_speciesnet",
+        deployment_folder,  # source folder
+        output_file,        # output file  
+        "--detections_file", json_fpath,  # skip detection, use existing results
+        "--classification_model", cls_model_dir,  # local model directory
+        "--loader_workers", "1",  # Reduce workers to avoid multiprocessing issues
+        "--classifier_batch_size", "4",  # Smaller batch size for stability
+        "--verbose"  # Enable verbose output for debugging
+    ]
+    
+    # Add geofencing parameters if specified
+    if country:
+        command.extend(["--country", country])
+        log(f"SpeciesNet geofencing enabled for country: {country}")
+        
+        if state and country == "USA":
+            command.extend(["--admin1_region", state])
+            log(f"SpeciesNet geofencing enabled for US state: {state}")
+
+    # Log the command for debugging/audit purposes
+    log(f"\n\nRunning SpeciesNet command:\n{' '.join(command)}\n")
+
+    status_placeholder = st.empty()
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        shell=False,
+        universal_newlines=True,
+        cwd=ADDAXAI_ROOT  # Set working directory to project root
+    )
+
+    for line in process.stdout:
+        # Check if processing was cancelled
+        if st.session_state.get("cancel_processing", False):
+            log("SpeciesNet classification cancelled by user - terminating subprocess")
+            process.terminate()
+            process.wait()
+            return False
+
+        line = line.strip()
+        log(line)
+        
+        # Update progress bar - SpeciesNet script outputs progress info
+        pbars.update_from_tqdm_string("Classification", line)
+
+    process.stdout.close()
+    process.wait()
+
+    if process.returncode != 0:
+        status_placeholder.error(f"SpeciesNet classification failed with exit code {process.returncode}.")
+        return False
+    
+    # Replace the original file with the SpeciesNet output
+    if os.path.exists(output_file):
+        if os.path.exists(json_fpath):
+            os.remove(json_fpath)
+        os.rename(output_file, json_fpath)
+        return True
+    else:
+        status_placeholder.error("SpeciesNet output file not created.")
+        return False
+
+
 def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
 
     model_file = os.path.join(
@@ -414,6 +522,9 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
         deployment_folder,
         output_file
     ]
+
+    # Log the command for debugging/audit purposes
+    log(f"\n\nRunning MegaDetector command:\n{' '.join(command)}\n")
 
     status_placeholder = st.empty()
     process = subprocess.Popen(
@@ -445,6 +556,62 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
     if not process.returncode == 0:
         status_placeholder.error(
             f"Failed with exit code {process.returncode}.")
+        return False
+    
+    # Clean up malformed bounding boxes after MegaDetector completes
+    _clean_malformed_bboxes(output_file)
+    return True
+
+
+def _clean_malformed_bboxes(json_file_path):
+    """
+    Clean up malformed bounding boxes (zero width/height) from MegaDetector results.
+    
+    Args:
+        json_file_path (str): Path to the MegaDetector JSON results file
+    """
+    try:
+        with open(json_file_path, 'r') as f:
+            data = json.load(f)
+        
+        total_detections = 0
+        removed_detections = 0
+        
+        for image_data in data.get('images', []):
+            if 'detections' not in image_data:
+                continue
+                
+            original_detections = image_data['detections']
+            total_detections += len(original_detections)
+            
+            # Filter out malformed bounding boxes
+            valid_detections = []
+            for detection in original_detections:
+                bbox = detection.get('bbox', [])
+                if len(bbox) >= 4:
+                    x, y, width, height = bbox[:4]
+                    # Keep detection if width and height are both > 0
+                    if width > 0 and height > 0:
+                        valid_detections.append(detection)
+                    else:
+                        removed_detections += 1
+                        log(f"Removed malformed bbox from {image_data.get('file', 'unknown')}: {bbox}")
+                else:
+                    removed_detections += 1
+                    log(f"Removed detection with invalid bbox format from {image_data.get('file', 'unknown')}: {bbox}")
+            
+            image_data['detections'] = valid_detections
+        
+        # Write cleaned data back to file
+        with open(json_file_path, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        if removed_detections > 0:
+            log(f"Cleaned {removed_detections}/{total_detections} malformed bounding boxes from detection results")
+        
+    except Exception as e:
+        log(f"Warning: Failed to clean malformed bounding boxes: {e}")
+
 
 # due to a bug there is extra whitespace below the map, so we use a custom class to reduce the height
 # https://discuss.streamlit.io/t/folium-map-white-space-under-the-map-on-the-first-rendering/84363
@@ -2586,6 +2753,8 @@ def add_deployment_to_queue():
     selected_cls_modelID = get_session_var(
         "analyse_advanced", "selected_cls_modelID")
     selected_species = get_session_var("analyse_advanced", "selected_species")
+    selected_country = get_session_var("analyse_advanced", "selected_country", None)
+    selected_state = get_session_var("analyse_advanced", "selected_state", None)
 
     # Create a new deployment entry
     new_deployment = {
@@ -2595,7 +2764,9 @@ def add_deployment_to_queue():
         "selected_min_datetime": selected_min_datetime,
         "selected_det_modelID": selected_det_modelID,
         "selected_cls_modelID": selected_cls_modelID,
-        "selected_species": selected_species
+        "selected_species": selected_species,
+        "selected_country": selected_country,
+        "selected_state": selected_state
     }
 
     # Add the new deployment to the queue

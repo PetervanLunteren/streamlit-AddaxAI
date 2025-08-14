@@ -4,7 +4,15 @@
 # - daarna testen met een fresh install en schone conda env
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
+# - select state must also be in print_widget_label
 
+
+
+# new TODOS:
+# - the modals are sometimes not fixed width
+# the buttons to delete and view the queue are not finished yet
+# parent_dir is still being selected at folder browse, not the folder itself
+# - select state must also be in print_widget_label
 
 """
 AddaxAI Streamlit Application - Main Entry Point
