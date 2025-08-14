@@ -734,9 +734,9 @@ def add_location_modal():
     m.add_child(fl.LatLngPopup())
 
     # render map
-    _, col_map_view, _ = st.columns([0.1, 1, 0.1])
+    _, col_map_view, _ = st.columns([0.05, 1, 0.05])
     with col_map_view:
-        map_data = render_map(height=280, width=600, m=m)
+        map_data = render_map(height=300, width=710, m=m)
 
     # update lat lng widgets when clicking on map
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
@@ -2753,8 +2753,24 @@ def add_deployment_to_queue():
     selected_cls_modelID = get_session_var(
         "analyse_advanced", "selected_cls_modelID")
     selected_species = get_session_var("analyse_advanced", "selected_species")
+    
+    # For country/state, get the current values from the widget's session state
+    # The country_selector_widget stores codes in these session vars via callbacks
     selected_country = get_session_var("analyse_advanced", "selected_country", None)
     selected_state = get_session_var("analyse_advanced", "selected_state", None)
+    
+    # If session vars are None but widget display states exist, derive from those
+    if selected_country is None:
+        country_display = get_session_var("analyse_advanced", "selected_country_display", None)
+        if country_display:
+            from assets.dicts.countries import countries_data
+            selected_country = countries_data.get(country_display, None)
+    
+    if selected_state is None:
+        state_display = get_session_var("analyse_advanced", "selected_state_display", None)
+        if state_display:
+            from assets.dicts.countries import us_states_data
+            selected_state = us_states_data.get(state_display, None)
 
     # Create a new deployment entry
     new_deployment = {
@@ -2785,6 +2801,35 @@ def add_deployment_to_queue():
     clear_vars("analyse_advanced")
 
     # return
+
+
+def remove_deployment_from_queue(index):
+    """Remove a deployment from the process queue by index."""
+    
+    # Load persistent queue from file
+    analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
+    process_queue = analyse_advanced_vars.get("process_queue", [])
+    
+    # Remove the deployment at the specified index
+    if 0 <= index < len(process_queue):
+        process_queue.pop(index)
+        
+        # Write back to the vars file
+        replace_vars(section="analyse_advanced", new_vars={
+            "process_queue": process_queue
+        })
+
+
+def get_model_friendly_name(model_id, model_type, model_meta):
+    """Get the friendly name for a model ID."""
+    if model_id == "NONE" or not model_id:
+        if model_type == "cls":
+            return "Generic animal detection (no identification)"
+        else:
+            return "No model selected"
+    
+    model_info = model_meta.get(model_type, {}).get(model_id, {})
+    return model_info.get('friendly_name', model_id)
 
 
 def read_selected_species(cls_model_ID):
@@ -2935,8 +2980,11 @@ def country_selector_widget():
     country_ss_key = "selected_country_display"
     country_widget_key = "country_selector"
     
+    # Get current display value from section-based session vars
+    current_country_display = get_session_var("analyse_advanced", country_ss_key, None)
+    
     # Initialize session state once, or repair if invalid
-    if country_ss_key not in st.session_state or st.session_state[country_ss_key] not in country_options:
+    if current_country_display is None or current_country_display not in country_options:
         # Find display name for remembered country code
         default_country = country_options[0]  # fallback
         if remembered_country:
@@ -2944,15 +2992,17 @@ def country_selector_widget():
                 if code == remembered_country and display_name in country_options:
                     default_country = display_name
                     break
-        st.session_state[country_ss_key] = default_country
+        current_country_display = default_country
+        set_session_var("analyse_advanced", country_ss_key, current_country_display)
     
     # Keep index in sync with session state, don't recompute from old vars
-    country_cur_idx = country_options.index(st.session_state[country_ss_key])
+    country_cur_idx = country_options.index(current_country_display)
     
     def on_country_change():
-        # Store both display name and code
-        st.session_state[country_ss_key] = st.session_state[country_widget_key]
-        selected_country_code = countries_data[st.session_state[country_widget_key]]
+        # Store both display name and code in section-based session vars
+        country_display = st.session_state[country_widget_key]
+        set_session_var("analyse_advanced", country_ss_key, country_display)
+        selected_country_code = countries_data[country_display]
         set_session_var("analyse_advanced", "selected_country", selected_country_code)
     
     selected_country_display = st.selectbox(
@@ -2964,7 +3014,9 @@ def country_selector_widget():
         label_visibility="collapsed"
     )
     
-    selected_country_code = countries_data[st.session_state[country_ss_key]]
+    # Get the current selection (either from callback or current display value)
+    current_country_display = get_session_var("analyse_advanced", country_ss_key, current_country_display)
+    selected_country_code = countries_data[current_country_display]
     selected_state_code = None
     
     # If USA is selected, show state selector
@@ -2974,8 +3026,11 @@ def country_selector_widget():
         state_ss_key = "selected_state_display"
         state_widget_key = "state_selector"
         
+        # Get current display value from section-based session vars
+        current_state_display = get_session_var("analyse_advanced", state_ss_key, None)
+        
         # Initialize session state once, or repair if invalid
-        if state_ss_key not in st.session_state or st.session_state[state_ss_key] not in state_options:
+        if current_state_display is None or current_state_display not in state_options:
             # Find display name for remembered state code
             default_state = state_options[0]  # fallback
             if remembered_state:
@@ -2983,15 +3038,17 @@ def country_selector_widget():
                     if code == remembered_state and state_name in state_options:
                         default_state = state_name
                         break
-            st.session_state[state_ss_key] = default_state
+            current_state_display = default_state
+            set_session_var("analyse_advanced", state_ss_key, current_state_display)
         
         # Keep index in sync with session state, don't recompute from old vars
-        state_cur_idx = state_options.index(st.session_state[state_ss_key])
+        state_cur_idx = state_options.index(current_state_display)
         
         def on_state_change():
-            # Store both display name and code
-            st.session_state[state_ss_key] = st.session_state[state_widget_key]
-            selected_state_code = us_states_data[st.session_state[state_widget_key]]
+            # Store both display name and code in section-based session vars
+            state_display = st.session_state[state_widget_key]
+            set_session_var("analyse_advanced", state_ss_key, state_display)
+            selected_state_code = us_states_data[state_display]
             set_session_var("analyse_advanced", "selected_state", selected_state_code)
         
         selected_state_display = st.selectbox(
@@ -3002,14 +3059,14 @@ def country_selector_widget():
             on_change=on_state_change
         )
         
-        selected_state_code = us_states_data[st.session_state[state_ss_key]]
+        # Get the current selection (either from callback or current display value)
+        current_state_display = get_session_var("analyse_advanced", state_ss_key, current_state_display)
+        selected_state_code = us_states_data[current_state_display]
         
     else:
         # Clear state selection if not USA
         set_session_var("analyse_advanced", "selected_state", None)
-        # Clear state display from session state too
-        if "selected_state_display" in st.session_state:
-            del st.session_state["selected_state_display"]
+        set_session_var("analyse_advanced", "selected_state_display", None)
     
     return selected_country_code, selected_state_code
 

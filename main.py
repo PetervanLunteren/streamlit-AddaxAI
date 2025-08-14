@@ -1,25 +1,20 @@
 
 # WAAR WAS IK? 
 # TODO: 
-# - daarna testen met een fresh install en schone conda env
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
-# - select state must also be in print_widget_label
-
-
 
 # new TODOS:
-# - the modals are sometimes not fixed width
-# the buttons to delete and view the queue are not finished yet
-# parent_dir is still being selected at folder browse, not the folder itself
+# - parent_dir is still being selected at folder browse, not the folder itself
 # - select state must also be in print_widget_label
+# - select state and country must be saved into the speciesnet variables json, so the next time the user selects the speciesnet model, it will have the last selected state and country
 
 """
 AddaxAI Streamlit Application - Main Entry Point
 
 This is the main entry point for the AddaxAI wildlife camera trap analysis platform.
 The application uses an optimized startup/rerun pattern to minimize I/O operations:
-- On startup (empty session_state): Load all files, initialize caches 
+- On startup (empty session_state): Load all files, initialize caches  
 - On reruns: Use cached data from session_state for maximum performance
 
 Architecture:

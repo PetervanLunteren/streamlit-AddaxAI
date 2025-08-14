@@ -9,7 +9,36 @@ footer {visibility: hidden;}
     padding-top: 25px !important;
 }
 
-/* Target all popover containers - works for species selector, add project, add location, etc. */
+/* Target st-modal containers - force 800px width */
+div[data-modal-container='true'] > div:first-child {
+    min-width: 800px !important;
+    width: 800px !important;
+    max-width: 800px !important;
+}
+
+div[data-modal-container='true'] > div:first-child > div:first-child > div:first-child {
+    min-width: 800px !important;
+    width: 800px !important;
+    max-width: 800px !important;
+    box-sizing: border-box !important;
+}
+
+/* Force all content inside modals to respect the 800px width */
+div[data-modal-container='true'] * {
+    max-width: none !important;
+    box-sizing: border-box !important;
+}
+
+/* Specific targeting for Streamlit widgets inside modals */
+div[data-modal-container='true'] .stTextInput > div,
+div[data-modal-container='true'] .stSelectbox > div,
+div[data-modal-container='true'] .stTextArea > div,
+div[data-modal-container='true'] .stButton > div,
+div[data-modal-container='true'] .stAlert {
+    width: 100% !important;
+    max-width: none !important;
+}
+
 [data-testid="stPopoverBody"] {
     width: 800px !important;  /* Adjust the width as needed */
     max-width: 90vw !important;          /* Optional: prevent overflow on small screens */

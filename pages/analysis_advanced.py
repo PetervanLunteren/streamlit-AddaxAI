@@ -22,6 +22,8 @@ from utils.analysis_utils import (browse_directory_widget,
                                   country_selector_widget,
                                   load_taxon_mapping_cached,
                                   add_deployment_to_queue,
+                                  remove_deployment_from_queue,
+                                  get_model_friendly_name,
                                   install_env,
                                   run_process_queue,
                                   download_model,
@@ -64,7 +66,7 @@ step = get_session_var("analyse_advanced", "step", 0)
 # modal for installing environment - only create when needed
 if get_session_var("analyse_advanced", "show_modal_install_env", False):
     modal_install_env = Modal(
-        f"#### Installing virtual environment", key="installing-env", show_close_button=False, max_width=800)
+        f"#### Installing virtual environment", key="installing-env", show_close_button=False)
     with modal_install_env.container():
         install_env(get_session_var(
             "analyse_advanced", "required_env_name"))
@@ -72,7 +74,7 @@ if get_session_var("analyse_advanced", "show_modal_install_env", False):
 # modal for downloading models - only create when needed
 if get_session_var("analyse_advanced", "show_modal_download_model", False):
     modal_download_model = Modal(
-        f"#### Downloading model...", key="download_model", show_close_button=False, max_width=800)
+        f"#### Downloading model...", key="download_model", show_close_button=False)
     with modal_download_model.container():
         download_model(get_session_var(
             "analyse_advanced", "download_modelID"), model_meta)
@@ -80,7 +82,7 @@ if get_session_var("analyse_advanced", "show_modal_download_model", False):
 # modal for processing queue - only create when needed
 if get_session_var("analyse_advanced", "show_modal_process_queue", False):
     modal_process_queue = Modal(
-        f"#### Processing deployments...", key="process_queue", show_close_button=False, max_width=800)
+        f"#### Processing deployments...", key="process_queue", show_close_button=False)
     with modal_process_queue.container():
         # Process queue should always be loaded from persistent storage
         process_queue = analyse_advanced_vars.get("process_queue", [])
@@ -95,21 +97,21 @@ if get_session_var("analyse_advanced", "show_modal_process_queue", False):
 # modal for adding new project - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_project", False):
     modal_add_project = Modal(
-        title="#### Describe new project", key="add_project", show_close_button=False, max_width=800)
+        title="#### Describe new project", key="add_project", show_close_button=False)
     with modal_add_project.container():
         add_project_modal()
 
 # modal for adding new location - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_location", False):
     modal_add_location = Modal(
-        f"#### Describe new location", key="add_location", show_close_button=False, max_width=800)
+        f"#### Describe new location", key="add_location", show_close_button=False)
     with modal_add_location.container():
         add_location_modal()
 
 # modal for showing classification model info - only create when needed
 if get_session_var("analyse_advanced", "show_modal_cls_model_info", False):
     modal_show_cls_model_info = Modal(
-        f"#### Model information", key="show_cls_model_info", show_close_button=False, max_width=800)
+        f"#### Model information", key="show_cls_model_info", show_close_button=False)
     with modal_show_cls_model_info.container():
         # Get model info from session state when modal is open
         model_info = get_session_var(
@@ -119,21 +121,21 @@ if get_session_var("analyse_advanced", "show_modal_cls_model_info", False):
 # modal for showing none model info - only create when needed
 if get_session_var("analyse_advanced", "show_modal_none_model_info", False):
     modal_show_none_model_info = Modal(
-        f"#### Model information", key="show_none_model_info", show_close_button=False, max_width=800)
+        f"#### Model information", key="show_none_model_info", show_close_button=False)
     with modal_show_none_model_info.container():
         show_none_model_info_modal()
  
 # modal for folder selector - only create when needed
 if get_session_var("analyse_advanced", "show_folder_selector_modal", False):
     modal_folder_selector = Modal(
-        title="#### Folder selection", key="folder_selector", show_close_button=False, max_width=800)
+        title="#### Folder selection", key="folder_selector", show_close_button=False)
     with modal_folder_selector.container():
         folder_selector_modal()
 
 # modal for species selector - only create when needed
 if get_session_var("analyse_advanced", "show_modal_species_selector", False):
     modal_species_selector = Modal(
-        f"#### Select species", key="species_selector", show_close_button=False, max_width=800)
+        f"#### Select species", key="species_selector", show_close_button=False)
     with modal_species_selector.container():
         # Get cached data from session state
         nodes = get_session_var("analyse_advanced", "modal_species_nodes", [])
@@ -455,7 +457,7 @@ with st.container(border=True):
                 is_none_model = (model_id == "NONE")
                 is_speciesnet = model_id.upper().startswith("SPECIESNET")
 
-                needs_species = bool(model_id) and not is_none_model and not is_speciesnet
+                needs_species = bool(model_id) and not is_none_model and not is_speciesnet 
 
                 if is_speciesnet and not selected_country:
                     warning_box(
@@ -525,19 +527,44 @@ else:
                         )
 
                     with col2:
-                        st.button(":material/delete:", help="Remove from queue", key=f"remove_{i}",
-                                  use_container_width=True)
+                        if st.button(":material/delete:", help="Remove from queue", key=f"remove_{i}",
+                                     use_container_width=True):
+                            remove_deployment_from_queue(i)
+                            st.rerun()
                     with col3:
                         # st.popover(f"Process {deployment['selected_folder']}")
                         with st.popover(":material/visibility:", help="Show details", use_container_width=True):
-                            st.write(
-                                f"**Project**: {deployment['selected_projectID']}")
-                            st.write(
-                                f"**Location**: {deployment['selected_locationID']}")
-                            st.write(
-                                f"**Species identification model**: {deployment['selected_cls_modelID']}")
-                            st.write(
-                                f"**Animal detection model**: {deployment['selected_det_modelID']}")
+                            # Format all deployment details with consistent styling
+                            folder_short = "..." + deployment['selected_folder'][-45:] if len(deployment['selected_folder']) > 45 else deployment['selected_folder']
+                            
+                            # Get friendly names for models
+                            cls_model_name = get_model_friendly_name(deployment['selected_cls_modelID'], 'cls', model_meta)
+                            det_model_name = get_model_friendly_name(deployment['selected_det_modelID'], 'det', model_meta)
+                            
+                            # Display all information in formatted style
+                            fields = [
+                                ("Folder", folder_short),
+                                ("Project", deployment['selected_projectID']),
+                                ("Location", deployment['selected_locationID']),
+                                ("Species identification model", cls_model_name),
+                                ("Animal detection model", det_model_name),
+                                ("Selected species", f"{len(deployment['selected_species'])} species" if deployment['selected_species'] else None),
+                                ("Country", deployment['selected_country']),
+                                ("State", deployment['selected_state']),
+                                ("Min datetime", str(deployment['selected_min_datetime']) if deployment['selected_min_datetime'] else None)
+                            ]
+                            
+                            # Only show fields that have values
+                            for field_name, field_value in fields:
+                                if field_value:
+                                    st.markdown(
+                                        f"""
+                                        <div style="margin-bottom: 3px;">
+                                            <strong>{field_name}:</strong> <code style='color:#086164; font-family:monospace;'>{field_value}</code>
+                                        </div>
+                                        """,
+                                        unsafe_allow_html=True
+                                    )
 
     if st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary"):
         # Set session state flag to show modal on next rerun
