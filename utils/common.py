@@ -21,7 +21,7 @@ except (KeyError, AttributeError):
     MAP_FILE_PATH = None
 
 # set versions
-with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'version.txt'), 'r') as file:
+with open(os.path.join(ADDAXAI_ROOT, 'assets', 'version.txt'), 'r') as file:
     
     current_AA_version = file.read().strip()
 
@@ -186,7 +186,7 @@ def update_session_vars(section, updates):
 
 
 def replace_vars(section, new_vars):
-    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
+    vars_file = os.path.join(ADDAXAI_ROOT, "AddaxAI",
                              "streamlit-AddaxAI", "config", f"{section}.json")
 
     # Overwrite with only the new updates
@@ -195,7 +195,7 @@ def replace_vars(section, new_vars):
 
 
 def update_vars(section, updates):
-    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
+    vars_file = os.path.join(ADDAXAI_ROOT, "AddaxAI",
                              "streamlit-AddaxAI", "config", f"{section}.json")
     if not os.path.exists(vars_file):
         with open(vars_file, "w", encoding="utf-8") as f:
@@ -241,7 +241,7 @@ def load_map():
 
 def load_vars(section):
     # if not exist, create empty vars file
-    vars_file = os.path.join(ADDAXAI_FILES, "AddaxAI",
+    vars_file = os.path.join(ADDAXAI_ROOT, "AddaxAI",
                              "streamlit-AddaxAI", "config", f"{section}.json")
     if not os.path.exists(vars_file):
         with open(vars_file, "w", encoding="utf-8") as f:
@@ -256,7 +256,7 @@ def load_vars(section):
 
 
 def load_lang_txts():
-    txts_fpath = os.path.join(ADDAXAI_FILES_ST, "assets", "language", "lang.json")
+    txts_fpath = os.path.join(ADDAXAI_ROOT, "assets", "language", "lang.json")
     with open(txts_fpath, "r", encoding="utf-8") as file:
         txts = json.load(file)
     return txts
@@ -285,8 +285,8 @@ def fetch_latest_model_info():
     
     # Define paths using the global ADDAXAI_FILES_ST from config
     model_meta_url = "https://raw.githubusercontent.com/PetervanLunteren/streamlit-AddaxAI/refs/heads/main/assets/model_meta/model_meta.json"
-    model_meta_local = os.path.join(ADDAXAI_FILES_ST, "assets", "model_meta", "model_meta.json")
-    models_dir = os.path.join(ADDAXAI_FILES_ST, "models")
+    model_meta_local = os.path.join(ADDAXAI_ROOT, "assets", "model_meta", "model_meta.json")
+    models_dir = os.path.join(ADDAXAI_ROOT, "models")
     
     try:
         log("Starting model metadata download...")
@@ -476,8 +476,8 @@ def check_model_availability(model_type, model_id, model_meta):
     model_fname = model_info["model_fname"]
     friendly_name = model_info["friendly_name"]
     
-    env_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
-    model_path = os.path.join(ADDAXAI_FILES_ST, "models", model_type, model_id, model_fname)
+    env_path = os.path.join(ADDAXAI_ROOT, "envs", f"env-{env_name}")
+    model_path = os.path.join(ADDAXAI_ROOT, "models", model_type, model_id, model_fname)
     
     return {
         'env_exists': os.path.exists(env_path),

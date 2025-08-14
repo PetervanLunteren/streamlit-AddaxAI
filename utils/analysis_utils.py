@@ -81,7 +81,7 @@ config_dir = user_config_dir("AddaxAI")
 map_file = os.path.join(config_dir, "map.json")
 
 # set versions
-with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'version.txt'), 'r') as file:
+with open(os.path.join(ADDAXAI_ROOT, 'assets', 'version.txt'), 'r') as file:
     current_AA_version = file.read().strip()
 
 
@@ -343,10 +343,10 @@ def run_cls(cls_modelID, json_fpath, pbars):
     model_info = model_meta['cls'][cls_modelID]
 
     cls_model_fpath = os.path.join(
-        ADDAXAI_FILES_ST, "models", "cls", cls_modelID, model_info["model_fname"])
-    python_executable = f"{ADDAXAI_FILES_ST}/envs/env-{model_info['env']}/bin/python"
+        ADDAXAI_ROOT, "models", "cls", cls_modelID, model_info["model_fname"])
+    python_executable = f"{ADDAXAI_ROOT}/envs/env-{model_info['env']}/bin/python"
     inference_script = os.path.join(
-        ADDAXAI_FILES_ST, "classification", "model_types", model_info["type"], "classify_detections.py")
+        ADDAXAI_ROOT, "classification", "model_types", model_info["type"], "classify_detections.py")
     # AddaxAI_files = ADDAXAI_FILES
     # cls_detec_thresh = 0.01
     # cls_class_thresh = 0.01
@@ -364,7 +364,7 @@ def run_cls(cls_modelID, json_fpath, pbars):
 
     # Set environment variables for subprocess
     env = os.environ.copy()
-    env['PYTHONPATH'] = ADDAXAI_FILES_ST
+    env['PYTHONPATH'] = ADDAXAI_ROOT
     
     # Fix MPS device issue on macOS by enabling CPU fallback
     if OS_NAME == 'macos':
@@ -379,7 +379,7 @@ def run_cls(cls_modelID, json_fpath, pbars):
         bufsize=1,
         shell=False,
         universal_newlines=True,
-        cwd=ADDAXAI_FILES_ST,  # Set working directory to project root
+        cwd=ADDAXAI_ROOT,  # Set working directory to project root
         env=env  # Pass environment with PYTHONPATH
     )
 
@@ -407,9 +407,9 @@ def run_cls(cls_modelID, json_fpath, pbars):
 def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
 
     model_file = os.path.join(
-        ADDAXAI_FILES_ST, "models", "det", det_modelID, model_meta["model_fname"])
+        ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
     command = [
-        f"{ADDAXAI_FILES_ST}/envs/env-megadetector/bin/python",
+        f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python",
         "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data",
         model_file,
         deployment_folder,
@@ -425,7 +425,7 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
         bufsize=1,
         shell=False,
         universal_newlines=True,
-        cwd=ADDAXAI_FILES_ST  # Set working directory to project root
+        cwd=ADDAXAI_ROOT  # Set working directory to project root
     )
 
     for line in process.stdout:
@@ -1059,7 +1059,7 @@ def download_model(
         download_model_info = model_meta['cls'][download_modelID]
         download_model_type = "cls"
 
-    final_dir = os.path.join(ADDAXAI_FILES_ST, "models",
+    final_dir = os.path.join(ADDAXAI_ROOT, "models",
                              download_model_type, download_modelID)
     temp_dir = os.path.join(TEMP_DIR, f"model-{download_modelID}")
 
@@ -1231,8 +1231,8 @@ def install_env(env_name: str):
     # st.divider()
 
     environment_file = os.path.join(
-        ADDAXAI_FILES_ST, "envs", "ymls", env_name, OS_NAME, "environment.yml")
-    final_path = os.path.join(ADDAXAI_FILES_ST, "envs", f"env-{env_name}")
+        ADDAXAI_ROOT, "envs", "ymls", env_name, OS_NAME, "environment.yml")
+    final_path = os.path.join(ADDAXAI_ROOT, "envs", f"env-{env_name}")
     temp_path = os.path.join(TEMP_DIR, f"env-{env_name}")
 
     if not os.path.exists(environment_file):
@@ -1932,7 +1932,7 @@ def select_folder():
         pass
     
     # Run folder selector with initial directory
-    cmd = [sys.executable, os.path.join(ADDAXAI_FILES_ST, "utils", "folder_selector.py")]
+    cmd = [sys.executable, os.path.join(ADDAXAI_ROOT, "utils", "folder_selector.py")]
     if initial_dir:
         cmd.append(initial_dir)
     
@@ -1965,7 +1965,7 @@ def select_folder():
 
 def load_model_metadata():
     model_info_json = os.path.join(
-        ADDAXAI_FILES_ST, "assets", "model_meta", "model_meta.json")
+        ADDAXAI_ROOT, "assets", "model_meta", "model_meta.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
     return model_info
@@ -2241,7 +2241,7 @@ def load_all_model_info(type):
 
     # load
     model_info_json = os.path.join(
-        ADDAXAI_FILES_ST, "model_info.json")
+        ADDAXAI_ROOT, "model_info.json")
     with open(model_info_json, "r") as file:
         model_info = json.load(file)
 
@@ -2513,7 +2513,7 @@ def format_class_name(s):
 def load_taxon_mapping(cls_model_ID):
     """Load taxon mapping CSV file for classification model (original function)"""
     taxon_mapping_csv = os.path.join(
-        ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "taxon-mapping.csv")
+        ADDAXAI_ROOT, "models", "cls", cls_model_ID, "taxon-mapping.csv")
 
     taxon_mapping = []
     with open(taxon_mapping_csv, newline='', encoding='utf-8') as f:
@@ -2804,7 +2804,7 @@ def read_selected_species(cls_model_ID):
     """
     try:
         json_path = os.path.join(
-            ADDAXAI_FILES_ST, "models", "cls", cls_model_ID, "variables.json")
+            ADDAXAI_ROOT, "models", "cls", cls_model_ID, "variables.json")
 
         if not os.path.exists(json_path):
             # No variables.json file, return all classes from taxon mapping
@@ -2826,7 +2826,7 @@ def read_selected_species(cls_model_ID):
 
 def write_selected_species(selected_species, cls_model_ID):
     # Construct the path to the JSON file
-    json_path = os.path.join(ADDAXAI_FILES_ST, "models",
+    json_path = os.path.join(ADDAXAI_ROOT, "models",
                              "cls", cls_model_ID, "variables.json")
 
     # Load the existing JSON content

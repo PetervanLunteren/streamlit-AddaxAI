@@ -20,7 +20,7 @@ from components import print_widget_label, StepperBar, info_box, warning_box
 from utils.common import (
     init_session_state, get_session_var, set_session_var, update_session_vars, clear_vars
 )
-from utils.config import ADDAXAI_FILES_ST
+from utils.config import ADDAXAI_ROOT
 
 # Initialize session state for this tool
 init_session_state("human_verification")
@@ -34,7 +34,7 @@ def create_sample_detection_data():
     """Create fictional detection DataFrame with realistic wildlife data"""
     
     # Get list of available test images
-    test_images_dir = os.path.join(ADDAXAI_FILES_ST, "data", "test-images")
+    test_images_dir = os.path.join(ADDAXAI_ROOT, "data", "test-images")
     available_images = [f for f in os.listdir(test_images_dir) if f.endswith('.jpg')]
     
     # Species categories for realistic data

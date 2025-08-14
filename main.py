@@ -72,7 +72,7 @@ sys.stdout.reconfigure(line_buffering=True)
 # Configure Streamlit page settings
 st.set_page_config(
     initial_sidebar_state="auto", 
-    page_icon=os.path.join(ADDAXAI_FILES_ST, "assets", "images", "logo_square.png"), 
+    page_icon=os.path.join(ADDAXAI_ROOT, "assets", "images", "logo_square.png"), 
     page_title="AddaxAI"
 )
 
@@ -82,7 +82,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Load and inject custom CSS (only on startup for performance)
-with open(os.path.join(ADDAXAI_FILES_ST, "assets", "css", "styles.css"), "r") as f:
+with open(os.path.join(ADDAXAI_ROOT, "assets", "css", "styles.css"), "r") as f:
     css_content = f.read()
 st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
@@ -98,7 +98,7 @@ if st.session_state == {}:
     # ─────────────────────────────────────────────────────────────────────────
     
     # Load Lottie animation for startup loading screen
-    lottie_animation_fpath = os.path.join(ADDAXAI_FILES_ST, "assets", "loaders", "squirrel.json")
+    lottie_animation_fpath = os.path.join(ADDAXAI_ROOT, "assets", "loaders", "squirrel.json")
     with open(lottie_animation_fpath, "r") as f:
         lottie_animation = json.load(f)
 
@@ -169,7 +169,7 @@ if st.session_state == {}:
             json.dump(map, f, indent=2)
 
     # Initialize general_settings.json if it doesn't exist
-    general_settings_file = os.path.join(ADDAXAI_FILES_ST, "config", f"general_settings.json")
+    general_settings_file = os.path.join(ADDAXAI_ROOT, "config", f"general_settings.json")
     if not os.path.exists(general_settings_file):
         
         # Create config directory if needed
@@ -215,8 +215,8 @@ if st.session_state == {}:
     st.session_state["model_meta"] = load_model_metadata()
     
     # Archive previous session log and create fresh log (only on startup)
-    log_fpath = os.path.join(ADDAXAI_FILES_ST, "assets", "logs", "log.txt")
-    previous_sessions_dir = os.path.join(ADDAXAI_FILES_ST, "assets", "logs", "previous_sessions")
+    log_fpath = os.path.join(ADDAXAI_ROOT, "assets", "logs", "log.txt")
+    previous_sessions_dir = os.path.join(ADDAXAI_ROOT, "assets", "logs", "previous_sessions")
     
     try:
         # Create previous_sessions directory if it doesn't exist
@@ -271,7 +271,7 @@ model_meta = st.session_state["model_meta"]
 # ─────────────────────────────────────────────────────────────────────────
 
 # Display application logo
-st.logo(os.path.join(ADDAXAI_FILES_ST, "assets", "images", "logo.png"), size="large")
+st.logo(os.path.join(ADDAXAI_ROOT, "assets", "images", "logo.png"), size="large")
 
 # Create navigation based on selected mode
 if mode == 0:  # Simple mode - single analysis tool only

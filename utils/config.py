@@ -57,20 +57,16 @@ OS_NAME = get_os_name()
 # CORE DIRECTORY STRUCTURE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Root AddaxAI installation directory
-# Path calculation: utils/config.py -> utils -> streamlit-AddaxAI -> AddaxAI -> AddaxAI_files
-ADDAXAI_FILES = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
-
-# Streamlit application directory - points directly to the streamlit app root
+# Root AddaxAI streamlit installation directory - points directly to the streamlit app root
 # Path calculation: utils/config.py -> utils -> streamlit-AddaxAI/
-ADDAXAI_FILES_ST = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+ADDAXAI_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 # Platform-specific micromamba binary for conda environment management
 # Used by tools to create and activate conda environments for different AI models
-MICROMAMBA = os.path.join(ADDAXAI_FILES_ST, "bin", OS_NAME, "micromamba")
+MICROMAMBA = os.path.join(ADDAXAI_ROOT, "bin", OS_NAME, "micromamba")
 
 # folder for storing temporary files, like inomplete downloads
-TEMP_DIR = os.path.join(ADDAXAI_FILES_ST, "assets", "temp")
+TEMP_DIR = os.path.join(ADDAXAI_ROOT, "assets", "temp")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MEDIA FILE PROCESSING CONSTANTS
@@ -101,7 +97,7 @@ def log(msg):
     Note: This is a simple logging function. The main.py file handles log rotation
     and archival of previous sessions.
     """
-    with open(os.path.join(ADDAXAI_FILES_ST, 'assets', 'logs', 'log.txt'), 'a') as f:
+    with open(os.path.join(ADDAXAI_ROOT, 'assets', 'logs', 'log.txt'), 'a') as f:
         f.write(f"{msg}\n")
     print(msg)
 

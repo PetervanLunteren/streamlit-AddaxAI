@@ -4,7 +4,7 @@ import sys
 import platform
 import os
 
-from utils.config import ADDAXAI_FILES_ST
+from utils.config import ADDAXAI_ROOT
 from utils.common import load_lang_txts, load_vars, load_map, set_session_var, update_vars
 
 
@@ -33,7 +33,7 @@ lang_selected = st.selectbox(
 if st.button("Start from scratch", use_container_width=True, type="primary"):
     
     # remove all config files in the config directory
-    config_dir = os.path.join(ADDAXAI_FILES_ST, "config")
+    config_dir = os.path.join(ADDAXAI_ROOT, "config")
     for filename in os.listdir(config_dir):
         file_path = os.path.join(config_dir, filename)
         if os.path.isfile(file_path):
