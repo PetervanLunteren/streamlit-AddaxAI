@@ -11,12 +11,10 @@ dependencies:
     - streamlit-extras
     - streamlit-aggrid
     
-    # Map and visualization components
+    # Map and UI components
     - folium
     - streamlit-folium
-    - streamlit-tree-select
-    
-    # UI components
+    - st-checkbox-tree
     - streamlit-antd-components
     - st-flexible-callout-elements
     - streamlit-modal

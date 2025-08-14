@@ -190,7 +190,7 @@ def run_process_queue(
     )
 
     # Show cancel button at the top
-    _, col_cancel, _ = st.columns([1, 2, 1])
+    _, col_cancel, _ = st.columns([2, 1, 2])
     with col_cancel:
         if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
             cancel_processing(cancel_key)
@@ -1034,7 +1034,7 @@ def download_model(
     if st.session_state.get(download_key, False):
         st.info("Download already in progress... Please wait.")
         # Show cancel button at the top during ongoing download
-        _, col_cancel, _ = st.columns([1, 2, 1])
+        _, col_cancel, _ = st.columns([2, 1, 2])
         with col_cancel:
             if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
                 cancel_download(download_modelID, cancel_key)
@@ -1045,7 +1045,7 @@ def download_model(
     )
 
     # Show cancel button at the top
-    _, col_cancel, _ = st.columns([1, 2, 1])
+    _, col_cancel, _ = st.columns([2, 1, 2])
     with col_cancel:
         if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
             cancel_download(download_modelID, cancel_key)
@@ -1224,7 +1224,7 @@ def install_env(env_name: str):
     info_box("The queue is currently being processed. Do not refresh the page or close the app, as this will interrupt the processing.")
 
     # Show cancel button at the top
-    _, col_cancel, _ = st.columns([1, 2, 1])
+    _, col_cancel, _ = st.columns([2, 1, 2])
     with col_cancel:
         if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
             cancel_installation(env_name, cancel_key)
