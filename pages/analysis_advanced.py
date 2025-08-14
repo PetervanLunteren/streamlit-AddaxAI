@@ -63,7 +63,7 @@ step = get_session_var("analyse_advanced", "step", 0)
 # modal for installing environment - only create when needed
 if get_session_var("analyse_advanced", "show_modal_install_env", False):
     modal_install_env = Modal(
-        f"#### Installing virtual environment", key="installing-env", show_close_button=False)
+        f"#### Installing virtual environment", key="installing-env", show_close_button=False, max_width=800)
     with modal_install_env.container():
         install_env(get_session_var(
             "analyse_advanced", "required_env_name"))
@@ -71,7 +71,7 @@ if get_session_var("analyse_advanced", "show_modal_install_env", False):
 # modal for downloading models - only create when needed
 if get_session_var("analyse_advanced", "show_modal_download_model", False):
     modal_download_model = Modal(
-        f"#### Downloading model...", key="download_model", show_close_button=False)
+        f"#### Downloading model...", key="download_model", show_close_button=False, max_width=800)
     with modal_download_model.container():
         download_model(get_session_var(
             "analyse_advanced", "download_modelID"), model_meta)
@@ -79,7 +79,7 @@ if get_session_var("analyse_advanced", "show_modal_download_model", False):
 # modal for processing queue - only create when needed
 if get_session_var("analyse_advanced", "show_modal_process_queue", False):
     modal_process_queue = Modal(
-        f"#### Processing deployments...", key="process_queue", show_close_button=False)
+        f"#### Processing deployments...", key="process_queue", show_close_button=False, max_width=800)
     with modal_process_queue.container():
         # Process queue should always be loaded from persistent storage
         process_queue = analyse_advanced_vars.get("process_queue", [])
@@ -94,21 +94,21 @@ if get_session_var("analyse_advanced", "show_modal_process_queue", False):
 # modal for adding new project - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_project", False):
     modal_add_project = Modal(
-        title="#### Describe new project", key="add_project", show_close_button=False)
+        title="#### Describe new project", key="add_project", show_close_button=False, max_width=800)
     with modal_add_project.container():
         add_project_modal()
 
 # modal for adding new location - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_location", False):
     modal_add_location = Modal(
-        f"#### Describe new location", key="add_location", show_close_button=False)
+        f"#### Describe new location", key="add_location", show_close_button=False, max_width=800)
     with modal_add_location.container():
         add_location_modal()
 
 # modal for showing classification model info - only create when needed
 if get_session_var("analyse_advanced", "show_modal_cls_model_info", False):
     modal_show_cls_model_info = Modal(
-        f"#### Model information", key="show_cls_model_info", show_close_button=False)
+        f"#### Model information", key="show_cls_model_info", show_close_button=False, max_width=800)
     with modal_show_cls_model_info.container():
         # Get model info from session state when modal is open
         model_info = get_session_var(
@@ -118,21 +118,21 @@ if get_session_var("analyse_advanced", "show_modal_cls_model_info", False):
 # modal for showing none model info - only create when needed
 if get_session_var("analyse_advanced", "show_modal_none_model_info", False):
     modal_show_none_model_info = Modal(
-        f"#### Model information", key="show_none_model_info", show_close_button=False)
+        f"#### Model information", key="show_none_model_info", show_close_button=False, max_width=800)
     with modal_show_none_model_info.container():
         show_none_model_info_modal()
  
 # modal for folder selector - only create when needed
 if get_session_var("analyse_advanced", "show_folder_selector_modal", False):
     modal_folder_selector = Modal(
-        title="#### Folder selection", key="folder_selector", show_close_button=False)
+        title="#### Folder selection", key="folder_selector", show_close_button=False, max_width=800)
     with modal_folder_selector.container():
         folder_selector_modal()
 
 # modal for species selector - only create when needed
 if get_session_var("analyse_advanced", "show_modal_species_selector", False):
     modal_species_selector = Modal(
-        f"#### Select species", key="species_selector", show_close_button=False)
+        f"#### Select species", key="species_selector", show_close_button=False, max_width=800)
     with modal_species_selector.container():
         # Get cached data from session state
         nodes = get_session_var("analyse_advanced", "modal_species_nodes", [])
