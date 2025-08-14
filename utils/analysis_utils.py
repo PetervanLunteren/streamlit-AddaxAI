@@ -38,7 +38,7 @@ Cache keys stored in st.session_state:
 """
 
 
-from streamlit_tree_select import tree_select  # pip install st-checkbox-tree
+from st_checkbox_tree import checkbox_tree  # pip install st-checkbox-tree
 import os
 import json
 import streamlit as st
@@ -803,7 +803,7 @@ def species_selector_modal(nodes, all_leaf_values):
 
     with st.container(border=True, height=400):
         # pip install st-checkbox-tree
-        selected = tree_select(
+        selected = checkbox_tree(
             nodes,
             check_model="leaf",
             checked=selected_nodes,
