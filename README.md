@@ -24,7 +24,7 @@ The application includes its own micromamba binary, so no external conda install
 
 ```bash
 # Create environment using included micromamba (installs in ./envs/env-addaxai-base)
-./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base
+./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
 ```
 
 ### 3. Launch Application
