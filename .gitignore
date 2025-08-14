@@ -27,3 +27,6 @@ config/*
 
 # dont commit claude stuff in any subfolder 
 **/.claude/
+
+# anything in temp is not relevant
+assets/temp/*
