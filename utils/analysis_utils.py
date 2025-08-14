@@ -69,7 +69,6 @@ from hachoir.parser import createParser
 import piexif
 
 
-# requires_addaxai_update, - UNUSED: Vulture detected unused import
 from utils.common import load_vars, update_vars, replace_vars, load_map, clear_vars, unique_animal_string, get_session_var, set_session_var, update_session_vars
 from components import MultiProgressBars, print_widget_label, info_box, success_box, warning_box
 
@@ -1675,103 +1674,6 @@ def load_known_locations():
     return locations, selected_locationID
 
 
-# UNUSED FUNCTION - Vulture detected unused function
-# def load_known_deployments():
-#     settings, _ = get_cached_map()
-#     general_settings_vars = get_cached_vars(section="general_settings")
-#     selected_projectID = general_settings_vars.get("selected_projectID")
-#     project = settings["projects"][selected_projectID]
-#
-#     # Get selections from session state instead of persistent storage
-#     selected_locationID = get_session_var("analyse_advanced", "selected_locationID")
-#     location = project["locations"][selected_locationID]
-#     deployments = location["deployments"]
-#     selected_deploymentID = get_session_var("analyse_advanced", "selected_deploymentID")
-#     return deployments, selected_deploymentID
-
-# UNUSED FUNCTION - Vulture detected unused function
-# def generate_deployment_id():
-#
-#     # Create a consistent 5-char hash from the datetime and some randomness
-#     rand_str_1 = ''.join(random.choices(
-#         string.ascii_uppercase + string.digits, k=5))
-#     rand_str_2 = ''.join(random.choices(
-#         string.ascii_uppercase + string.digits, k=5))
-#
-#
-#
-#     # Combine into deployment ID
-#     return f"dep-{rand_str_1}-{rand_str_2}"
-
-
-# UNUSED FUNCTION - Vulture detected unused function
-# def add_deployment(selected_min_datetime):
-#
-#
-#     map, _ = get_cached_map()
-#     analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
-#     general_settings_vars = get_cached_vars(section="general_settings")
-#     selected_folder = analyse_advanced_vars.get(
-#         "selected_folder")
-#     selected_projectID = general_settings_vars.get(
-#         "selected_projectID")
-#     project = map["projects"][selected_projectID]
-#     selected_locationID = analyse_advanced_vars.get(
-#         "selected_locationID")
-#     location = project["locations"][selected_locationID]
-#     deployments = location["deployments"]
-#
-#     # check what the exif datetime is
-#     exif_min_datetime_str = analyse_advanced_vars.get(
-#         "exif_min_datetime", None)
-#     exif_min_datetime = (
-#         datetime.fromisoformat(exif_min_datetime_str)
-#         if exif_min_datetime_str is not None
-#         else None
-#     )
-#     exif_max_datetime_str = analyse_advanced_vars.get(
-#         "exif_max_datetime", None)
-#     exif_max_datetime = (
-#         datetime.fromisoformat(exif_max_datetime_str)
-#         if exif_max_datetime_str is not None
-#         else None
-#     )
-#
-#     # then calculate the difference between the selected datetime and the exif datetime
-#     diff_min_datetime = selected_min_datetime - exif_min_datetime
-#     # TODO: if the exif_min_datetime is None, it errors. fix that.
-#
-#     # Adjust exif_max_datetime if selected_min_datetime is later than exif_min_datetime
-#     selected_max_datetime = exif_max_datetime + diff_min_datetime
-#
-#     # generate a unique deployment ID
-#     deployment_id = f"dep-{unique_animal_string()}"
-#
-#     # Store deployment selection in session state instead of persistent vars
-#     set_session_var("analyse_advanced", "selected_deploymentID", deployment_id)
-#
-#     # Add new deployment # TODO: i want to have this information at the end, right? When the deploymeny is processed?
-#     deployments[deployment_id] = {
-#         "deploymentStart": datetime.isoformat(selected_min_datetime),
-#         # this is not ctually selected, but calculated from the exif metadata
-#         "deploymentEnd": datetime.isoformat(selected_max_datetime),
-#         "path": selected_folder,
-#         "datetimeDiffSeconds": diff_min_datetime.total_seconds()
-#     }
-#
-#     # Save updated settings
-#     with open(map_file, "w") as file:
-#         json.dump(map, file, indent=2)
-#     # Invalidate map cache after update
-#     invalidate_map_cache()
-#
-#     # Return list of deployments and index of the new one
-#     deployment_list = list(deployments.values())
-#     selected_index = deployment_list.index(deployments[deployment_id])
-#
-#     return selected_index, deployment_list
-
-
 def add_location(location_id, lat, lon):
 
     settings, _ = get_cached_map()
@@ -2213,30 +2115,6 @@ def cls_model_selector_widget(model_meta):
     return selected_modelID
 
 
-# UNUSED FUNCTION - Vulture detected unused function
-# def select_model_widget(model_type, prev_selected_model):
-#     # prepare radio button options
-#     model_info = load_all_model_info(model_type)
-#     model_options = {}
-#     for key, info in model_info.items():
-#         model_options[key] = {"option": info["friendly_name"],
-#                               "caption": f":material/calendar_today: Released {info['release']} &nbsp;|&nbsp; "
-#                               f":material/code_blocks: Developed by {info['developer']} &nbsp;|&nbsp; "
-#                               f":material/description: {info['short_description']}"}
-#     selected_model = radio_buttons_with_captions(
-#         option_caption_dict=model_options,
-#         key=f"{model_type}_model",
-#         scrollable=True,
-#         default_option=prev_selected_model)
-#
-#     # more info button
-#     friendly_name = model_info[selected_model]["friendly_name"]
-#     if st.button(f":material/info: More info about :grey-background[{friendly_name}]", key=f"{model_type}_model_info_button"):
-#         show_model_info(model_info[selected_model])
-#
-#     return selected_model
-
-
 def load_all_model_info(type):
 
     # load
@@ -2288,22 +2166,6 @@ def get_video_datetime(file_path):
     return None
 
 
-# UNUSED FUNCTION - Vulture detected unused function
-# def get_file_datetime(file_path):
-#     # Try image EXIF
-#     if file_path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
-#         dt = get_image_datetime(file_path)
-#         if dt:
-#             return dt
-#
-#     # Try video metadata
-#     if file_path.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']:
-#         dt = get_video_datetime(file_path)
-#         if dt:
-#             return dt
-#
-#     # Fallback: file modified time
-#     return datetime.fromtimestamp(file_path.stat().st_mtime)
 
 
 def get_image_gps(file_path):
@@ -2365,19 +2227,6 @@ def get_video_gps(file_path):
         return None
 
 
-# UNUSED FUNCTION - Vulture detected unused function
-# def get_file_gps(file_path):
-#     suffix = file_path.suffix.lower()
-#
-#     # Image formats
-#     if suffix in ['.jpg', '.jpeg', '.png']:
-#         return get_image_gps(file_path)
-#
-#     # Video formats
-#     if suffix in ['.mp4', '.avi', '.mov', '.mkv']:
-#         return get_video_gps(file_path)
-#
-#     return None
 
 
 def check_folder_metadata():
@@ -2476,11 +2325,6 @@ def check_folder_metadata():
         info_box(info_txt, icon=":material/info:")
 
 
-# OLD POPOVER FUNCTION - CONVERTED TO MODAL
-# show_none_model_info_popover() has been replaced with modal_show_none_model_info.open()
-
-# format the class name for display
-
 
 def format_class_name(s):
     if "http" in s:
@@ -2490,24 +2334,6 @@ def format_class_name(s):
         s = s.strip()
         s = s.lower()
         return s
-
-# UNUSED FUNCTION - Vulture detected unused function
-# def load_model_info(model_name):
-#     return json.load(open(os.path.join(CLS_DIR, model_name, "variables.json"), "r"))
-
-
-# UNUSED FUNCTION - Vulture detected unused function
-# def save_cls_classes(cls_model_key, slected_classes):
-#     # load
-#     model_info_json = os.path.join(
-#         ADDAXAI_FILES_ST, "model_info.json")
-#     with open(model_info_json, "r") as file:
-#         model_info = json.load(file)
-#     model_info['cls'][cls_model_key]['selected_classes'] = slected_classes
-#
-#     # save
-#     with open(model_info_json, "w") as file:
-#         json.dump(model_info, file, indent=4)
 
 
 def load_taxon_mapping(cls_model_ID):
@@ -2914,6 +2740,107 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
 
     return current_selected
     # st.write("Selected nodes:", current_selected)
+
+
+def country_selector_widget():
+    """
+    Country selector widget for SPECIESNET models with support for US state selection.
+    
+    Returns:
+        tuple: (country_code, state_code) where country_code is ISO 3166-1 alpha-3 
+               and state_code is US two-letter abbreviation (or None for non-US countries)
+    """
+    
+    # get country and state data
+    from assets.dicts.countries import countries_data, us_states_data
+    
+    # Get remembered selections from session state
+    remembered_country = get_session_var("analyse_advanced", "selected_country", None)
+    remembered_state = get_session_var("analyse_advanced", "selected_state", None)
+    
+    # Country selection - make option order stable
+    country_options = list(countries_data.keys())
+    
+    country_ss_key = "selected_country_display"
+    country_widget_key = "country_selector"
+    
+    # Initialize session state once, or repair if invalid
+    if country_ss_key not in st.session_state or st.session_state[country_ss_key] not in country_options:
+        # Find display name for remembered country code
+        default_country = country_options[0]  # fallback
+        if remembered_country:
+            for display_name, code in countries_data.items():
+                if code == remembered_country and display_name in country_options:
+                    default_country = display_name
+                    break
+        st.session_state[country_ss_key] = default_country
+    
+    # Keep index in sync with session state, don't recompute from old vars
+    country_cur_idx = country_options.index(st.session_state[country_ss_key])
+    
+    def on_country_change():
+        # Store both display name and code
+        st.session_state[country_ss_key] = st.session_state[country_widget_key]
+        selected_country_code = countries_data[st.session_state[country_widget_key]]
+        set_session_var("analyse_advanced", "selected_country", selected_country_code)
+    
+    selected_country_display = st.selectbox(
+        "Select Country",
+        options=country_options,
+        index=country_cur_idx,
+        key=country_widget_key,
+        on_change=on_country_change,
+        label_visibility="collapsed"
+    )
+    
+    selected_country_code = countries_data[st.session_state[country_ss_key]]
+    selected_state_code = None
+    
+    # If USA is selected, show state selector
+    if selected_country_code == "USA":
+        state_options = list(us_states_data.keys())
+        
+        state_ss_key = "selected_state_display"
+        state_widget_key = "state_selector"
+        
+        # Initialize session state once, or repair if invalid
+        if state_ss_key not in st.session_state or st.session_state[state_ss_key] not in state_options:
+            # Find display name for remembered state code
+            default_state = state_options[0]  # fallback
+            if remembered_state:
+                for state_name, code in us_states_data.items():
+                    if code == remembered_state and state_name in state_options:
+                        default_state = state_name
+                        break
+            st.session_state[state_ss_key] = default_state
+        
+        # Keep index in sync with session state, don't recompute from old vars
+        state_cur_idx = state_options.index(st.session_state[state_ss_key])
+        
+        def on_state_change():
+            # Store both display name and code
+            st.session_state[state_ss_key] = st.session_state[state_widget_key]
+            selected_state_code = us_states_data[st.session_state[state_widget_key]]
+            set_session_var("analyse_advanced", "selected_state", selected_state_code)
+        
+        selected_state_display = st.selectbox(
+            "Select State",
+            options=state_options,
+            index=state_cur_idx,
+            key=state_widget_key,
+            on_change=on_state_change
+        )
+        
+        selected_state_code = us_states_data[st.session_state[state_ss_key]]
+        
+    else:
+        # Clear state selection if not USA
+        set_session_var("analyse_advanced", "selected_state", None)
+        # Clear state display from session state too
+        if "selected_state_display" in st.session_state:
+            del st.session_state["selected_state_display"]
+    
+    return selected_country_code, selected_state_code
 
 
 def check_selected_models_version_compatibility(selected_cls_modelID, selected_det_modelID, model_meta):

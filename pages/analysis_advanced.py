@@ -19,6 +19,7 @@ from utils.analysis_utils import (browse_directory_widget,
                                   cls_model_selector_widget,
                                   det_model_selector_widget,
                                   species_selector_widget,
+                                  country_selector_widget,
                                   load_taxon_mapping_cached,
                                   add_deployment_to_queue,
                                   install_env,
@@ -411,7 +412,7 @@ with st.container(border=True):
         # Only loads CSV file when classification model changes
         # Previous: CSV parsing on every step 3 visit
         # Now: Cached in session state by model ID
-        if not selected_cls_modelID == "NONE":
+        if not selected_cls_modelID == "NONE" and not selected_cls_modelID.startswith("SPECIESNET"):
             taxon_mapping = load_taxon_mapping_cached(selected_cls_modelID)
             # st.write(taxon_mapping)
             with st.container(border=True):
@@ -419,7 +420,14 @@ with st.container(border=True):
                                    help_text="Here you can select the model of your choosing.")
                 selected_species = species_selector_widget(
                     taxon_mapping, selected_cls_modelID)
-
+        elif selected_cls_modelID.startswith("SPECIESNET"):
+            # for SpeciesNet models, we use a country dropdown to select species
+            selected_species = None
+            with st.container(border=True):
+                print_widget_label("Country selection",
+                                   help_text="Select a country to determine species presence for SPECIESNET models.")
+                selected_country, selected_state = country_selector_widget()
+                
         else:
             selected_species = None
             info_box(
@@ -437,20 +445,38 @@ with st.container(border=True):
 
         with col_btn_next:
             if st.button(":material/playlist_add: Add to queue", use_container_width=True, type="primary"):
-                # Validation: Check if at least one species is selected for classification models
-                if selected_cls_modelID and selected_cls_modelID != "NONE" and not selected_species:
+                
+                # validation:
+                # - speciesnet models: require a country, do NOT require species selection
+                # - other classification models: require at least one species
+                # - model id "NONE" or empty: skip both checks
+
+                model_id = selected_cls_modelID or ""  # guard against None
+                is_none_model = (model_id == "NONE")
+                is_speciesnet = model_id.upper().startswith("SPECIESNET")
+
+                needs_species = bool(model_id) and not is_none_model and not is_speciesnet
+
+                if is_speciesnet and not selected_country:
+                    warning_box(
+                        msg="You need to select a country to determine species presence for SPECIESNET models.",
+                        title="Country selection required"
+                    )
+                elif needs_species and not selected_species:
                     warning_box(
                         msg="At least one species must be selected for species classification.",
                         title="Species selection required"
                     )
                 else:
-                    # Store selected species temporarily, then commit all to queue
-                    set_session_var("analyse_advanced",
-                                    "selected_species", selected_species)
-                    # Reset step to beginning
+                    # store selected species (will be empty for SPECIESNET or NONE, which is fine)
+                    set_session_var("analyse_advanced", "selected_species", selected_species)
+
+                    # reset step to beginning
                     set_session_var("analyse_advanced", "step", 0)
-                    # Add deployment to persistent queue
+
+                    # add deployment to persistent queue
                     add_deployment_to_queue()
+
                     st.rerun()
 
 
