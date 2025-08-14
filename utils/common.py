@@ -186,8 +186,7 @@ def update_session_vars(section, updates):
 
 
 def replace_vars(section, new_vars):
-    vars_file = os.path.join(ADDAXAI_ROOT, "AddaxAI",
-                             "streamlit-AddaxAI", "config", f"{section}.json")
+    vars_file = os.path.join(ADDAXAI_ROOT, "config", f"{section}.json")
 
     # Overwrite with only the new updates
     with open(vars_file, "w", encoding="utf-8") as file:
@@ -195,8 +194,7 @@ def replace_vars(section, new_vars):
 
 
 def update_vars(section, updates):
-    vars_file = os.path.join(ADDAXAI_ROOT, "AddaxAI",
-                             "streamlit-AddaxAI", "config", f"{section}.json")
+    vars_file = os.path.join(ADDAXAI_ROOT, "config", f"{section}.json")
     if not os.path.exists(vars_file):
         with open(vars_file, "w", encoding="utf-8") as f:
             json.dump({}, f, indent=2)
@@ -241,8 +239,7 @@ def load_map():
 
 def load_vars(section):
     # if not exist, create empty vars file
-    vars_file = os.path.join(ADDAXAI_ROOT, "AddaxAI",
-                             "streamlit-AddaxAI", "config", f"{section}.json")
+    vars_file = os.path.join(ADDAXAI_ROOT, "config", f"{section}.json")
     if not os.path.exists(vars_file):
         with open(vars_file, "w", encoding="utf-8") as f:
             json.dump({}, f, indent=2)

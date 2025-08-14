@@ -161,7 +161,7 @@ if st.session_state == {}:
     if not os.path.exists(MAP_FILE_PATH):
 
         # Create empty projects structure
-        map = {
+        map = { 
             "projects": {}
         }
 
