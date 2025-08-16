@@ -20,6 +20,7 @@ from utils.analysis_utils import (browse_directory_widget,
                                   det_model_selector_widget,
                                   species_selector_widget,
                                   country_selector_widget,
+                                 state_selector_widget,
                                   load_taxon_mapping_cached,
                                   add_deployment_to_queue,
                                   remove_deployment_from_queue,
@@ -428,7 +429,37 @@ with st.container(border=True):
             with st.container(border=True):
                 print_widget_label("Country selection",
                                    help_text="Select a country to determine species presence for SPECIESNET models.")
-                selected_country, selected_state = country_selector_widget()
+                selected_country = country_selector_widget()
+                
+            # Show state selector only if USA is selected
+            if selected_country == "USA":
+                with st.container(border=True):
+                    print_widget_label("State selection", 
+                                       help_text="Select a US state for more specific species presence data.")
+                    selected_state = state_selector_widget()
+            else:
+                selected_state = None
+                # Clear state selection if not USA
+                from utils.analysis_utils import set_session_var, get_cached_vars, get_cached_map, invalidate_map_cache
+                import json
+                set_session_var("analyse_advanced", "selected_state", None)
+                set_session_var("analyse_advanced", "selected_state_display", None)
+                
+                # Also clear state from persistent storage if project is selected
+                general_settings_vars = get_cached_vars(section="general_settings")
+                selected_projectID = general_settings_vars.get("selected_projectID")
+                if selected_projectID:
+                    map_data, map_file_path = get_cached_map()
+                    if selected_projectID in map_data["projects"] and "speciesnet_settings" in map_data["projects"][selected_projectID]:
+                        speciesnet_settings = map_data["projects"][selected_projectID]["speciesnet_settings"]
+                        if speciesnet_settings.get("state") is not None:
+                            speciesnet_settings["state"] = None
+                            
+                            # Save updated map
+                            with open(map_file_path, 'w') as f:
+                                json.dump(map_data, f, indent=2)
+                            # Invalidate cache so next read gets fresh data
+                            invalidate_map_cache()
                 
         else:
             selected_species = None

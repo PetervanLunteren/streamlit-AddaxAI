@@ -2959,19 +2959,34 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
 
 def country_selector_widget():
     """
-    Country selector widget for SPECIESNET models with support for US state selection.
+    Country selector widget for SPECIESNET models.
     
     Returns:
-        tuple: (country_code, state_code) where country_code is ISO 3166-1 alpha-3 
-               and state_code is US two-letter abbreviation (or None for non-US countries)
+        str: country_code (ISO 3166-1 alpha-3)
     """
     
     # get country and state data
     from assets.dicts.countries import countries_data, us_states_data
     
-    # Get remembered selections from session state
-    remembered_country = get_session_var("analyse_advanced", "selected_country", None)
-    remembered_state = get_session_var("analyse_advanced", "selected_state", None)
+    # Load previously selected country/state from current project
+    general_settings_vars = get_cached_vars(section="general_settings")
+    selected_projectID = general_settings_vars.get("selected_projectID")
+    
+    # Default values
+    previously_selected_country = None
+    previously_selected_state = None
+    
+    if selected_projectID:
+        # Load project-specific preferred country/state for SPECIESNET
+        map_data, _ = get_cached_map()
+        project_data = map_data["projects"].get(selected_projectID, {})
+        speciesnet_settings = project_data.get("speciesnet_settings", {})
+        previously_selected_country = speciesnet_settings.get("country", None)
+        previously_selected_state = speciesnet_settings.get("state", None)
+    
+    # Get remembered selections from session state (fallback to persistent storage)
+    remembered_country = get_session_var("analyse_advanced", "selected_country", previously_selected_country)
+    remembered_state = get_session_var("analyse_advanced", "selected_state", previously_selected_state)
     
     # Country selection - make option order stable
     country_options = list(countries_data.keys())
@@ -2998,11 +3013,27 @@ def country_selector_widget():
     country_cur_idx = country_options.index(current_country_display)
     
     def on_country_change():
-        # Store both display name and code in section-based session vars
+        # Store both display name and code in session-based session vars
         country_display = st.session_state[country_widget_key]
         set_session_var("analyse_advanced", country_ss_key, country_display)
         selected_country_code = countries_data[country_display]
         set_session_var("analyse_advanced", "selected_country", selected_country_code)
+        
+        # Save to persistent storage if project is selected and country changed
+        if selected_projectID and selected_country_code != previously_selected_country:
+            map_data, map_file_path = get_cached_map()
+            if selected_projectID not in map_data["projects"]:
+                map_data["projects"][selected_projectID] = {}
+            if "speciesnet_settings" not in map_data["projects"][selected_projectID]:
+                map_data["projects"][selected_projectID]["speciesnet_settings"] = {}
+            
+            map_data["projects"][selected_projectID]["speciesnet_settings"]["country"] = selected_country_code
+            
+            # Save updated map
+            with open(map_file_path, 'w') as f:
+                json.dump(map_data, f, indent=2)
+            # Invalidate cache so next read gets fresh data
+            invalidate_map_cache()
     
     selected_country_display = st.selectbox(
         "Select Country",
@@ -3016,58 +3047,100 @@ def country_selector_widget():
     # Get the current selection (either from callback or current display value)
     current_country_display = get_session_var("analyse_advanced", country_ss_key, current_country_display)
     selected_country_code = countries_data[current_country_display]
-    selected_state_code = None
     
-    # If USA is selected, show state selector
-    if selected_country_code == "USA":
-        state_options = list(us_states_data.keys())
-        
-        state_ss_key = "selected_state_display"
-        state_widget_key = "state_selector"
-        
-        # Get current display value from section-based session vars
-        current_state_display = get_session_var("analyse_advanced", state_ss_key, None)
-        
-        # Initialize session state once, or repair if invalid
-        if current_state_display is None or current_state_display not in state_options:
-            # Find display name for remembered state code
-            default_state = state_options[0]  # fallback
-            if remembered_state:
-                for state_name, code in us_states_data.items():
-                    if code == remembered_state and state_name in state_options:
-                        default_state = state_name
-                        break
-            current_state_display = default_state
-            set_session_var("analyse_advanced", state_ss_key, current_state_display)
-        
-        # Keep index in sync with session state, don't recompute from old vars
-        state_cur_idx = state_options.index(current_state_display)
-        
-        def on_state_change():
-            # Store both display name and code in section-based session vars
-            state_display = st.session_state[state_widget_key]
-            set_session_var("analyse_advanced", state_ss_key, state_display)
-            selected_state_code = us_states_data[state_display]
-            set_session_var("analyse_advanced", "selected_state", selected_state_code)
-        
-        selected_state_display = st.selectbox(
-            "Select State",
-            options=state_options,
-            index=state_cur_idx,
-            key=state_widget_key,
-            on_change=on_state_change
-        )
-        
-        # Get the current selection (either from callback or current display value)
-        current_state_display = get_session_var("analyse_advanced", state_ss_key, current_state_display)
-        selected_state_code = us_states_data[current_state_display]
-        
-    else:
-        # Clear state selection if not USA
-        set_session_var("analyse_advanced", "selected_state", None)
-        set_session_var("analyse_advanced", "selected_state_display", None)
+    return selected_country_code
+
+
+def state_selector_widget():
+    """
+    State selector widget for US states when country is USA.
+    Should only be called when USA is selected as country.
     
-    return selected_country_code, selected_state_code
+    Returns:
+        str or None: state_code (US two-letter abbreviation) or None if no state selected
+    """
+    
+    # get state data
+    from assets.dicts.countries import us_states_data
+    
+    # Load previously selected state from current project
+    general_settings_vars = get_cached_vars(section="general_settings")
+    selected_projectID = general_settings_vars.get("selected_projectID")
+    
+    # Default values
+    previously_selected_state = None
+    
+    if selected_projectID:
+        # Load project-specific preferred state for SPECIESNET
+        map_data, _ = get_cached_map()
+        project_data = map_data["projects"].get(selected_projectID, {})
+        speciesnet_settings = project_data.get("speciesnet_settings", {})
+        previously_selected_state = speciesnet_settings.get("state", None)
+    
+    # Get remembered selection from session state (fallback to persistent storage)
+    remembered_state = get_session_var("analyse_advanced", "selected_state", previously_selected_state)
+    
+    # State selection - make option order stable
+    state_options = list(us_states_data.keys())
+    
+    state_ss_key = "selected_state_display"
+    state_widget_key = "state_selector"
+    
+    # Get current display value from section-based session vars
+    current_state_display = get_session_var("analyse_advanced", state_ss_key, None)
+    
+    # Initialize session state once, or repair if invalid
+    if current_state_display is None or current_state_display not in state_options:
+        # Find display name for remembered state code
+        default_state = state_options[0]  # fallback
+        if remembered_state:
+            for state_name, code in us_states_data.items():
+                if code == remembered_state and state_name in state_options:
+                    default_state = state_name
+                    break
+        current_state_display = default_state
+        set_session_var("analyse_advanced", state_ss_key, current_state_display)
+    
+    # Keep index in sync with session state, don't recompute from old vars
+    state_cur_idx = state_options.index(current_state_display)
+    
+    def on_state_change():
+        # Store both display name and code in section-based session vars
+        state_display = st.session_state[state_widget_key]
+        set_session_var("analyse_advanced", state_ss_key, state_display)
+        selected_state_code = us_states_data[state_display]
+        set_session_var("analyse_advanced", "selected_state", selected_state_code)
+        
+        # Save to persistent storage if project is selected and state changed
+        if selected_projectID and selected_state_code != previously_selected_state:
+            map_data, map_file_path = get_cached_map()
+            if selected_projectID not in map_data["projects"]:
+                map_data["projects"][selected_projectID] = {}
+            if "speciesnet_settings" not in map_data["projects"][selected_projectID]:
+                map_data["projects"][selected_projectID]["speciesnet_settings"] = {}
+            
+            map_data["projects"][selected_projectID]["speciesnet_settings"]["state"] = selected_state_code
+            
+            # Save updated map
+            with open(map_file_path, 'w') as f:
+                json.dump(map_data, f, indent=2)
+            # Invalidate cache so next read gets fresh data
+            invalidate_map_cache()
+    
+    selected_state_display = st.selectbox(
+        "Select State",
+        options=state_options,
+        index=state_cur_idx,
+        key=state_widget_key,
+        on_change=on_state_change,
+        label_visibility="collapsed"
+    )
+    
+    # Get the current selection (either from callback or current display value)
+    current_state_display = get_session_var("analyse_advanced", state_ss_key, current_state_display)
+    selected_state_code = us_states_data[current_state_display]
+    
+    return selected_state_code
 
 
 def check_selected_models_version_compatibility(selected_cls_modelID, selected_det_modelID, model_meta):

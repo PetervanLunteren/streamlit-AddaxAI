@@ -5,10 +5,6 @@
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
 # - create a claude.md for the project with the env micromamba instructions, and an quick overview of the project etc.
 
-# new TODOS:
-# - parent_dir is still being selected at folder browse, not the folder itself
-# - select state must also be in print_widget_label
-# - select state and country must be saved into the speciesnet variables json, so the next time the user selects the speciesnet model, it will have the last selected state and country
 
 """
 AddaxAI Streamlit Application - Main Entry Point
