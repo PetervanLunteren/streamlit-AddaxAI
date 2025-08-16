@@ -1,3 +1,13 @@
+"""
+AddaxAI HuggingFace Model Downloader
+
+Optimized multi-threaded downloader for HuggingFace model repositories with:
+- Adaptive worker scaling based on connection speed
+- Progress tracking with tqdm integration
+- Resume capability for interrupted downloads
+- Thread-safe progress updates for Streamlit UI
+"""
+
 import os
 import time
 import requests

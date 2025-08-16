@@ -65,7 +65,7 @@ ADDAXAI_ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 # Used by tools to create and activate conda environments for different AI models
 MICROMAMBA = os.path.join(ADDAXAI_ROOT, "bin", OS_NAME, "micromamba")
 
-# folder for storing temporary files, like inomplete downloads
+# Directory for temporary files like incomplete downloads
 TEMP_DIR = os.path.join(ADDAXAI_ROOT, "assets", "temp")
 
 # ═══════════════════════════════════════════════════════════════════════════════

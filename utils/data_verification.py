@@ -1,4 +1,12 @@
 
+"""
+AddaxAI Data Verification Utilities
+
+Functions for validating and organizing deployment data:
+- Location-deployment hierarchical structures
+- Data integrity checks for camera trap datasets
+- UI components for data exploration and verification
+"""
 
 import streamlit as st
 # from st_aggrid import AgGrid  # UNUSED: Vulture detected unused import
@@ -8,6 +16,16 @@ import os
 from components import print_widget_label
 
 def get_location_deployment_nested_dict(df):
+    """
+    Convert deployment DataFrame to hierarchical location-deployment structure.
+    
+    Args:
+        df (pd.DataFrame): DataFrame with 'location' and 'deployment' columns
+        
+    Returns:
+        list: Hierarchical nodes for checkbox tree widget with locations as parents
+              and deployments as children
+    """
     
     d = (
         df[['location', 'deployment']]

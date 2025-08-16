@@ -19,8 +19,8 @@ Architecture:
 - Write-through caching: Changes update both persistent storage and session_state 
 - Startup detection: if st.session_state == {} triggers initialization
 
-CLI to run:
-cd /Applications/AddaxAI_files/AddaxAI/streamlit-AddaxAI && conda activate env-streamlit-addaxai && streamlit run main.py
+Run with micromamba:
+./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
 TODOs:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
@@ -63,11 +63,10 @@ from utils.config import *
 # GLOBAL CONFIGURATION & SETUP (runs on every request)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Force all output to be unbuffered for real-time logging
+# Force unbuffered output for real-time logging
 sys.stdout.reconfigure(line_buffering=True)
-# Note: stderr redirection moved to after TeeOutput setup to ensure errors are logged
 
-# Streamlit config is loaded from .streamlit/config.toml (standard location) 
+# Streamlit config loaded from .streamlit/config.toml 
 
 # Configure Streamlit page settings
 st.set_page_config(
@@ -128,14 +127,13 @@ if st.session_state == {}:
     # Initialize shared session state container for cross-tool temporary variables
     st.session_state["shared"] = {}
     
-    # Create config and temp directories (done at startup since appdirs 
-    # may not be available in different conda environments used by tools)
+    # Create config directories at startup (appdirs may not be available in all environments)
     CONFIG_DIR = user_config_dir("AddaxAI")
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
     MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
     
-    # Store paths in session state for access by all tools
+    # Store paths in session state for tool access
     st.session_state["shared"] = {
         "CONFIG_DIR": CONFIG_DIR,
         "MAP_FILE_PATH": MAP_FILE_PATH
@@ -161,7 +159,7 @@ if st.session_state == {}:
     if not os.path.exists(MAP_FILE_PATH):
 
         # Create empty projects structure
-        map = {  
+        map = {
             "projects": {}
         }
 
@@ -184,8 +182,7 @@ if st.session_state == {}:
         with open(general_settings_file, "w") as f:
             json.dump(general_settings, f, indent=2)
 
-    # Load general settings from file and cache in session state
-    # (avoids file reads on every rerun for lang/mode)
+    # Load and cache general settings to avoid file reads on reruns
     general_settings_vars = load_vars(section = "general_settings")
     lang = general_settings_vars["lang"]
     mode = general_settings_vars["mode"]
@@ -197,18 +194,17 @@ if st.session_state == {}:
     # Load and cache expensive resources (language, models, UI assets)
     # ─────────────────────────────────────────────────────────────────────────
     
-    # Load language texts and cache in session state (avoids file I/O on reruns)
+    # Load and cache language texts to avoid file I/O on reruns
     if not st.session_state.get("txts"):
         full_txts = load_lang_txts()
         # Store only current language's texts in flattened structure for efficiency
         st.session_state["txts"] = {key: value[lang] for key, value in full_txts.items()}
 
-    # Load AI model metadata and cache in session state (large JSON file)
+    # Load and cache AI model metadata (large JSON file)
     if not st.session_state.get("model_meta"):
         st.session_state["model_meta"] = load_model_metadata()
 
-    # Download latest model metadata and create folder structure for new models
-    # This will show notifications for any new models that aren't in local filesystem
+    # Download latest model metadata and create folders for new models
     fetch_latest_model_info()
     
     # Reload model metadata after download to ensure session state has latest data
@@ -322,7 +318,7 @@ mode_options = {
 def on_mode_change():
     """Write-through callback: updates both persistent file and session state cache"""
     if "mode_selection" in st.session_state:
-        mode_selection = st.session_state["mode_selection"]  # Intentional error for testing
+        mode_selection = st.session_state["mode_selection"]
         
         # Write to persistent file for next session
         update_vars("general_settings", {"mode": mode_selection})
@@ -343,6 +339,7 @@ mode_selected = st.sidebar.segmented_control(
     on_change=on_mode_change,
     default=mode)
 
+@logged_callback
 def on_project_change():
     """Write-through callback: updates both persistent file and session state cache"""
     if "project_selection_sidebar" in st.session_state:
@@ -369,7 +366,7 @@ if mode == 1:  # Advanced mode requires project context
         selected_index = options.index(selected_projectID) if selected_projectID in options else 0
 
         # Project selector in sidebar
-        print_widget_label("Project", help_text="The project selected here is the one that all tools will work with. If you have a new project, you can add it at + add deployment when you want to process the first batch data.", sidebar=True)
+        print_widget_label("Project", help_text="Selected project applies to all tools. Add new projects via + add deployment.", sidebar=True)
         selected_projectID = st.sidebar.selectbox(
             "Project",
             options=options,

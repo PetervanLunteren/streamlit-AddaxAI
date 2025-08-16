@@ -1,3 +1,15 @@
+"""
+AddaxAI Advanced Analysis Tool
+
+4-step wizard for processing camera trap deployments:
+1. Folder Selection: Choose deployment folder
+2. Deployment Metadata: Project, location, capture dates  
+3. Model Selection: Detection + classification AI models
+4. Species Selection: Target species for analysis area
+
+Features optimized startup with session state caching and write-through configuration updates.
+"""
+
 import streamlit as st
 import os
 from st_modal import Modal

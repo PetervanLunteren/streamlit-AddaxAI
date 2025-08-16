@@ -1,4 +1,14 @@
 
+"""
+AddaxAI Application Settings
+
+Configuration interface for global application settings including:
+- Language selection
+- Application mode (Simple/Advanced)
+- System information display
+- Version and environment details
+"""
+
 import streamlit as st
 import sys
 import platform

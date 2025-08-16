@@ -1,5 +1,14 @@
+"""
+AddaxAI Geographic Data
+
+Country and US state data with flag emojis and ISO codes for location selection.
+
+Note: Workaround for Claude Code API quirk - it fails on plain US state names.
+To avoid this, we prefix states with emojis, split them in two parts, and map them to their codes.
+"""
+
 # Workaround for Claude Code API quirk: it fails on plain US state names.
-# To avoid this, we prefix states with emojis, splot them in two parts, and map them to their codes.
+# To avoid this, we prefix states with emojis, split them in two parts, and map them to their codes.
 
 # Country data with flag emojis and ISO country codes
 countries_data = {

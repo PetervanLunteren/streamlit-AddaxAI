@@ -1,4 +1,15 @@
 
+"""
+AddaxAI Common Utilities
+
+Shared utility functions used across the AddaxAI application including:
+- Session state management and caching
+- File I/O operations for JSON configuration
+- Animal name generation for unique identifiers
+- Model metadata fetching and management
+- Logging wrapper functions
+"""
+
 import os
 import json
 import streamlit as st
@@ -20,12 +31,20 @@ try:
 except (KeyError, AttributeError):
     MAP_FILE_PATH = None
 
-# set versions
+# Load current AddaxAI version from file
 with open(os.path.join(ADDAXAI_ROOT, 'assets', 'version.txt'), 'r') as file:
     
     current_AA_version = file.read().strip()
 
 def unique_animal_string():
+    """
+    Generate a unique animal-themed identifier string.
+    
+    Returns:
+        str: Random combination of adverb + adjective + animal name (e.g., "quite_sharp_jaguar")
+    
+    Used for creating unique deployment IDs and temporary identifiers.
+    """
     
     # 5-letter intensifying adverbs
     adverbs = [
@@ -194,6 +213,15 @@ def replace_vars(section, new_vars):
 
 
 def update_vars(section, updates):
+    """
+    Update specific values in a configuration JSON file.
+    
+    Args:
+        section (str): Configuration section name (becomes {section}.json)
+        updates (dict): Key-value pairs to update in the configuration
+    
+    Creates the config file if it doesn't exist. Merges updates with existing data.
+    """
     vars_file = os.path.join(ADDAXAI_ROOT, "config", f"{section}.json")
     if not os.path.exists(vars_file):
         with open(vars_file, "w", encoding="utf-8") as f:

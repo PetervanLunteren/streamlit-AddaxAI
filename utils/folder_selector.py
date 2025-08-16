@@ -1,9 +1,25 @@
+"""
+AddaxAI Folder Selection Utility
+
+Standalone tkinter-based folder selector that can be called from Streamlit subprocess.
+Provides cross-platform directory selection with optional initial directory.
+"""
+
 import tkinter as tk
 from tkinter import filedialog
 import sys
 import os
 
 def select_folder(initial_dir=None):
+    """
+    Open folder selection dialog using tkinter.
+    
+    Args:
+        initial_dir (str, optional): Initial directory to open in dialog
+        
+    Returns:
+        str: Selected folder path or empty string if cancelled
+    """
     root = tk.Tk()
     root.withdraw()  # Hide the main tkinter window
     

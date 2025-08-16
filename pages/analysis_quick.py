@@ -1,3 +1,10 @@
+"""
+AddaxAI Quick Analysis Tool
+
+Simplified single-tool mode for users who want to run models with default settings.
+Provides basic model selection and species identification without advanced configuration options.
+"""
+
 import streamlit as st
 # from backend.analyse_utils import class_selector
 

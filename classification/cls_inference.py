@@ -1,6 +1,12 @@
-# library of inference functions to be used for classifying MD crops 
-# Created by Peter van Lunteren
-# Latest edit by Peter van Lunteren on 19 May 2025
+"""
+AddaxAI Classification Inference Library
+
+Core inference functions for classifying MegaDetector animal crops using various ML models.
+Provides standardized interface for different classification model types (PyTorch, TensorFlow, etc.).
+
+Created by Peter van Lunteren
+Latest edit by Peter van Lunteren on 19 May 2025
+"""
 
 # import logging
 # print("=== CLS_INFERENCE.PY LOADED ===")
@@ -27,12 +33,20 @@ from megadetector.data_management import read_exif
 from utils.config import *
 
 
-# lets not freak out over truncated images
+# Allow loading of truncated images to handle corrupted camera trap images
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# fetch label map from json
 def fetch_label_map_from_json(path_to_json):
+    """
+    Extract detection category labels from MegaDetector JSON output.
+    
+    Args:
+        path_to_json (str): Path to detection results JSON file
+        
+    Returns:
+        dict: Label mapping for detection categories
+    """
     with open(path_to_json, "r") as json_file:
         data = json.load(json_file)
     label_map = data['detection_categories']
