@@ -3,6 +3,7 @@
 # TODO: 
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
+# - create a claude.md for the project with the env micromamba instructions, and an quick overview of the project etc.
 
 # new TODOS:
 # - parent_dir is still being selected at folder browse, not the folder itself

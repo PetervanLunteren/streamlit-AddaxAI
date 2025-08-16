@@ -2009,15 +2009,14 @@ def select_folder():
     folder_path = result.stdout.strip()
     
     if folder_path != "" and result.returncode == 0:
-        # Save parent directory of selected folder to global config
-        parent_dir = os.path.dirname(folder_path)
+        # Save selected folder to global config
         
-        if parent_dir:
+        if folder_path:
             # Save to global config file
             try:
                 with open(config_file, 'r') as f:
                     config = json.load(f)
-                config["previously_browsed_folder"] = parent_dir
+                config["previously_browsed_folder"] = folder_path
                 with open(config_file, 'w') as f:
                     json.dump(config, f, indent=2)
             except:
