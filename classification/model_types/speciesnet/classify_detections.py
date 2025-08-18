@@ -20,7 +20,7 @@ parser.add_argument('--country', default=None, help='Country code for geofencing
 parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
 
 args = parser.parse_args()
-cls_model_dir = args.model_path
+cls_model_path = args.model_path
 json_path = args.json_path
 country = args.country
 state = args.state
@@ -29,6 +29,13 @@ state = args.state
 ############### MODEL SPECIFIC ###############
 ##############################################
 import os
+
+# SpeciesNet expects a model directory, but the standard interface passes a model file path
+# Convert file path to directory path if needed
+if os.path.isfile(cls_model_path):
+    cls_model_dir = os.path.dirname(cls_model_path)
+else:
+    cls_model_dir = cls_model_path
 import sys
 import subprocess
 
@@ -62,14 +69,14 @@ def run_speciesnet_classification():
     # Add geofencing parameters if specified
     if country:
         command.extend(["--country", country])
-        print(f"SpeciesNet geofencing enabled for country: {country}")
+        print(f"SpeciesNet geofencing enabled for country: {country}", flush=True)
         
         if state and country == "USA":
             command.extend(["--admin1_region", state])
-            print(f"SpeciesNet geofencing enabled for US state: {state}")
+            print(f"SpeciesNet geofencing enabled for US state: {state}", flush=True)
 
     # Log the command for debugging/audit purposes
-    print(f"\n\nRunning SpeciesNet command:\n{' '.join(command)}\n")
+    print(f"\n\nRunning SpeciesNet command:\n{' '.join(command)}\n", flush=True)
 
     # Set working directory to project root
     process = subprocess.Popen(
@@ -83,16 +90,16 @@ def run_speciesnet_classification():
         cwd=ADDAXAI_ROOT  # Set working directory to project root
     )
 
-    # Stream output to console
+    # Stream output to console with immediate flushing
     for line in process.stdout:
         line = line.strip()
-        print(line)
+        print(line, flush=True)
 
     process.stdout.close()
     return_code = process.wait()
 
     if return_code != 0:
-        print(f"SpeciesNet classification failed with exit code {return_code}.")
+        print(f"SpeciesNet classification failed with exit code {return_code}.", flush=True)
         sys.exit(return_code)
     
     # Replace the original file with the SpeciesNet output
@@ -100,9 +107,9 @@ def run_speciesnet_classification():
         if os.path.exists(json_path):
             os.remove(json_path)
         os.rename(output_file, json_path)
-        print("SpeciesNet classification completed successfully.")
+        print("SpeciesNet classification completed successfully.", flush=True)
     else:
-        print("SpeciesNet output file not created.")
+        print("SpeciesNet output file not created.", flush=True)
         sys.exit(1)
 
 #############################################

@@ -70,7 +70,7 @@ def create_raw_classifications(json_path,
     img_dir = os.path.dirname(json_path)
     
     # Set classification detection threshold for filtering low-confidence detections
-    cls_detec_thresh = 0.01
+    cls_detec_thresh = 0.1
     
     # Load JSON data and label mapping once to avoid repeated file I/O
     with open(json_path) as image_recognition_file_content:

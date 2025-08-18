@@ -427,7 +427,11 @@ with st.container(border=True):
         # Only loads CSV file when classification model changes
         # Previous: CSV parsing on every step 3 visit
         # Now: Cached in session state by model ID
-        if not selected_cls_modelID == "NONE" and not selected_cls_modelID.startswith("SPECIESNET"):
+        # Handle different model types with their specific requirements
+        from components.speciesnet_ui import is_speciesnet_model, render_speciesnet_species_selector
+        
+        if not selected_cls_modelID == "NONE" and not is_speciesnet_model(selected_cls_modelID):
+            # Standard classification models - require species selection
             taxon_mapping = load_taxon_mapping_cached(selected_cls_modelID)
             # st.write(taxon_mapping)
             with st.container(border=True):
@@ -435,46 +439,18 @@ with st.container(border=True):
                                    help_text="Here you can select the model of your choosing.")
                 selected_species = species_selector_widget(
                     taxon_mapping, selected_cls_modelID)
-        elif selected_cls_modelID.startswith("SPECIESNET"):
-            # for SpeciesNet models, we use a country dropdown to select species
-            selected_species = None
-            with st.container(border=True):
-                print_widget_label("Country selection",
-                                   help_text="Select a country to determine species presence for SPECIESNET models.")
-                selected_country = country_selector_widget()
-                
-            # Show state selector only if USA is selected
-            if selected_country == "USA":
-                with st.container(border=True):
-                    print_widget_label("State selection", 
-                                       help_text="Select a US state for more specific species presence data.")
-                    selected_state = state_selector_widget()
-            else:
+                # No country/state needed for standard models
+                selected_country = None
                 selected_state = None
-                # Clear state selection if not USA
-                from utils.analysis_utils import set_session_var, get_cached_vars, get_cached_map, invalidate_map_cache
-                import json
-                set_session_var("analyse_advanced", "selected_state", None)
-                set_session_var("analyse_advanced", "selected_state_display", None)
-                
-                # Also clear state from persistent storage if project is selected
-                general_settings_vars = get_cached_vars(section="general_settings")
-                selected_projectID = general_settings_vars.get("selected_projectID")
-                if selected_projectID:
-                    map_data, map_file_path = get_cached_map()
-                    if selected_projectID in map_data["projects"] and "speciesnet_settings" in map_data["projects"][selected_projectID]:
-                        speciesnet_settings = map_data["projects"][selected_projectID]["speciesnet_settings"]
-                        if speciesnet_settings.get("state") is not None:
-                            speciesnet_settings["state"] = None
-                            
-                            # Save updated map
-                            with open(map_file_path, 'w') as f:
-                                json.dump(map_data, f, indent=2)
-                            # Invalidate cache so next read gets fresh data
-                            invalidate_map_cache()
+        elif is_speciesnet_model(selected_cls_modelID):
+            # SpeciesNet models - require country selection, no species selection
+            selected_species, selected_country, selected_state = render_speciesnet_species_selector()
                 
         else:
+            # No classification model selected
             selected_species = None
+            selected_country = None
+            selected_state = None
             info_box(
                 title="No species identification model selected",
                 msg="This is where you normally would selectw hich species are present in your project area, but you have not selected a species identification model. Please proceed to add the deployment to the queue.")
@@ -491,28 +467,27 @@ with st.container(border=True):
         with col_btn_next:
             if st.button(":material/playlist_add: Add to queue", use_container_width=True, type="primary"):
                 
-                # validation:
-                # - speciesnet models: require a country, do NOT require species selection
-                # - other classification models: require at least one species
-                # - model id "NONE" or empty: skip both checks
-
+                # Validate model requirements
+                from components.speciesnet_ui import validate_speciesnet_requirements
+                
                 model_id = selected_cls_modelID or ""  # guard against None
                 is_none_model = (model_id == "NONE")
-                is_speciesnet = model_id.upper().startswith("SPECIESNET")
-
+                is_speciesnet = is_speciesnet_model(model_id)
                 needs_species = bool(model_id) and not is_none_model and not is_speciesnet 
 
-                if is_speciesnet and not selected_country:
-                    warning_box(
-                        msg="You need to select a country to determine species presence for SPECIESNET models.",
-                        title="Country selection required"
-                    )
+                # Validation logic
+                validation_passed = True
+                
+                if is_speciesnet:
+                    validation_passed = validate_speciesnet_requirements(selected_country)
                 elif needs_species and not selected_species:
                     warning_box(
                         msg="At least one species must be selected for species classification.",
                         title="Species selection required"
                     )
-                else:
+                    validation_passed = False
+                
+                if validation_passed:
                     # store selected species (will be empty for SPECIESNET or NONE, which is fine)
                     set_session_var("analyse_advanced", "selected_species", selected_species)
 
