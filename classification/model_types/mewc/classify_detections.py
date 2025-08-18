@@ -16,10 +16,14 @@ import argparse
 parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
 parser.add_argument('--model-path', required=True, help='Path to the classification model file')
 parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
+parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
+parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
 
 args = parser.parse_args()
 cls_model_fpath = args.model_path
 json_path = args.json_path
+country = args.country
+state = args.state
 
 # lets not freak out over truncated images
 from PIL import ImageFile
