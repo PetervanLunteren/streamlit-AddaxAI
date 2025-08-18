@@ -472,59 +472,59 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
             f"Failed with exit code {process.returncode}.")
         return False
     
-    # Clean up malformed bounding boxes after MegaDetector completes
-    _clean_malformed_bboxes(output_file)
-    return True
+#     # Clean up malformed bounding boxes after MegaDetector completes
+#     _clean_malformed_bboxes(output_file)
+#     return True
 
 
-def _clean_malformed_bboxes(json_file_path):
-    """
-    Clean up malformed bounding boxes (zero width/height) from MegaDetector results.
+# def _clean_malformed_bboxes(json_file_path):
+#     """
+#     Clean up malformed bounding boxes (zero width/height) from MegaDetector results.
     
-    Args:
-        json_file_path (str): Path to the MegaDetector JSON results file
-    """
-    try:
-        with open(json_file_path, 'r') as f:
-            data = json.load(f)
+#     Args:
+#         json_file_path (str): Path to the MegaDetector JSON results file
+#     """
+#     try:
+#         with open(json_file_path, 'r') as f:
+#             data = json.load(f)
         
-        total_detections = 0
-        removed_detections = 0
+#         total_detections = 0
+#         removed_detections = 0
         
-        for image_data in data.get('images', []):
-            if 'detections' not in image_data:
-                continue
+#         for image_data in data.get('images', []):
+#             if 'detections' not in image_data:
+#                 continue
                 
-            original_detections = image_data['detections']
-            total_detections += len(original_detections)
+#             original_detections = image_data['detections']
+#             total_detections += len(original_detections)
             
-            # Filter out malformed bounding boxes
-            valid_detections = []
-            for detection in original_detections:
-                bbox = detection.get('bbox', [])
-                if len(bbox) >= 4:
-                    x, y, width, height = bbox[:4]
-                    # Keep detection if width and height are both > 0
-                    if width > 0 and height > 0:
-                        valid_detections.append(detection)
-                    else:
-                        removed_detections += 1
-                        log(f"Removed malformed bbox from {image_data.get('file', 'unknown')}: {bbox}")
-                else:
-                    removed_detections += 1
-                    log(f"Removed detection with invalid bbox format from {image_data.get('file', 'unknown')}: {bbox}")
+#             # Filter out malformed bounding boxes
+#             valid_detections = []
+#             for detection in original_detections:
+#                 bbox = detection.get('bbox', [])
+#                 if len(bbox) >= 4:
+#                     x, y, width, height = bbox[:4]
+#                     # Keep detection if width and height are both > 0
+#                     if width > 0 and height > 0:
+#                         valid_detections.append(detection)
+#                     else:
+#                         removed_detections += 1
+#                         log(f"Removed malformed bbox from {image_data.get('file', 'unknown')}: {bbox}")
+#                 else:
+#                     removed_detections += 1
+#                     log(f"Removed detection with invalid bbox format from {image_data.get('file', 'unknown')}: {bbox}")
             
-            image_data['detections'] = valid_detections
+#             image_data['detections'] = valid_detections
         
-        # Write cleaned data back to file
-        with open(json_file_path, 'w') as f:
-            json.dump(data, f, indent=2)
+#         # Write cleaned data back to file
+#         with open(json_file_path, 'w') as f:
+#             json.dump(data, f, indent=2)
         
-        if removed_detections > 0:
-            log(f"Cleaned {removed_detections}/{total_detections} malformed bounding boxes from detection results")
+#         if removed_detections > 0:
+#             log(f"Cleaned {removed_detections}/{total_detections} malformed bounding boxes from detection results")
         
-    except Exception as e:
-        log(f"Warning: Failed to clean malformed bounding boxes: {e}")
+#     except Exception as e:
+#         log(f"Warning: Failed to clean malformed bounding boxes: {e}")
 
 
 # due to a bug there is extra whitespace below the map, so we use a custom class to reduce the height

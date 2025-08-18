@@ -1,8 +1,6 @@
 
 # WAAR WAS IK? 
 # TODO: 
-# - move SPECIESNET specifics to its own classify detections script
-# get rid of the _validate_md preds function _clean_malformed_bboxes() utils/analysis_utils.py:566
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
 # - create a claude.md for the project with the env micromamba instructions, and an quick overview of the project etc.
