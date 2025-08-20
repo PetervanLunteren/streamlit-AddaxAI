@@ -75,6 +75,12 @@ from components import MultiProgressBars, print_widget_label, info_box, success_
 
 
 from utils.config import *
+from utils.megadetector_utils import (
+    run_megadetector_on_images, 
+    run_megadetector_on_videos, 
+    merge_detection_results,
+    count_media_files_in_folder
+)
 
 # load camera IDs
 config_dir = user_config_dir("AddaxAI")
@@ -199,9 +205,6 @@ def run_process_queue(
     # overall_progress = st.empty()
     pbars = MultiProgressBars(container_label="Processing...",)
 
-    pbars.add_pbar(label="Detection", show_device=True)
-    pbars.add_pbar(label="Classification", show_device=True, done_text="Finalizing...")
-
     # calculate the total number of deployments to process
     process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
     total_deployment_idx = len(process_queue)
@@ -237,10 +240,7 @@ def run_process_queue(
 
         deployment = process_queue[0]
         
-        # reset the pbars to 0
-        pbars.reset_all_pbars()
-
-        # for idx, deployment in enumerate(process_queue):
+        # Extract deployment info
         selected_folder = deployment['selected_folder']
         selected_projectID = deployment['selected_projectID']
         selected_locationID = deployment['selected_locationID']
@@ -250,6 +250,22 @@ def run_process_queue(
         selected_country = deployment.get('selected_country', None)
         selected_state = deployment.get('selected_state', None)
 
+        # Check what types of media files exist in THIS deployment
+        video_count, image_count = count_media_files_in_folder(selected_folder)
+        
+        # Clear all previous progress bars and reinitialize for this deployment
+        pbars = MultiProgressBars(container_label="Processing...",)
+        
+        # Add progress bars in the order they will be used for THIS deployment
+        if video_count > 0:
+            pbars.add_pbar(label="Detecting... (videos)", show_device=True)
+        
+        if image_count > 0:
+            pbars.add_pbar(label="Detecting... (images)", show_device=True)
+        
+        # Only add classification progress bar if a classification model is selected
+        if selected_cls_modelID and selected_cls_modelID != "NONE":
+            pbars.add_pbar(label="Classification", show_device=True, done_text="Finalizing...")
 
         # Create JSON file with in-progress suffix during processing
         in_progress_json_path = os.path.join(
@@ -257,7 +273,7 @@ def run_process_queue(
         final_json_path = os.path.join(
             selected_folder, "addaxai-deployment.json")
 
-        # run the MegaDetector
+        # Set deployment progress label
         pbars.update_label(
             f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
 
@@ -266,16 +282,53 @@ def run_process_queue(
         # Check for cancellation before starting detection
         if st.session_state.get(cancel_key, False):
             break
-
-        detection_success = run_md(
-            selected_det_modelID, model_meta["det"][selected_det_modelID], selected_folder, in_progress_json_path, pbars)
-
+        
+        # Create temporary result files
+        video_results_path = os.path.join(selected_folder, "addaxai-video-results-temp.json")
+        image_results_path = os.path.join(selected_folder, "addaxai-image-results-temp.json")
+        
+        detection_success = True
+        
+        # Process videos if present
+        if video_count > 0:
+            log(f"Found {video_count} videos to process")
+            
+            video_success = run_megadetector_on_videos(
+                selected_det_modelID, 
+                model_meta["det"][selected_det_modelID], 
+                selected_folder, 
+                video_results_path, 
+                pbars
+            )
+            
+            if video_success is False:
+                detection_success = False
+        
+        # Process images if present
+        if image_count > 0 and detection_success:
+            log(f"Found {image_count} images to process")
+            
+            image_success = run_megadetector_on_images(
+                selected_det_modelID,
+                model_meta["det"][selected_det_modelID], 
+                selected_folder, 
+                image_results_path, 
+                pbars
+            )
+            
+            if image_success is False:
+                detection_success = False
+        
+        # Merge results if both types were processed successfully
+        if detection_success and (video_count > 0 or image_count > 0):
+            merge_detection_results(video_results_path, image_results_path, in_progress_json_path)
+        
         # If detection was cancelled or failed, skip to next iteration
         if detection_success is False:
             continue
 
         # run the classifier
-        if selected_cls_modelID:
+        if selected_cls_modelID and selected_cls_modelID != "NONE":
             # Check for cancellation before starting classification
             if st.session_state.get(cancel_key, False):
                 break
@@ -425,106 +478,8 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None):
 
 
 
-def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
-
-    model_file = os.path.join(
-        ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
-    command = [
-        f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python",
-        "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data",
-        model_file,
-        deployment_folder,
-        output_file
-    ]
-
-    # Log the command for debugging/audit purposes
-    log(f"\n\nRunning MegaDetector command:\n{' '.join(command)}\n")
-
-    status_placeholder = st.empty()
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        shell=False,
-        universal_newlines=True,
-        cwd=ADDAXAI_ROOT  # Set working directory to project root
-    )
-
-    for line in process.stdout:
-        # Check if processing was cancelled
-        if st.session_state.get("cancel_processing", False):
-            log("Detection cancelled by user - terminating subprocess")
-            process.terminate()
-            process.wait()
-            return False
-
-        line = line.strip()
-        print(line)
-        pbars.update_from_tqdm_string("Detection", line)
-
-    process.stdout.close()
-    process.wait()
-
-    if not process.returncode == 0:
-        status_placeholder.error(
-            f"Failed with exit code {process.returncode}.")
-        return False
-    
-#     # Clean up malformed bounding boxes after MegaDetector completes
-#     _clean_malformed_bboxes(output_file)
-#     return True
-
-
-# def _clean_malformed_bboxes(json_file_path):
-#     """
-#     Clean up malformed bounding boxes (zero width/height) from MegaDetector results.
-    
-#     Args:
-#         json_file_path (str): Path to the MegaDetector JSON results file
-#     """
-#     try:
-#         with open(json_file_path, 'r') as f:
-#             data = json.load(f)
-        
-#         total_detections = 0
-#         removed_detections = 0
-        
-#         for image_data in data.get('images', []):
-#             if 'detections' not in image_data:
-#                 continue
-                
-#             original_detections = image_data['detections']
-#             total_detections += len(original_detections)
-            
-#             # Filter out malformed bounding boxes
-#             valid_detections = []
-#             for detection in original_detections:
-#                 bbox = detection.get('bbox', [])
-#                 if len(bbox) >= 4:
-#                     x, y, width, height = bbox[:4]
-#                     # Keep detection if width and height are both > 0
-#                     if width > 0 and height > 0:
-#                         valid_detections.append(detection)
-#                     else:
-#                         removed_detections += 1
-#                         log(f"Removed malformed bbox from {image_data.get('file', 'unknown')}: {bbox}")
-#                 else:
-#                     removed_detections += 1
-#                     log(f"Removed detection with invalid bbox format from {image_data.get('file', 'unknown')}: {bbox}")
-            
-#             image_data['detections'] = valid_detections
-        
-#         # Write cleaned data back to file
-#         with open(json_file_path, 'w') as f:
-#             json.dump(data, f, indent=2)
-        
-#         if removed_detections > 0:
-#             log(f"Cleaned {removed_detections}/{total_detections} malformed bounding boxes from detection results")
-        
-#     except Exception as e:
-#         log(f"Warning: Failed to clean malformed bounding boxes: {e}")
+# Old run_md() function has been replaced with separate video and image processing
+# using utils.megadetector_utils module for cleaner code organization
 
 
 # due to a bug there is extra whitespace below the map, so we use a custom class to reduce the height

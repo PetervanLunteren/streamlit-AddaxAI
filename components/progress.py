@@ -121,7 +121,7 @@ class MultiProgressBars:
             elif "GPU available: False" in tqdm_line:
                 self.device_info[pbar_id] = "CPU"
         
-        tqdm_pattern = r"(\d+)%\|.*\|\s*(\d+)/(\d+).*?\[(.*?)<([^,]+),\s*([\d.]+)\s*(\S+)?/s\]"
+        tqdm_pattern = r"(\d+)%\|.*\|\s*(\d+)/(\d+).*?\[(.*?)<([^,]+),\s*([\d.]+)\s*([^,\]]+)\]"
         match = re.search(tqdm_pattern, tqdm_line)
 
         if not match:
@@ -133,16 +133,16 @@ class MultiProgressBars:
         elapsed_str = match.group(4).strip()
         eta_str = match.group(5).strip()
         rate = float(match.group(6))
-        unit = match.group(7) or ""
+        rate_unit = match.group(7) or ""
 
         self.set_max_value(pbar_id, total)
         self.states[pbar_id] = n  # Sync directly to avoid increment error
 
-        # Build label components
+        # Build label components - keep units simple and generic
         label_parts = [
             f":material/clock_loader_40: {percent}%",
-            f":material/laps: {n} {unit} / {total} {unit}",
-            f":material/speed: {rate:.2f} {unit}/s",
+            f":material/laps: {n} / {total}",
+            f":material/speed: {rate:.2f} {rate_unit}",
             f":material/timer: {elapsed_str}",
             f":material/sports_score: {eta_str}"
         ]
