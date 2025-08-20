@@ -13,6 +13,7 @@ import streamlit as st
 import json
 
 from utils.config import ADDAXAI_ROOT, log
+from utils.video_utils import get_video_datetime
 
 
 def run_megadetector_on_images(det_modelID, model_meta, deployment_folder, output_file, pbars):
@@ -130,7 +131,41 @@ def _run_megadetector_subprocess(command, pbars, progress_label):
     return True
 
 
-def merge_detection_results(video_results_file, image_results_file, output_file):
+def enrich_video_results_with_datetime(video_results_file, deployment_folder):
+    """
+    Add datetime metadata to video detection results.
+    
+    Args:
+        video_results_file (str): Path to video detection results JSON
+        deployment_folder (str): Path to deployment folder containing videos
+    """
+    if not os.path.exists(video_results_file):
+        return
+    
+    with open(video_results_file, 'r') as f:
+        data = json.load(f)
+    
+    # Process each video entry
+    for item in data.get('images', []):
+        if 'file' in item:
+            # Construct full path to video file
+            video_path = os.path.join(deployment_folder, item['file'])
+            
+            # Extract datetime
+            datetime_obj = get_video_datetime(video_path)
+            if datetime_obj:
+                # Format as requested: '2022:03:02 22:59:00'
+                item['datetime'] = datetime_obj.strftime('%Y:%m:%d %H:%M:%S')
+                log(f"Added datetime {item['datetime']} to video {item['file']}")
+    
+    # Write back the enriched data
+    with open(video_results_file, 'w') as f:
+        json.dump(data, f, indent=2)
+    
+    log(f"Enriched video results with datetime metadata: {video_results_file}")
+
+
+def merge_detection_results(video_results_file, image_results_file, output_file, deployment_folder=None):
     """
     Merge video and image detection results into a single JSON file.
     
@@ -138,11 +173,16 @@ def merge_detection_results(video_results_file, image_results_file, output_file)
         video_results_file (str): Path to video detection results JSON
         image_results_file (str): Path to image detection results JSON  
         output_file (str): Path to merged output JSON file
+        deployment_folder (str): Path to deployment folder (needed for datetime extraction)
     """
     merged_data = None
     
     # Load video results if they exist
     if os.path.exists(video_results_file):
+        # Enrich video results with datetime before merging
+        if deployment_folder:
+            enrich_video_results_with_datetime(video_results_file, deployment_folder)
+        
         with open(video_results_file, 'r') as f:
             video_data = json.load(f)
         merged_data = video_data

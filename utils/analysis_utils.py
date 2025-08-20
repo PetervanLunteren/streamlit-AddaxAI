@@ -81,6 +81,7 @@ from utils.megadetector_utils import (
     merge_detection_results,
     count_media_files_in_folder
 )
+from utils.video_utils import get_video_gps, get_video_datetime
 
 # load camera IDs
 config_dir = user_config_dir("AddaxAI")
@@ -209,6 +210,8 @@ def run_process_queue(
     process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
     total_deployment_idx = len(process_queue)
     current_deployment_idx = 1
+    
+    # Note: Progress bars will be initialized per deployment inside the processing loop
 
     # Check if cancelled before starting
     if st.session_state.get(cancel_key, False):
@@ -240,7 +243,7 @@ def run_process_queue(
 
         deployment = process_queue[0]
         
-        # Extract deployment info
+        # for idx, deployment in enumerate(process_queue):
         selected_folder = deployment['selected_folder']
         selected_projectID = deployment['selected_projectID']
         selected_locationID = deployment['selected_locationID']
@@ -267,13 +270,14 @@ def run_process_queue(
         if selected_cls_modelID and selected_cls_modelID != "NONE":
             pbars.add_pbar(label="Classification", show_device=True, done_text="Finalizing...")
 
+
         # Create JSON file with in-progress suffix during processing
         in_progress_json_path = os.path.join(
             selected_folder, "addaxai-deployment-in-progress.json")
         final_json_path = os.path.join(
             selected_folder, "addaxai-deployment.json")
 
-        # Set deployment progress label
+        # run the MegaDetector
         pbars.update_label(
             f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
 
@@ -282,6 +286,9 @@ def run_process_queue(
         # Check for cancellation before starting detection
         if st.session_state.get(cancel_key, False):
             break
+
+        # Check what types of media files exist in the folder
+        video_count, image_count = count_media_files_in_folder(selected_folder)
         
         # Create temporary result files
         video_results_path = os.path.join(selected_folder, "addaxai-video-results-temp.json")
@@ -321,7 +328,7 @@ def run_process_queue(
         
         # Merge results if both types were processed successfully
         if detection_success and (video_count > 0 or image_count > 0):
-            merge_detection_results(video_results_path, image_results_path, in_progress_json_path)
+            merge_detection_results(video_results_path, image_results_path, in_progress_json_path, selected_folder)
         
         # If detection was cancelled or failed, skip to next iteration
         if detection_success is False:
@@ -2188,17 +2195,6 @@ def get_image_datetime(file_path):
     return None
 
 
-def get_video_datetime(file_path):
-    try:
-        parser = createParser(str(file_path))
-        if not parser:
-            return None
-        metadata = extractMetadata(parser)
-        if metadata and metadata.has("creation_date"):
-            return metadata.get("creation_date")
-    except Exception:
-        pass
-    return None
 
 
 
@@ -2230,36 +2226,6 @@ def get_image_gps(file_path):
         # st.error(e)
         return None
 
-
-def get_video_gps(file_path):
-    try:
-        parser = createParser(str(file_path))
-        if not parser:
-            return None
-
-        with parser:
-            metadata = extractMetadata(parser)
-            if not metadata:
-                return None
-
-            # hachoir stores GPS sometimes under 'location' or 'latitude/longitude'
-            location = metadata.get('location')
-            if location:
-                # Might return something like "+52.379189+004.899431/"
-                parts = location.strip("/").split("+")
-                parts = [p for p in parts if p]
-                if len(parts) >= 2:
-                    lat = float(parts[0])
-                    lon = float(parts[1])
-                    return (lat, lon)
-
-            # Try direct latitude/longitude keys
-            lat = metadata.get('latitude')
-            lon = metadata.get('longitude')
-            if lat and lon:
-                return (float(lat), float(lon))
-    except Exception:
-        return None
 
 
 
@@ -2319,13 +2285,13 @@ def check_folder_metadata():
 
         # videos
         for i, file in enumerate(video_files):
-            dt = get_video_datetime(file)
+            dt = get_video_datetime(str(file))
             if dt:
                 datetimes.append(dt)
 
             # spread GPS checks across files and early exit
             if i % check_every_nth == 0 and gps_checked < max_gps_checks and len(gps_coords) < sufficient_gps_coords:
-                gps = get_video_gps(file)
+                gps = get_video_gps(str(file))
                 if gps:
                     gps_coords.append(gps)
                 gps_checked += 1
