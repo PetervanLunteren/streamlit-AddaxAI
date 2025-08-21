@@ -14,10 +14,12 @@ class MultiProgressBars:
     """
     
     def __init__(self, container_label="Progress Bars"):
-        self.container = st.container(border=True)
-        self.label_placeholder = self.container.empty()
-        if container_label:
-            self.label_placeholder.markdown(container_label)
+        self._placeholder = st.empty()
+        with self._placeholder:
+            self.container = st.container(border=True)
+            self.label_placeholder = self.container.empty()
+            if container_label:
+                self.label_placeholder.markdown(container_label)
         self.bars = {}
         self.states = {}
         self.max_values = {}
@@ -28,6 +30,10 @@ class MultiProgressBars:
         self.show_device = {}
         self.device_info = {}
         self.label_divider = " \u00A0\u00A0 | \u00A0\u00A0 "
+
+    def clear(self):
+        """Remove the container and all bars from the screen."""
+        self._placeholder.empty()
 
     def update_label(self, new_label):
         """Update the container label dynamically."""

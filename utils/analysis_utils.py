@@ -203,15 +203,13 @@ def run_process_queue(
             cancel_processing(cancel_key)
     # st.divider()
 
-    # overall_progress = st.empty()
-    pbars = MultiProgressBars(container_label="Processing...",)
-
     # calculate the total number of deployments to process
     process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
     total_deployment_idx = len(process_queue)
     current_deployment_idx = 1
     
-    # Note: Progress bars will be initialized per deployment inside the processing loop
+    # Initialize pbars as None - will be created per deployment
+    pbars = None
 
     # Check if cancelled before starting
     if st.session_state.get(cancel_key, False):
@@ -256,7 +254,11 @@ def run_process_queue(
         # Check what types of media files exist in THIS deployment
         video_count, image_count = count_media_files_in_folder(selected_folder)
         
-        # Clear all previous progress bars and reinitialize for this deployment
+        # Clear previous progress bars if they exist
+        if pbars is not None:
+            pbars.clear()
+        
+        # Create a completely new MultiProgressBars for this deployment
         pbars = MultiProgressBars(container_label="Processing...",)
         
         # Add progress bars in the order they will be used for THIS deployment
