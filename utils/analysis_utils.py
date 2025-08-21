@@ -45,7 +45,6 @@ import streamlit as st
 import sys
 import folium as fl
 from streamlit_folium import st_folium
-import streamlit as st
 from appdirs import user_config_dir
 import statistics
 import subprocess
@@ -264,13 +263,15 @@ def run_process_queue(
         # Add progress bars in the order they will be used for THIS deployment
         if video_count > 0:
             pbars.add_pbar(label="Detecting... (videos)", show_device=True)
+            # Add video classification bar if classification model is selected
+            if selected_cls_modelID and selected_cls_modelID != "NONE":
+                pbars.add_pbar(label="Classification... (videos)", show_device=True)
         
         if image_count > 0:
             pbars.add_pbar(label="Detecting... (images)", show_device=True)
-        
-        # Only add classification progress bar if a classification model is selected
-        if selected_cls_modelID and selected_cls_modelID != "NONE":
-            pbars.add_pbar(label="Classification", show_device=True, done_text="Finalizing...")
+            # Add image classification bar if classification model is selected
+            if selected_cls_modelID and selected_cls_modelID != "NONE":
+                pbars.add_pbar(label="Classification... (images)", show_device=True, done_text="Finalizing...")
 
 
         # Create JSON file with in-progress suffix during processing
@@ -312,6 +313,20 @@ def run_process_queue(
             
             if video_success is False:
                 detection_success = False
+            
+            # Run classification on video results if requested and videos were processed successfully
+            if video_success and selected_cls_modelID and selected_cls_modelID != "NONE":
+                # Check for cancellation before starting video classification
+                if st.session_state.get(cancel_key, False):
+                    break
+                
+                from utils.video_classification import run_cls_videos
+                video_cls_success = run_cls_videos(
+                    selected_cls_modelID, video_results_path, pbars, selected_country, selected_state)
+                
+                if video_cls_success is False:
+                    log("Video classification failed")
+                    # Don't break here - we can still process images
         
         # Process images if present
         if image_count > 0 and detection_success:
@@ -327,6 +342,86 @@ def run_process_queue(
             
             if image_success is False:
                 detection_success = False
+            
+            # Run classification on image results if requested and images were processed successfully
+            if image_success and selected_cls_modelID and selected_cls_modelID != "NONE":
+                # Check for cancellation before starting image classification
+                if st.session_state.get(cancel_key, False):
+                    break
+                
+                # Use subprocess-based classification for consistency
+                model_meta = get_cached_model_meta()
+                model_info = model_meta['cls'][selected_cls_modelID]
+                
+                cls_model_fpath = os.path.join(
+                    ADDAXAI_ROOT, "models", "cls", selected_cls_modelID, model_info["model_fname"])
+                
+                # Run subprocess-based classification in base environment
+                base_python_executable = f"{ADDAXAI_ROOT}/envs/env-addaxai-base/bin/python"
+                cls_subprocess_script = os.path.join(ADDAXAI_ROOT, "classification", "cls_inference_subprocess.py")
+                
+                command_args = [
+                    base_python_executable,
+                    cls_subprocess_script,
+                    '--model-path', cls_model_fpath,
+                    '--model-type', model_info["type"],
+                    '--model-env', model_info["env"],
+                    '--json-path', image_results_path
+                ]
+                
+                # Add country and state parameters if provided
+                if selected_country:
+                    command_args.extend(['--country', selected_country])
+                if selected_state:
+                    command_args.extend(['--state', selected_state])
+                
+                # Set environment variables for subprocess
+                env = os.environ.copy()
+                env['PYTHONPATH'] = ADDAXAI_ROOT
+                
+                # Fix MPS device issue on macOS by enabling CPU fallback
+                if OS_NAME == 'macos':
+                    env['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+                
+                # Log the command for debugging
+                log(f"\n\nRunning image classification command:\n{' '.join(command_args)}\n")
+                
+                process = subprocess.Popen(
+                    command_args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    shell=False,
+                    universal_newlines=True,
+                    cwd=ADDAXAI_ROOT,
+                    env=env
+                )
+                
+                # Process output
+                image_cls_success = True
+                for line in process.stdout:
+                    # Check if processing was cancelled
+                    if st.session_state.get(cancel_key, False):
+                        log("Image classification cancelled by user - terminating subprocess")
+                        process.terminate()
+                        process.wait()
+                        image_cls_success = False
+                        break
+                    
+                    line = line.strip()
+                    log(line)
+                    pbars.update_from_tqdm_string("Classification... (images)", line)
+                
+                process.stdout.close()
+                process.wait()
+                
+                if process.returncode != 0:
+                    image_cls_success = False
+                
+                if image_cls_success is False:
+                    log("Image classification failed")
+                    # Don't break here - we can still merge results
         
         # Merge results if both types were processed successfully
         if detection_success and (video_count > 0 or image_count > 0):
@@ -336,18 +431,7 @@ def run_process_queue(
         if detection_success is False:
             continue
 
-        # run the classifier
-        if selected_cls_modelID and selected_cls_modelID != "NONE":
-            # Check for cancellation before starting classification
-            if st.session_state.get(cancel_key, False):
-                break
-
-            classification_success = run_cls(
-                selected_cls_modelID, in_progress_json_path, pbars, selected_country, selected_state)
-
-            # If classification was cancelled or failed, skip to next iteration
-            if classification_success is False:
-                continue
+        # Classification is now done separately for videos and images before merging
 
         # if all processes are done, update the map file and rename to final
         if os.path.exists(in_progress_json_path):
@@ -395,7 +479,7 @@ def run_process_queue(
     st.rerun()
 
 
-def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None):
+def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None, progress_label="Classification"):
     """
     Run the classifier on the given deployment folder using the specified model ID.
     
@@ -405,6 +489,7 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None):
         pbars: Progress bar manager
         country (str, optional): Country code for geofencing (e.g., "USA", "KEN")
         state (str, optional): State code for geofencing (e.g., "CA", "TX" - US only)
+        progress_label (str, optional): Label to use for progress bar updates (default: "Classification")
     """
     # Skip classification if no model selected
     if cls_modelID == "NONE":
@@ -476,7 +561,7 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None):
         line = line.strip()
         log(line)
         # st.code(line)
-        pbars.update_from_tqdm_string("Classification", line)
+        pbars.update_from_tqdm_string(progress_label, line)
 
     process.stdout.close()
     process.wait()
