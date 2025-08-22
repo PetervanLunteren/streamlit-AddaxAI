@@ -25,21 +25,10 @@ TODOs:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 - RDE
 - material icons must be offline, but I can only do that at the end when I know which icons I'm using.
-- make it accessible for all models and envs
 - also save the image or video that had the min_datetime, so that we can calculate the diff every time we need it "deployment_start_file". Then it can read the exif from the path. No need to read all exifs of all images.  searc h for deployment_start_file, deployment_start_datetime
-- add SpeciesNet
-- add video processing 
 - reformat obj names, function names, and variable names, and classes, etc
-- add GPU / CPU icon to pbars 
 - do the loading squirell in a modal too, to you cant click anything else while loading
-- open a model when the folder_selection.py script is done with an info box saying a new window has opened. It the model will only close once the tkinter script is done sucessfully.
-- if NONE cls model is selected, then dont show the cls pbars. 
-- The pbars for progress should be taken care of. They should be updated, the texts proper,etc
 - if no CLS is selected, it should skip species selection and the button should be add to queue. 
-- the license warning should be for all models, not just the yolov11 models. Where?
-- delete the all_classes from the variables json? It should probabaly take it from the taxon csv right? That is redundant and error prone.
-- open a modal that tells the user to select a folder in a new window. That wat the user cannot click anything else while the folder selection is happening.
-- browse folder must open last chosen folder, not the root of the filesystem
 """
 
 # Standard library imports
