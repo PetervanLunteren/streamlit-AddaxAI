@@ -18,7 +18,9 @@ import os
 import sys
 import json
 import subprocess
-import tempfile
+import base64
+import io
+import uuid
 from tqdm import tqdm
 
 # Add MegaDetector to path for video utilities
@@ -35,89 +37,172 @@ def is_video_file(filename):
     return filename.lower().endswith(VIDEO_EXTENSIONS)
 
 
-def call_model_inference(model_path, model_type, model_env, image_path, bbox_coords=None):
+class ModelServerClient:
+    """Client for communicating with persistent model server."""
+    
+    def __init__(self, model_path, model_type, model_env):
+        """
+        Initialize model server client.
+        
+        Args:
+            model_path (str): Path to the model file
+            model_type (str): Type of model (directory name)
+            model_env (str): Environment name (e.g., 'pytorch', 'tensorflow-v1')
+        """
+        self.model_path = model_path
+        self.model_type = model_type
+        self.model_env = model_env
+        self.server_process = None
+        self.start_server()
+    
+    def start_server(self):
+        """Start the persistent model server subprocess."""
+        # Build the command
+        python_executable = f"{ADDAXAI_ROOT}/envs/env-{self.model_env}/bin/python"
+        server_script = f"{ADDAXAI_ROOT}/classification/model_server.py"
+        
+        command = [
+            python_executable,
+            server_script,
+            '--model-path', self.model_path,
+            '--model-type', self.model_type
+        ]
+        
+        # Set environment variables
+        env = os.environ.copy()
+        env['PYTHONPATH'] = ADDAXAI_ROOT
+        
+        try:
+            # Start the server process
+            self.server_process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+                cwd=ADDAXAI_ROOT,
+                bufsize=1,  # Line buffered
+                universal_newlines=True
+            )
+            
+            # Wait for server to be ready
+            while True:
+                line = self.server_process.stderr.readline()
+                if 'Model server ready' in line:
+                    print("Model server started successfully")
+                    break
+                elif self.server_process.poll() is not None:
+                    # Process died
+                    stdout, stderr = self.server_process.communicate()
+                    raise RuntimeError(f"Model server failed to start. stderr: {stderr}")
+                    
+        except Exception as e:
+            print(f"Failed to start model server: {str(e)}")
+            raise
+    
+    def classify_crop(self, image_np, bbox_coords=None):
+        """
+        Classify a single crop using the persistent model server.
+        
+        Args:
+            image_np (numpy.ndarray): Image as numpy array
+            bbox_coords (list, optional): Normalized bounding box [x,y,w,h]
+        
+        Returns:
+            list: Classification results as [["species_name", confidence], ...]
+        """
+        if self.server_process is None or self.server_process.poll() is not None:
+            print("Model server is not running")
+            return []
+        
+        try:
+            # Convert numpy array to PIL Image
+            from PIL import Image
+            if image_np.dtype != 'uint8':
+                image_np = (image_np * 255).astype('uint8')
+            image_pil = Image.fromarray(image_np)
+            
+            # Encode image as base64 JPEG
+            buffer = io.BytesIO()
+            image_pil.save(buffer, format='JPEG', quality=85)
+            image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            
+            # Create request
+            request = {
+                "request_id": str(uuid.uuid4()),
+                "image_data": image_data,
+                "bbox": bbox_coords
+            }
+            
+            # Send request to server
+            request_json = json.dumps(request) + '\n'
+            self.server_process.stdin.write(request_json)
+            self.server_process.stdin.flush()
+            
+            # Read response
+            response_line = self.server_process.stdout.readline()
+            if not response_line:
+                print("No response from model server")
+                return []
+            
+            response = json.loads(response_line.strip())
+            
+            if response.get('error'):
+                print(f"Model server error: {response['error']}")
+                return []
+            
+            return response.get('classifications', [])
+            
+        except Exception as e:
+            print(f"Error communicating with model server: {str(e)}")
+            return []
+    
+    def shutdown(self):
+        """Shutdown the model server."""
+        if self.server_process and self.server_process.poll() is None:
+            try:
+                # Send shutdown signal
+                shutdown_request = json.dumps({"shutdown": True}) + '\n'
+                self.server_process.stdin.write(shutdown_request)
+                self.server_process.stdin.flush()
+                
+                # Wait for graceful shutdown
+                self.server_process.wait(timeout=10)
+                
+            except Exception:
+                # Force kill if graceful shutdown fails
+                self.server_process.terminate()
+                self.server_process.wait(timeout=5)
+            finally:
+                self.server_process = None
+
+
+def call_model_inference(model_server_client, image_np, bbox_coords=None):
     """
-    Call the model inference subprocess to classify a single image crop.
+    Call the persistent model server to classify a single image crop.
     
     Args:
-        model_path (str): Path to the model file
-        model_type (str): Type of model (directory name)
-        model_env (str): Environment name (e.g., 'pytorch', 'tensorflow-v1')
-        image_path (str): Path to the image file
+        model_server_client (ModelServerClient): Client for persistent model server
+        image_np (numpy.ndarray): Image as numpy array
         bbox_coords (list, optional): Normalized bounding box [x,y,w,h]
     
     Returns:
         list: Classification results as [["species_name", confidence], ...]
     """
-    
-    # Build the command
-    python_executable = f"{ADDAXAI_ROOT}/envs/env-{model_env}/bin/python"
-    inference_script = f"{ADDAXAI_ROOT}/classification/model_inference_wrapper.py"
-    
-    command = [
-        python_executable,
-        inference_script,
-        '--model-path', model_path,
-        '--model-type', model_type,
-        '--image-path', image_path
-    ]
-    
-    # Add bbox if provided
-    if bbox_coords:
-        bbox_str = ','.join(map(str, bbox_coords))
-        command.extend(['--bbox', bbox_str])
-    
-    # Set environment variables
-    env = os.environ.copy()
-    env['PYTHONPATH'] = ADDAXAI_ROOT
-    
-    try:
-        # Run the subprocess
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=30,  # 30 second timeout per inference
-            env=env,
-            cwd=ADDAXAI_ROOT
-        )
-        
-        if result.returncode == 0:
-            # Parse JSON output
-            output = json.loads(result.stdout.strip())
-            if 'error' in output:
-                print(f"Model inference error: {output['error']}")
-                return []
-            return output.get('classifications', [])
-        else:
-            print(f"Model inference failed: {result.stderr}")
-            return []
-            
-    except subprocess.TimeoutExpired:
-        print(f"Model inference timed out for {image_path}")
-        return []
-    except json.JSONDecodeError as e:
-        print(f"Failed to parse model output: {e}")
-        print(f"Raw output: {result.stdout}")
-        return []
-    except Exception as e:
-        print(f"Error calling model inference: {str(e)}")
-        return []
+    return model_server_client.classify_crop(image_np, bbox_coords)
 
 
-def create_video_frame_callback(model_path, model_type, model_env, detections_by_frame, 
-                                label_map, classification_data, temp_dir):
+def create_video_frame_callback(model_server_client, detections_by_frame, 
+                                label_map, classification_data):
     """
     Create callback function to process video frames and classify detections.
     
     Args:
-        model_path (str): Path to classification model
-        model_type (str): Type of classification model  
-        model_env (str): Environment for the model
+        model_server_client (ModelServerClient): Client for persistent model server
         detections_by_frame: Dict mapping frame numbers to detection lists
         label_map: Detection category label mapping
         classification_data: Dict to store classification results and categories
-        temp_dir: Temporary directory for frame images
     
     Returns:
         Callback function for video frame processing
@@ -129,12 +214,6 @@ def create_video_frame_callback(model_path, model_type, model_env, detections_by
         # Get detections for this frame
         frame_detections = detections_by_frame.get(frame_number, [])
         
-        # Save the frame as a temporary image
-        from PIL import Image
-        frame_image = Image.fromarray(image_np)
-        frame_path = os.path.join(temp_dir, f"frame_{frame_number:06d}.jpg")
-        frame_image.save(frame_path)
-        
         # Process each animal detection in this frame
         for detection in frame_detections:
             category_id = detection['category']
@@ -144,9 +223,9 @@ def create_video_frame_callback(model_path, model_type, model_env, detections_by
             if category == 'animal' and detection.get('conf', 0) >= 0.1:  # confidence threshold
                 bbox = detection['bbox']
                 
-                # Call model inference subprocess
+                # Call persistent model server - no temp files needed!
                 name_classifications = call_model_inference(
-                    model_path, model_type, model_env, frame_path, bbox
+                    model_server_client, image_np, bbox
                 )
                 
                 # Process classification results
@@ -170,10 +249,6 @@ def create_video_frame_callback(model_path, model_type, model_env, detections_by
                     if idx_classifications:
                         detection['classifications'] = [idx_classifications[0]]
         
-        # Clean up temporary frame file
-        if os.path.exists(frame_path):
-            os.remove(frame_path)
-        
         return frame_detections
     
     return frame_callback
@@ -181,7 +256,7 @@ def create_video_frame_callback(model_path, model_type, model_env, detections_by
 
 def classify_video_detections(json_path, model_path, model_type, model_env):
     """
-    Classify animal detections in video files using subprocess-based model inference.
+    Classify animal detections in video files using persistent model server.
     
     Args:
         json_path (str): Path to JSON file with video detection results
@@ -210,23 +285,25 @@ def classify_video_detections(json_path, model_path, model_type, model_env):
     # Get directory containing videos
     video_dir = os.path.dirname(json_path)
     
-    # Create temporary directory for frame processing
-    with tempfile.TemporaryDirectory(prefix='addaxai_video_frames_') as temp_dir:
-        
-        # Process each video
-        total_detections = 0
-        for image_entry in data['images']:
-            if is_video_file(image_entry['file']) and 'detections' in image_entry:
-                # Count animal detections for progress tracking
-                animal_detections = [d for d in image_entry['detections'] 
-                                   if label_map.get(d['category'], '') == 'animal' and d.get('conf', 0) >= 0.1]
-                total_detections += len(animal_detections)
-        
-        if total_detections == 0:
-            print("No animal detections found in videos.")
-            return
-        
-        print(f"Processing {total_detections} animal detections in videos...")
+    # Count total detections for progress tracking
+    total_detections = 0
+    for image_entry in data['images']:
+        if is_video_file(image_entry['file']) and 'detections' in image_entry:
+            # Count animal detections for progress tracking
+            animal_detections = [d for d in image_entry['detections'] 
+                               if label_map.get(d['category'], '') == 'animal' and d.get('conf', 0) >= 0.1]
+            total_detections += len(animal_detections)
+    
+    if total_detections == 0:
+        print("No animal detections found in videos.")
+        return
+    
+    print(f"Processing {total_detections} animal detections in videos...")
+    
+    # Start persistent model server - this loads the model ONCE
+    model_server_client = None
+    try:
+        model_server_client = ModelServerClient(model_path, model_type, model_env)
         
         # Process each video with progress tracking
         with tqdm(total=total_detections, desc="Classifying") as pbar:
@@ -263,10 +340,10 @@ def classify_video_detections(json_path, model_path, model_type, model_env):
                 # Get frames to process
                 frames_to_process = list(detections_by_frame.keys())
                 
-                # Create callback for this video
+                # Create callback for this video - uses persistent model server
                 callback = create_video_frame_callback(
-                    model_path, model_type, model_env, detections_by_frame,
-                    label_map, classification_data, temp_dir
+                    model_server_client, detections_by_frame,
+                    label_map, classification_data
                 )
                 
                 # Process video frames
@@ -284,6 +361,11 @@ def classify_video_detections(json_path, model_path, model_type, model_env):
                 except Exception as e:
                     print(f"Error processing video {file_path}: {str(e)}")
                     pbar.update(animal_count)  # Still update progress
+    
+    finally:
+        # Always shutdown the model server
+        if model_server_client:
+            model_server_client.shutdown()
     
     # Update classification categories in data
     data['classification_categories'] = {v: k for k, v in classification_data['inverted_label_map'].items()}

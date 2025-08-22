@@ -63,7 +63,7 @@ def run_cls_videos(cls_modelID, json_fpath, pbars, country=None, state=None):
         ADDAXAI_ROOT, "models", "cls", cls_modelID, model_info["model_fname"])
     
     # Create the video classification script path
-    video_cls_script = os.path.join(ADDAXAI_ROOT, "classification", "video_cls_inference.py")
+    video_cls_script = os.path.join(ADDAXAI_ROOT, "classification", "classify_videos.py")
     
     # Build command arguments - run video classification in MegaDetector environment (has OpenCV)
     megadetector_python_executable = f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python"

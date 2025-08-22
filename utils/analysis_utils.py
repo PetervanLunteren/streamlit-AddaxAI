@@ -358,7 +358,7 @@ def run_process_queue(
                 
                 # Run subprocess-based classification in base environment
                 base_python_executable = f"{ADDAXAI_ROOT}/envs/env-addaxai-base/bin/python"
-                cls_subprocess_script = os.path.join(ADDAXAI_ROOT, "classification", "cls_inference_subprocess.py")
+                cls_subprocess_script = os.path.join(ADDAXAI_ROOT, "classification", "classify_images.py")
                 
                 command_args = [
                     base_python_executable,
