@@ -3,8 +3,6 @@
 # TODO: 
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
-# - create a claude.md for the project with the env micromamba instructions, and an quick overview of the project etc.
-
 
 """
 AddaxAI Streamlit Application - Main Entry Point
@@ -53,6 +51,7 @@ import json
 
 # Third-party imports
 from streamlit_lottie import st_lottie
+from st_modal import Modal
 from appdirs import user_config_dir, user_cache_dir
  
 
@@ -91,166 +90,252 @@ st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 
 # Detect app startup: empty session_state means this is a fresh session
 if st.session_state == {}:
+    # Set flag to show startup modal
+    st.session_state["show_startup_modal"] = True
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Display loading animation and status during startup
-    # ─────────────────────────────────────────────────────────────────────────
+# Create startup modal only when flag is set (following existing modal pattern)
+if st.session_state.get("show_startup_modal", False):
+    modal_startup = Modal(
+        title=None, 
+        key="startup-loading", 
+        show_close_button=False
+    )
     
-    # Load Lottie animation for startup loading screen
-    lottie_animation_fpath = os.path.join(ADDAXAI_ROOT, "assets", "loaders", "squirrel.json")
-    with open(lottie_animation_fpath, "r") as f:
-        lottie_animation = json.load(f)
-
-    _, col_animation, _ = st.columns([1, 2, 1])
-    with col_animation:
-        # Create a container for the animation that we can clear later
-        animation_container = st.empty()
-        
-        with animation_container:
+    with modal_startup.container():
+        # Load and display Lottie squirrel animation
+        lottie_animation_fpath = os.path.join(ADDAXAI_ROOT, "assets", "loaders", "squirrel.json")
+        with open(lottie_animation_fpath, "r") as f:
+            lottie_animation = json.load(f)
+            
+        # Center the animation
+        _, col_animation, _ = st.columns([1, 2, 1])
+        with col_animation:
             st_lottie(
                 lottie_animation,
                 speed=1,
                 reverse=False,
                 loop=True,
                 quality="high",
-                key="lottie_animation"
+                key="startup_lottie_animation"
             )
-
-    status_placeholder = st.empty()
-    status_placeholder.status("Loading AddaxAI Streamlit app...")
-    time.sleep(0.5)  # Simulate loading time
     
-    # ─────────────────────────────────────────────────────────────────────────
-    # Initialize session state and directory structure
-    # ─────────────────────────────────────────────────────────────────────────
-    
-    # Initialize shared session state container for cross-tool temporary variables
-    st.session_state["shared"] = {}
-    
-    # Create config directories at startup (appdirs may not be available in all environments)
-    CONFIG_DIR = user_config_dir("AddaxAI")
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-    
-    MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
-    
-    # Store paths in session state for tool access
-    st.session_state["shared"] = {
-        "CONFIG_DIR": CONFIG_DIR,
-        "MAP_FILE_PATH": MAP_FILE_PATH
-        }
-    
-    # ─────────────────────────────────────────────────────────────────────────
-    # Load utility modules and initialize settings cache
-    # ─────────────────────────────────────────────────────────────────────────
-    
-    # Import utils now that shared session state exists (modules depend on it)
-    from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, fetch_latest_model_info
-    from components import print_widget_label
-    from utils.analysis_utils import load_known_projects, load_model_metadata
-    
-
-    
-    # ─────────────────────────────────────────────────────────────────────────
-    # Initialize global configuration files
-    # ─────────────────────────────────────────────────────────────────────────
-    
-    # Initialize global map.json if it doesn't exist
-    # (stores project definitions, camera locations, deployment history)
-    if not os.path.exists(MAP_FILE_PATH):
-
-        # Create empty projects structure
-        map = {
-            "projects": {}
-        }
-
-        with open(MAP_FILE_PATH, "w") as f:
-            json.dump(map, f, indent=2)
-
-    # Initialize general_settings.json if it doesn't exist
-    general_settings_file = os.path.join(ADDAXAI_ROOT, "config", f"general_settings.json")
-    if not os.path.exists(general_settings_file):
         
-        # Create config directory if needed
-        os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
-        
-        # Create default settings
-        general_settings = {
-            "lang": "en",
-            "mode": 1,  # 0: simple mode, 1: advanced mode
-            "selected_projectID": None
-        }
-        with open(general_settings_file, "w") as f:
-            json.dump(general_settings, f, indent=2)
+        # Initialize startup with detailed progress tracking
+        _, col, _ = st.columns([1, 2, 1])
+        with col:
+            with st.status("Initializing AddaxAI...", expanded=False) as startup_status:
+                
+                # ─────────────────────────────────────────────────────────────────────────
+                # Step 1: Initialize session state and directory structure
+                # ─────────────────────────────────────────────────────────────────────────
+                try:
+                    st.write("Setting up session state...")
+                    startup_status.update(label="Setting up session state...")
+                    # Initialize shared session state container for cross-tool temporary variables
+                    st.session_state["shared"] = {}
+                    
+                    st.write("Creating configuration directories...")
+                    startup_status.update(label="Creating configuration directories...")
+                    # Create config directories at startup (appdirs may not be available in all environments)
+                    CONFIG_DIR = user_config_dir("AddaxAI")
+                    os.makedirs(CONFIG_DIR, exist_ok=True)
+                    
+                    MAP_FILE_PATH = os.path.join(CONFIG_DIR, "map.json")
+                    
+                    # Store paths in session state for tool access
+                    st.session_state["shared"] = {
+                        "CONFIG_DIR": CONFIG_DIR,
+                        "MAP_FILE_PATH": MAP_FILE_PATH
+                    }
+                    st.write("Initializing directories...")
+                    startup_status.update(label="Initializing directories...")
+                    
+                except Exception as e:
+                    st.error(f"Failed to initialize directories: {str(e)}")
+                    startup_status.update(label="Startup failed", state="error", expanded=True)
+                    st.stop()
+    
+                # ─────────────────────────────────────────────────────────────────────────
+                # Step 2: Load utility modules
+                # ─────────────────────────────────────────────────────────────────────────
+                try:
+                    st.write("Loading utility modules...")
+                    startup_status.update(label="Loading utility modules...")
+                    # Import utils now that shared session state exists (modules depend on it)
+                    from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, fetch_latest_model_info
+                    from components import print_widget_label
+                    from utils.analysis_utils import load_known_projects, load_model_metadata
+                    st.write("Loading utility modules...")
+                    startup_status.update(label="Loading utility modules...")
+                    
+                except Exception as e:
+                    st.error(f"Failed to load utility modules: {str(e)}")
+                    startup_status.update(label="Startup failed", state="error", expanded=True)
+                    st.stop()
 
-    # Load and cache general settings to avoid file reads on reruns
-    general_settings_vars = load_vars(section = "general_settings")
-    lang = general_settings_vars["lang"]
-    mode = general_settings_vars["mode"]
-    
-    set_session_var("shared", "lang", lang)
-    set_session_var("shared", "mode", mode)
+                # ─────────────────────────────────────────────────────────────────────────
+                # Step 3: Initialize configuration files
+                # ─────────────────────────────────────────────────────────────────────────
+                try:
+                    st.write("Creating configuration files...")
+                    startup_status.update(label="Creating configuration files...")
+                    
+                    # Initialize global map.json if it doesn't exist
+                    # (stores project definitions, camera locations, deployment history)
+                    if not os.path.exists(MAP_FILE_PATH):
+                        # Create empty projects structure
+                        map = {
+                            "projects": {}
+                        }
+                        with open(MAP_FILE_PATH, "w") as f:
+                            json.dump(map, f, indent=2)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Load and cache expensive resources (language, models, UI assets)
-    # ─────────────────────────────────────────────────────────────────────────
-    
-    # Load and cache language texts to avoid file I/O on reruns
-    if not st.session_state.get("txts"):
-        full_txts = load_lang_txts()
-        # Store only current language's texts in flattened structure for efficiency
-        st.session_state["txts"] = {key: value[lang] for key, value in full_txts.items()}
+                    # Initialize general_settings.json if it doesn't exist
+                    general_settings_file = os.path.join(ADDAXAI_ROOT, "config", f"general_settings.json")
+                    if not os.path.exists(general_settings_file):
+                        # Create config directory if needed
+                        os.makedirs(os.path.dirname(general_settings_file), exist_ok=True)
+                        
+                        # Create default settings
+                        general_settings = {
+                            "lang": "en",
+                            "mode": 1,  # 0: simple mode, 1: advanced mode
+                            "selected_projectID": None
+                        }
+                        with open(general_settings_file, "w") as f:
+                            json.dump(general_settings, f, indent=2)
 
-    # Load and cache AI model metadata (large JSON file)
-    if not st.session_state.get("model_meta"):
-        st.session_state["model_meta"] = load_model_metadata()
+                    st.write("Loading general settings...")
+                    startup_status.update(label="Loading general settings...")
+                    # Load and cache general settings to avoid file reads on reruns
+                    general_settings_vars = load_vars(section = "general_settings")
+                    lang = general_settings_vars["lang"]
+                    mode = general_settings_vars["mode"]
+                    
+                    set_session_var("shared", "lang", lang)
+                    set_session_var("shared", "mode", mode)
+                    st.write("Initializing configuration files...")
+                    startup_status.update(label="Initializing configuration files...")
+                    
+                except Exception as e:
+                    st.error(f"Failed to initialize configuration files: {str(e)}")
+                    startup_status.update(label="Startup failed", state="error", expanded=True)
+                    st.stop()
 
-    # Download latest model metadata and create folders for new models
-    fetch_latest_model_info()
-    
-    # Reload model metadata after download to ensure session state has latest data
-    st.session_state["model_meta"] = load_model_metadata()
-    
-    # Archive previous session log and create fresh log (only on startup)
-    log_fpath = os.path.join(ADDAXAI_ROOT, "assets", "logs", "log.txt")
-    previous_sessions_dir = os.path.join(ADDAXAI_ROOT, "assets", "logs", "previous_sessions")
-    
-    try:
-        # Create previous_sessions directory if it doesn't exist
-        os.makedirs(previous_sessions_dir, exist_ok=True)
-        
-        # If there's an existing log file, archive it with timestamp
-        if os.path.exists(log_fpath) and os.path.getsize(log_fpath) > 0:
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            archived_log_path = os.path.join(previous_sessions_dir, f"log_{timestamp}.txt")
-            
-            # Move the existing log to archive
-            import shutil
-            shutil.move(log_fpath, archived_log_path)
-            
-        # Create a fresh log file for this session
-        with open(log_fpath, "w", encoding="utf-8") as file:
-            from datetime import datetime
-            session_start = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            file.write(f"AddaxAI Streamlit App Log - Session Started: {session_start}\n")
-            file.write("=" * 60 + "\n")
-            file.write("This log contains all output from the current session.\n")
-            file.write("Previous sessions are archived in: assets/logs/previous_sessions/\n")
-            file.write("=" * 60 + "\n\n")
-        
-        # Use simple log() function from config.py for reliable logging
-        from utils.config import log
-        log("Logging system initialized using simple log() function")
-        log("Testing log function - this should appear in both console and log file")
-            
-    except PermissionError:
-        print(f"Permission denied when accessing {log_fpath}. Could not setup logging.")
-    except Exception as e:
-        print(f"Error setting up logging: {e}")
-    
-    # Clean up loading UI elements
-    status_placeholder.empty()
-    animation_container.empty()
+                # ─────────────────────────────────────────────────────────────────────────
+                # Step 4: Load language files
+                # ─────────────────────────────────────────────────────────────────────────
+                try:
+                    st.write("Loading language files...")
+                    startup_status.update(label="Loading language files...")
+                    # Load and cache language texts to avoid file I/O on reruns
+                    if not st.session_state.get("txts"):
+                        full_txts = load_lang_txts()
+                        # Store only current language's texts in flattened structure for efficiency
+                        st.session_state["txts"] = {key: value[lang] for key, value in full_txts.items()}
+                    st.write("Loading language files...")
+                    startup_status.update(label="Loading language files...")
+                    
+                except Exception as e:
+                    st.error(f"Failed to load language files: {str(e)}")
+                    startup_status.update(label="Startup failed", state="error", expanded=True)
+                    st.stop()
+
+                # ─────────────────────────────────────────────────────────────────────────
+                # Step 5: Load AI model metadata
+                # ─────────────────────────────────────────────────────────────────────────
+                try:
+                    st.write("Loading AI model metadata...")
+                    startup_status.update(label="Loading AI model metadata...")
+                    # Load and cache AI model metadata (large JSON file)
+                    if not st.session_state.get("model_meta"):
+                        st.session_state["model_meta"] = load_model_metadata()
+                    st.write("Loading model metadata...")
+                    startup_status.update(label="Loading model metadata...")
+                    
+                except Exception as e:
+                    st.error(f"Failed to load model metadata: {str(e)}")
+                    startup_status.update(label="Startup failed", state="error", expanded=True)
+                    st.stop()
+
+                # ─────────────────────────────────────────────────────────────────────────
+                # Step 6: Download latest model information
+                # ─────────────────────────────────────────────────────────────────────────
+                try:
+                    st.write("Downloading latest model information...")
+                    startup_status.update(label="Downloading latest model information...")
+                    # Download latest model metadata and create folders for new models
+                    fetch_latest_model_info()
+                    
+                    # Reload model metadata after download to ensure session state has latest data
+                    st.session_state["model_meta"] = load_model_metadata()
+                    st.write("Downloading model information...")
+                    startup_status.update(label="Downloading model information...")
+                    
+                except Exception as e:
+                    st.error(f"Failed to download model information: {str(e)}")
+                    startup_status.update(label="Startup failed", state="error", expanded=True)
+                    st.stop()
+
+                # ─────────────────────────────────────────────────────────────────────────
+                # Step 7: Setup logging system
+                # ─────────────────────────────────────────────────────────────────────────
+                try:
+                    st.write("Setting up logging system...")
+                    startup_status.update(label="Setting up logging system...")
+                    # Archive previous session log and create fresh log (only on startup)
+                    log_fpath = os.path.join(ADDAXAI_ROOT, "assets", "logs", "log.txt")
+                    previous_sessions_dir = os.path.join(ADDAXAI_ROOT, "assets", "logs", "previous_sessions")
+                    
+                    # Create previous_sessions directory if it doesn't exist
+                    os.makedirs(previous_sessions_dir, exist_ok=True)
+                    
+                    # If there's an existing log file, archive it with timestamp
+                    if os.path.exists(log_fpath) and os.path.getsize(log_fpath) > 0:
+                        from datetime import datetime
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        archived_log_path = os.path.join(previous_sessions_dir, f"log_{timestamp}.txt")
+                        
+                        # Move the existing log to archive
+                        import shutil
+                        shutil.move(log_fpath, archived_log_path)
+                        
+                    # Create a fresh log file for this session
+                    with open(log_fpath, "w", encoding="utf-8") as file:
+                        from datetime import datetime
+                        session_start = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        file.write(f"AddaxAI Streamlit App Log - Session Started: {session_start}\n")
+                        file.write("=" * 60 + "\n")
+                        file.write("This log contains all output from the current session.\n")
+                        file.write("Previous sessions are archived in: assets/logs/previous_sessions/\n")
+                        file.write("=" * 60 + "\n\n")
+                    
+                    # Use simple log() function from config.py for reliable logging
+                    from utils.config import log
+                    log("Logging system initialized using simple log() function")
+                    log("Testing log function - this should appear in both console and log file")
+                    st.write("Setting up logging system...")
+                    startup_status.update(label="Setting up logging system...")
+                    
+                except PermissionError:
+                    st.warning(f"Permission denied when accessing log file. Logging disabled.")
+                except Exception as e:
+                    st.warning(f"Failed to setup logging: {str(e)}. Continuing without logging.")
+                
+                # ─────────────────────────────────────────────────────────────────────────
+                # Startup complete
+                # ─────────────────────────────────────────────────────────────────────────
+                startup_status.update(
+                    label="AddaxAI startup complete!", 
+                    state="complete", 
+                    expanded=False
+                )
+                
+                # Clear startup modal flag to close the modal
+                st.session_state["show_startup_modal"] = False
+                
+                # Force rerun to apply modal closure
+                st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN APPLICATION (runs on startup and every rerun)
