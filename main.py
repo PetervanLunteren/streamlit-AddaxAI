@@ -1,5 +1,45 @@
 
-# WAAR WAS IK? 
+# WAAR WAS IK? Ik ben bezig met het simplificeren van de AddaxAI classificatie code. De video processing was erg complex geworden, met ene model_server.py en subprocessen en stdin/stdout communicatie. Dit was erg complex. 
+# we kiezen nu voor een simplele aanpak, waar voor video processing de videos in chunks van 10 videos gedaan worden (det, frame extractie, classificatie, cleanup). Dat scheelt memory issues and is heel simpel. 
+# dit moet nog getest worden, en ook enorm veel onnodige code moet nog verwijderd worden. Ook de classify_detectoins.py zijn aardig aangepast.
+# ZIe hieronder de samenvatting van de huidige status.
+
+# Current Status Summary
+
+#   What we accomplished today:
+#   We completely simplified the AddaxAI classification system by removing the complex model server architecture and replacing it with direct model loading.
+
+#   Key changes made:
+#   1. Fixed deepfaune model lazy loading - Resolved NameError: name 'weight_path' is not defined by properly passing weight paths to Model and Classifier classes
+#   2. Eliminated model_server.py complexity - No more subprocess servers, stdin/stdout communication, threading, or base64 encoding overhead
+#   3. Replaced with direct model loading - Both image and video classification now load models once and call functions directly
+#   4. Implemented video chunking - Videos are processed in chunks of 10, with clear phases: extract frames → classify → cleanup
+
+#   Current architecture:
+#   - Image classification: Load model once → process all images directly
+#   - Video classification: Process 10 videos at a time → extract frames with detections to temp dir → load model once → classify all frames → cleanup → repeat
+
+#   Files modified:
+#   - classification/classify_images.py - Simplified to direct model loading
+#   - classification/classify_videos.py - Rewritten for video chunking approach
+#   - classification/model_types/deepfaune-v1.3/classify_detections.py - Fixed lazy loading bugs
+#   - Backup files created: *_backup.py for all complex versions
+
+#   Expected performance improvement:
+#   - Deepfaune model: From 4.5 seconds per classification → ~0.01-0.2 seconds per classification
+#   - No more server crashes or memory issues
+#   - Much easier to debug and understand
+
+#   Ready for testing:
+#   The simplified system should work much faster and more reliably. The deepfaune model classification should now complete in minutes instead of hours.
+
+
+
+
+
+
+
+
 # TODO: 
 # - Adding new project does not auto select it, it stays on the previous project. Fix that.
 # - zorg voor dat de data van de deployments wordt opgehaald in een session state df wordt gezet, test het op windows inclusief de instalatie, en zorg voor dat de vrijwilliger aan de slag kan

@@ -1,30 +1,28 @@
 """
-Video Classification Inference for AddaxAI - Scalable Architecture
+Super Simple Video Classification for AddaxAI - Video Chunking
 
-Handles classification of animals detected in video files by:
-1. Extracting frames that contain detections (using MegaDetector video utils)
-2. Cropping animal bounding boxes from those frames  
-3. Calling model-specific subprocess for classification inference
-4. Updating the JSON with classification results
+Process videos in chunks to make everything simple and understandable:
+1. Take 10 videos at a time
+2. Run MegaDetector on all 10 videos → extract frames with detections to temp dir
+3. Load classification model once → classify all frames from those 10 videos  
+4. Clean up temp frames
+5. Repeat for next 10 videos
+6. Merge all results into final JSON
 
-This script runs in the base environment (has OpenCV + MegaDetector) and calls
-model inference subprocesses in their specific environments.
+No more complex frame chunking - just simple video batches!
 
-Created by Claude for AddaxAI scalable video support
+Created by Claude for AddaxAI super-simplified architecture
 """
 
 import argparse
 import os
 import sys
 import json
-import subprocess
-import base64
-import io
-import uuid
-import threading
-import queue
-import time
+import tempfile
+import shutil
+import importlib.util
 from tqdm import tqdm
+from pathlib import Path
 
 # Add MegaDetector to path for video utilities
 sys.path.append("/Users/peter/Desktop/MegaDetector")
@@ -40,254 +38,261 @@ def is_video_file(filename):
     return filename.lower().endswith(VIDEO_EXTENSIONS)
 
 
-class ModelServerClient:
-    """Client for communicating with persistent model server."""
+def load_classification_model(model_path, model_type, model_env):
+    """
+    Load a classification model directly into memory.
     
-    def __init__(self, model_path, model_type, model_env):
-        """
-        Initialize model server client.
+    Args:
+        model_path (str): Path to model file
+        model_type (str): Model type (directory name)  
+        model_env (str): Environment name
         
-        Args:
-            model_path (str): Path to the model file
-            model_type (str): Type of model (directory name)
-            model_env (str): Environment name (e.g., 'pytorch', 'tensorflow-v1')
-        """
-        self.model_path = model_path
-        self.model_type = model_type
-        self.model_env = model_env
-        self.server_process = None
-        self.start_server()
+    Returns:
+        tuple: (get_crop_function, get_classification_function)
+    """
+    print(f"Loading classification model: {model_type}")
     
-    def start_server(self):
-        """Start the persistent model server subprocess."""
-        # Build the command
-        python_executable = f"{ADDAXAI_ROOT}/envs/env-{self.model_env}/bin/python"
-        server_script = f"{ADDAXAI_ROOT}/classification/model_server.py"
+    # Get the path to the model-specific script
+    model_script_path = os.path.join(
+        ADDAXAI_ROOT, "classification", "model_types", model_type, "classify_detections.py"
+    )
+    
+    if not os.path.exists(model_script_path):
+        raise ValueError(f"Model script not found: {model_script_path}")
+    
+    # Load the module dynamically
+    spec = importlib.util.spec_from_file_location("model_module", model_script_path)
+    model_module = importlib.util.module_from_spec(spec)
+    
+    # Set up the model arguments
+    original_argv = sys.argv.copy()
+    sys.argv = ['classify_detections.py', '--model-path', model_path, '--json-path', '/dev/null']
+    
+    try:
+        # Execute the module to define functions and classes
+        spec.loader.exec_module(model_module)
         
-        command = [
-            python_executable,
-            server_script,
-            '--model-path', self.model_path,
-            '--model-type', self.model_type
-        ]
+        # Set the model path in the module
+        model_module.cls_model_fpath = model_path
+        model_module.json_path = '/dev/null'
         
-        # Set environment variables
-        env = os.environ.copy()
-        env['PYTHONPATH'] = ADDAXAI_ROOT
+        # Load the model (trigger lazy loading)
+        if hasattr(model_module, 'load_model'):
+            model_module.load_model()
         
-        try:
-            # Start the server process
-            self.server_process = subprocess.Popen(
-                command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=env,
-                cwd=ADDAXAI_ROOT,
-                bufsize=1,  # Line buffered
-                universal_newlines=True
-            )
+        # Get the required functions
+        get_crop = getattr(model_module, 'get_crop', None)
+        get_classification = getattr(model_module, 'get_classification', None)
+        
+        if get_crop is None or get_classification is None:
+            raise ValueError(f"Model script must define 'get_crop' and 'get_classification' functions")
+        
+        print(f"Model loaded successfully: {model_type}")
+        return get_crop, get_classification
+        
+    except Exception as e:
+        raise ValueError(f"Error loading model from {model_script_path}: {str(e)}")
+    finally:
+        # Restore original sys.argv
+        sys.argv = original_argv
+
+
+def extract_frames_with_detections(video_chunk, temp_dir, label_map):
+    """
+    Extract frames that contain animal detections from a chunk of videos.
+    
+    Args:
+        video_chunk (list): List of video info dictionaries
+        temp_dir (str): Temporary directory to save frames
+        label_map (dict): Detection category mapping
+        
+    Returns:
+        dict: Mapping of saved frame paths to their detection info
+    """
+    frame_detection_map = {}
+    
+    for video_info in video_chunk:
+        video_path = video_info['path']
+        detections_by_frame = video_info['detections_by_frame']
+        frames_to_extract = list(detections_by_frame.keys())
+        
+        if not frames_to_extract:
+            continue
+        
+        def frame_callback(image_np, frame_filename):
+            # Extract frame number from filename  
+            frame_number = int(frame_filename.replace("frame", "").replace(".jpg", ""))
             
-            # Wait for server to be ready
-            while True:
-                line = self.server_process.stderr.readline()
-                if 'Model server ready' in line:
-                    print("Model server started successfully")
-                    break
-                elif self.server_process.poll() is not None:
-                    # Process died
-                    stdout, stderr = self.server_process.communicate()
-                    raise RuntimeError(f"Model server failed to start. stderr: {stderr}")
+            # Check if this frame has animal detections
+            if frame_number in detections_by_frame:
+                frame_detections = detections_by_frame[frame_number]
+                
+                # Check if any detections are animals above threshold
+                animal_detections = []
+                for detection in frame_detections:
+                    category_id = detection['category']
+                    category = label_map[category_id]
+                    if category == 'animal' and detection.get('conf', 0) >= 0.1:
+                        animal_detections.append(detection)
+                
+                if animal_detections:
+                    # Save frame to temp directory
+                    from PIL import Image
+                    if image_np.dtype != 'uint8':
+                        image_np = (image_np * 255).astype('uint8')
+                    image_pil = Image.fromarray(image_np)
                     
-        except Exception as e:
-            print(f"Failed to start model server: {str(e)}")
-            raise
-    
-    def classify_crop(self, image_np, bbox_coords=None):
-        """
-        Classify a single crop using the persistent model server.
+                    # Create unique filename
+                    video_name = Path(video_info['entry']['file']).stem
+                    frame_path = os.path.join(temp_dir, f"{video_name}_frame{frame_number:06d}.jpg")
+                    image_pil.save(frame_path, 'JPEG', quality=85)
+                    
+                    # Store detection info
+                    frame_detection_map[frame_path] = {
+                        'video_entry': video_info['entry'],
+                        'frame_number': frame_number,
+                        'detections': animal_detections
+                    }
+            
+            return []  # Don't need to return anything for extraction
         
-        Args:
-            image_np (numpy.ndarray): Image as numpy array
-            bbox_coords (list, optional): Normalized bounding box [x,y,w,h]
-        
-        Returns:
-            list: Classification results as [["species_name", confidence], ...]
-        """
-        if self.server_process is None or self.server_process.poll() is not None:
-            print("Model server is not running")
-            return []
-        
+        # Extract frames from this video
         try:
-            # Convert numpy array to PIL Image
-            from PIL import Image
-            if image_np.dtype != 'uint8':
-                image_np = (image_np * 255).astype('uint8')
-            image_pil = Image.fromarray(image_np)
-            
-            # Encode image as base64 JPEG with reduced quality for memory efficiency
-            buffer = io.BytesIO()
-            image_pil.save(buffer, format='JPEG', quality=60)
-            image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
-            # Create request
-            request = {
-                "request_id": str(uuid.uuid4()),
-                "image_data": image_data,
-                "bbox": bbox_coords
-            }
-            
-            # Send request to server
-            request_json = json.dumps(request) + '\n'
-            self.server_process.stdin.write(request_json)
-            self.server_process.stdin.flush()
-            
-            # Read response
-            response_line = self.server_process.stdout.readline()
-            if not response_line:
-                # Check if server died
-                if self.server_process.poll() is not None:
-                    print(f"Model server process died (exit code: {self.server_process.poll()})")
-                return []
-            
-            response_line = response_line.strip()
-            if not response_line:
-                return []
-            
-            try:
-                response = json.loads(response_line)
-            except json.JSONDecodeError as e:
-                print(f"Failed to parse server response: {response_line[:100]}... (JSON error: {str(e)})")
-                return []
-            
-            if response.get('error'):
-                print(f"Model server error: {response['error']}")
-                return []
-            
-            return response.get('classifications', [])
-            
+            run_callback_on_frames(
+                input_video_file=video_path,
+                frame_callback=frame_callback,
+                frames_to_process=frames_to_extract,
+                verbose=False
+            )
         except Exception as e:
-            print(f"Error communicating with model server: {str(e)}")
-            # Check if server is still alive
-            if self.server_process and self.server_process.poll() is not None:
-                print(f"Server died during request processing")
-            return []
+            print(f"Error extracting frames from {video_info['entry']['file']}: {str(e)}")
     
-    def shutdown(self):
-        """Shutdown the model server."""
-        if self.server_process and self.server_process.poll() is None:
-            try:
-                # Send shutdown signal
-                shutdown_request = json.dumps({"shutdown": True}) + '\n'
-                self.server_process.stdin.write(shutdown_request)
-                self.server_process.stdin.flush()
-                
-                # Wait for graceful shutdown
-                self.server_process.wait(timeout=10)
-                
-            except Exception:
-                # Force kill if graceful shutdown fails
-                self.server_process.terminate()
-                self.server_process.wait(timeout=5)
-            finally:
-                self.server_process = None
+    return frame_detection_map
 
 
-def call_model_inference(model_server_client, image_np, bbox_coords=None):
+def classify_extracted_frames(frame_detection_map, get_crop, get_classification, classification_data):
     """
-    Call the persistent model server to classify a single image crop.
+    Classify all extracted frames using the loaded model.
     
     Args:
-        model_server_client (ModelServerClient): Client for persistent model server
-        image_np (numpy.ndarray): Image as numpy array
-        bbox_coords (list, optional): Normalized bounding box [x,y,w,h]
-    
-    Returns:
-        list: Classification results as [["species_name", confidence], ...]
-    """
-    return model_server_client.classify_crop(image_np, bbox_coords)
-
-
-def create_video_frame_callback(model_server_client, detections_by_frame, 
-                                label_map, classification_data):
-    """
-    Create callback function to process video frames and classify detections.
-    
-    Args:
-        model_server_client (ModelServerClient): Client for persistent model server
-        detections_by_frame: Dict mapping frame numbers to detection lists
-        label_map: Detection category label mapping
-        classification_data: Dict to store classification results and categories
-    
-    Returns:
-        Callback function for video frame processing
-    """
-    def frame_callback(image_np, frame_filename):
-        # Extract frame number from filename (e.g., "frame000024.jpg" -> 24)
-        frame_number = int(frame_filename.replace("frame", "").replace(".jpg", ""))
+        frame_detection_map (dict): Map of frame paths to detection info
+        get_crop, get_classification: Model functions
+        classification_data (dict): Classification data structure
         
-        # Get detections for this frame
-        frame_detections = detections_by_frame.get(frame_number, [])
+    Returns:
+        int: Number of animals processed
+    """
+    animals_processed = 0
+    
+    for frame_path, frame_info in frame_detection_map.items():
+        # Load the frame image
+        try:
+            from PIL import Image
+            image_pil = Image.open(frame_path)
+        except Exception as e:
+            print(f"Error loading frame {frame_path}: {str(e)}")
+            continue
         
         # Process each animal detection in this frame
-        for detection in frame_detections:
-            category_id = detection['category']
-            category = label_map[category_id]
+        for detection in frame_info['detections']:
+            bbox = detection['bbox']
             
-            # Only classify animal detections
-            if category == 'animal' and detection.get('conf', 0) >= 0.1:  # confidence threshold
-                bbox = detection['bbox']
+            try:
+                # Get crop using model-specific function
+                crop = get_crop(image_pil, bbox)
+                if crop is None:
+                    continue  # Invalid crop
                 
-                # Call persistent model server - no temp files needed!
-                name_classifications = call_model_inference(
-                    model_server_client, image_np, bbox
-                )
+                # Classify the crop
+                classifications = get_classification(crop)
                 
-                # Process classification results
-                if name_classifications:
+                if classifications:
+                    # Convert to indexed format
                     idx_classifications = []
-                    for name, confidence in name_classifications:
+                    for name, confidence in classifications:
                         # Add to classification categories if not present
                         if name not in classification_data['inverted_label_map']:
-                            # Find next available ID
                             max_id = max([int(v) for v in classification_data['inverted_label_map'].values()] + [0])
                             classification_data['inverted_label_map'][name] = str(max_id + 1)
                         
-                        # Convert to indexed format
                         idx_classifications.append([
                             classification_data['inverted_label_map'][name], 
                             round(float(confidence), 5)
                         ])
                     
-                    # Sort by confidence and keep only top result
+                    # Sort by confidence and keep top result
                     idx_classifications = sorted(idx_classifications, key=lambda x: x[1], reverse=True)
                     if idx_classifications:
                         detection['classifications'] = [idx_classifications[0]]
-        
-        return frame_detections
+                
+                animals_processed += 1
+                
+            except Exception as e:
+                print(f"Error classifying detection in frame {frame_path}: {str(e)}")
+                continue
     
-    return frame_callback
+    return animals_processed
 
 
-def classify_video_detections(json_path, model_path, model_type, model_env):
+def process_video_chunk(video_chunk, model_path, model_type, model_env, label_map, classification_data):
     """
-    Classify animal detections in video files using persistent model server.
+    Process a chunk of videos: extract frames with detections, classify them, clean up.
     
     Args:
-        json_path (str): Path to JSON file with video detection results
-        model_path (str): Path to classification model file
-        model_type (str): Type/architecture of the classification model
-        model_env (str): Environment name for the model
+        video_chunk (list): List of video info dictionaries
+        model_path, model_type, model_env: Model parameters
+        label_map (dict): Detection category mapping
+        classification_data (dict): Classification data structure
+        
+    Returns:
+        int: Number of animals processed in this chunk
     """
+    # Create temporary directory for this chunk
+    with tempfile.TemporaryDirectory() as temp_dir:
+        print(f"Extracting frames from {len(video_chunk)} videos...")
+        
+        # Step 1: Extract frames with animal detections to temp directory
+        frame_detection_map = extract_frames_with_detections(video_chunk, temp_dir, label_map)
+        
+        if not frame_detection_map:
+            print("No frames with animal detections found in this chunk.")
+            return 0
+        
+        print(f"Extracted {len(frame_detection_map)} frames, loading classification model...")
+        
+        # Step 2: Load classification model once for this chunk
+        get_crop, get_classification = load_classification_model(model_path, model_type, model_env)
+        
+        print(f"Classifying {len(frame_detection_map)} frames...")
+        
+        # Step 3: Classify all extracted frames
+        animals_processed = classify_extracted_frames(
+            frame_detection_map, get_crop, get_classification, classification_data
+        )
+        
+        print(f"Classified {animals_processed} animals in this chunk.")
+        
+        # Step 4: Cleanup happens automatically when temp_dir context exits
+        
+        return animals_processed
+
+
+def classify_videos_by_chunks(json_path, model_path, model_type, model_env, chunk_size=10):
+    """
+    Classify animal detections in videos by processing videos in chunks.
     
+    Args:
+        json_path (str): Path to JSON with video detection results
+        model_path (str): Path to classification model
+        model_type (str): Model type/architecture  
+        model_env (str): Environment name
+        chunk_size (int): Number of videos to process per chunk
+    """
     # Load JSON data
     with open(json_path, 'r') as f:
         data = json.load(f)
     
-    print(f"Loading classification model: {model_type}")
-    
-    # Get label mapping for detections
+    # Get label mapping
     label_map = data.get('detection_categories', {'1': 'animal', '2': 'person', '3': 'vehicle'})
     
     # Initialize classification data
@@ -298,117 +303,99 @@ def classify_video_detections(json_path, model_path, model_type, model_env):
         'inverted_label_map': {v: k for k, v in data['classification_categories'].items()}
     }
     
-    # Get directory containing videos
+    # Get video directory
     video_dir = os.path.dirname(json_path)
     
-    # Count total detections for progress tracking
+    # Prepare videos for processing
+    videos_to_process = []
     total_detections = 0
+    
     for image_entry in data['images']:
         if is_video_file(image_entry['file']) and 'detections' in image_entry:
-            # Count animal detections for progress tracking
-            animal_detections = [d for d in image_entry['detections'] 
-                               if label_map.get(d['category'], '') == 'animal' and d.get('conf', 0) >= 0.1]
-            total_detections += len(animal_detections)
+            video_path = os.path.join(video_dir, image_entry['file'])
+            
+            if not os.path.exists(video_path):
+                print(f"Warning: Video {image_entry['file']} not found")
+                continue
+            
+            # Count and group detections by frame
+            detections_by_frame = {}
+            animal_count = 0
+            
+            for detection in image_entry['detections']:
+                if label_map.get(detection['category'], '') == 'animal' and detection.get('conf', 0) >= 0.1:
+                    frame_num = detection.get('frame_number', 0)
+                    if frame_num not in detections_by_frame:
+                        detections_by_frame[frame_num] = []
+                    detections_by_frame[frame_num].append(detection)
+                    animal_count += 1
+            
+            if detections_by_frame:
+                videos_to_process.append({
+                    'entry': image_entry,
+                    'path': video_path,
+                    'detections_by_frame': detections_by_frame,
+                    'animal_count': animal_count
+                })
+                total_detections += animal_count
     
     if total_detections == 0:
         print("No animal detections found in videos.")
         return
     
-    print(f"Processing {total_detections} animal detections in videos...")
+    print(f"Processing {total_detections} animal detections in {len(videos_to_process)} videos...")
+    print(f"Using video chunks of size {chunk_size}")
     
-    # Start persistent model server - this loads the model ONCE
-    model_server_client = None
-    try:
-        model_server_client = ModelServerClient(model_path, model_type, model_env)
-        
-        # Process each video with progress tracking
-        with tqdm(total=total_detections, desc="Classifying") as pbar:
-            for image_entry in data['images']:
-                file_path = image_entry['file']
-                
-                if not is_video_file(file_path):
-                    continue
-                
-                video_path = os.path.join(video_dir, file_path)
-                
-                if not os.path.exists(video_path):
-                    print(f"Warning: Video file {file_path} not found")
-                    continue
-                
-                if 'detections' not in image_entry:
-                    continue
-                
-                # Group detections by frame number
-                detections_by_frame = {}
-                animal_count = 0
-                
-                for detection in image_entry['detections']:
-                    if label_map.get(detection['category'], '') == 'animal' and detection.get('conf', 0) >= 0.1:
-                        frame_num = detection.get('frame_number', 0)
-                        if frame_num not in detections_by_frame:
-                            detections_by_frame[frame_num] = []
-                        detections_by_frame[frame_num].append(detection)
-                        animal_count += 1
-                
-                if not detections_by_frame:
-                    continue
-                
-                # Get frames to process
-                frames_to_process = list(detections_by_frame.keys())
-                
-                # Create callback for this video - uses persistent model server
-                callback = create_video_frame_callback(
-                    model_server_client, detections_by_frame,
+    # Split videos into chunks
+    video_chunks = [videos_to_process[i:i + chunk_size] 
+                   for i in range(0, len(videos_to_process), chunk_size)]
+    
+    # Process each chunk
+    total_processed = 0
+    with tqdm(total=total_detections, desc="Processing video chunks") as pbar:
+        for i, video_chunk in enumerate(video_chunks, 1):
+            print(f"\n--- Processing chunk {i}/{len(video_chunks)} ({len(video_chunk)} videos) ---")
+            
+            try:
+                animals_processed = process_video_chunk(
+                    video_chunk, model_path, model_type, model_env, 
                     label_map, classification_data
                 )
+                total_processed += animals_processed
+                pbar.update(animals_processed)
                 
-                # Process video frames
-                try:
-                    run_callback_on_frames(
-                        input_video_file=video_path,
-                        frame_callback=callback,
-                        frames_to_process=frames_to_process,
-                        verbose=False
-                    )
-                    
-                    # Update progress
-                    pbar.update(animal_count)
-                    
-                except Exception as e:
-                    print(f"Error processing video {file_path}: {str(e)}")
-                    pbar.update(animal_count)  # Still update progress
+            except Exception as e:
+                print(f"Error processing chunk {i}: {str(e)}")
+                # Still update progress for this chunk
+                chunk_animals = sum(v['animal_count'] for v in video_chunk)
+                pbar.update(chunk_animals)
     
-    finally:
-        # Always shutdown the model server
-        if model_server_client:
-            model_server_client.shutdown()
-    
-    # Update classification categories in data
+    # Update classification categories
     data['classification_categories'] = {v: k for k, v in classification_data['inverted_label_map'].items()}
     
-    # Write updated JSON back to file
+    # Save results
     with open(json_path, 'w') as f:
         json.dump(data, f, indent=1)
     
-    print("Video classification completed successfully!")
+    print(f"\nVideo classification completed! Processed {total_processed}/{total_detections} animals successfully.")
 
 
 def main():
-    """Main function for video classification script."""
-    
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Video classification inference for AddaxAI')
-    parser.add_argument('--model-path', required=True, help='Path to classification model file')
+    """Main function for video chunk classification."""
+    parser = argparse.ArgumentParser(description='Simple video classification by chunks for AddaxAI')
+    parser.add_argument('--model-path', required=True, help='Path to classification model')
     parser.add_argument('--model-type', required=True, help='Type of classification model')
     parser.add_argument('--model-env', required=True, help='Environment name for the model')
-    parser.add_argument('--json-path', required=True, help='Path to JSON file with video detection results')
-    parser.add_argument('--country', default=None, help='Country code for geofencing')
-    parser.add_argument('--state', default=None, help='State code for geofencing')
+    parser.add_argument('--json-path', required=True, help='Path to JSON with detection results')
+    parser.add_argument('--chunk-size', type=int, default=10, help='Videos per chunk (default: 10)')
     
     args = parser.parse_args()
     
     try:
-        classify_video_detections(args.json_path, args.model_path, args.model_type, args.model_env)
+        classify_videos_by_chunks(
+            args.json_path, args.model_path, args.model_type, 
+            args.model_env, args.chunk_size
+        )
     except Exception as e:
         print(f"Error: {str(e)}")
         sys.exit(1)

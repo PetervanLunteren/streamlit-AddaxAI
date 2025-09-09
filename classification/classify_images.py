@@ -1,236 +1,84 @@
 """
-AddaxAI Classification Inference Library - Persistent Server Architecture
+Simple Image Classification for AddaxAI - Direct Model Loading
 
-Core inference functions for classifying MegaDetector animal crops using persistent
-model server. This eliminates model loading overhead for optimal performance.
+Simple, straightforward image classification without model servers:
+1. Load classification model once
+2. Process all images directly
+3. No complex subprocess communication
 
-Created by Claude for AddaxAI scalable architecture
-Latest edit for persistent server-based inference
+Created by Claude for AddaxAI simplified architecture
 """
 
 import os
 import json
-import subprocess
-import base64
-import io
-import uuid
-import threading
-import queue
+import importlib.util
+import argparse
+import sys
 from tqdm import tqdm
 from PIL import Image
 
 # Add AddaxAI to path
-import sys
 sys.path.append(os.environ.get('PYTHONPATH', ''))
 from utils.config import ADDAXAI_ROOT
 
 
-class ModelServerClient:
-    """Client for communicating with persistent model server."""
+def load_classification_model(model_path, model_type, model_env):
+    """
+    Load a classification model directly into memory.
     
-    def __init__(self, model_path, model_type, model_env):
-        """
-        Initialize model server client.
+    Args:
+        model_path (str): Path to model file
+        model_type (str): Model type (directory name)  
+        model_env (str): Environment name
         
-        Args:
-            model_path (str): Path to the model file
-            model_type (str): Type of model (directory name)
-            model_env (str): Environment name (e.g., 'pytorch', 'tensorflow-v1')
-        """
-        self.model_path = model_path
-        self.model_type = model_type
-        self.model_env = model_env
-        self.server_process = None
-        self.stderr_queue = queue.Queue()
-        self.stderr_thread = None
-        self.start_server()
+    Returns:
+        tuple: (get_crop_function, get_classification_function)
+    """
+    print(f"Loading classification model: {model_type}")
     
-    def start_server(self):
-        """Start the persistent model server subprocess."""
-        # Build the command
-        python_executable = f"{ADDAXAI_ROOT}/envs/env-{self.model_env}/bin/python"
-        server_script = f"{ADDAXAI_ROOT}/classification/model_server.py"
-        
-        command = [
-            python_executable,
-            server_script,
-            '--model-path', self.model_path,
-            '--model-type', self.model_type
-        ]
-        
-        # Set environment variables
-        env = os.environ.copy()
-        env['PYTHONPATH'] = ADDAXAI_ROOT
-        
-        try:
-            # Start the server process
-            self.server_process = subprocess.Popen(
-                command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=env,
-                cwd=ADDAXAI_ROOT,
-                bufsize=1,  # Line buffered
-                universal_newlines=True
-            )
-            
-            # Start stderr reader thread
-            self.stderr_thread = threading.Thread(target=self._read_stderr, daemon=True)
-            self.stderr_thread.start()
-            
-            # Wait for server to be ready
-            import time
-            timeout = 30  # 30 seconds timeout
-            start_time = time.time()
-            server_ready = False
-            
-            while time.time() - start_time < timeout:
-                # Check stderr queue for messages
-                try:
-                    line = self.stderr_queue.get(timeout=0.1)
-                    if 'Model server ready' in line:
-                        server_ready = True
-                        break
-                except queue.Empty:
-                    pass
-                
-                # Check if process died
-                if self.server_process.poll() is not None:
-                    # Process died
-                    time.sleep(0.5)  # Let stderr reader catch remaining output
-                    remaining_stderr = []
-                    while not self.stderr_queue.empty():
-                        try:
-                            remaining_stderr.append(self.stderr_queue.get_nowait())
-                        except queue.Empty:
-                            break
-                    raise RuntimeError(f"Model server failed to start")
-            
-            if not server_ready:
-                raise RuntimeError(f"Model server did not start within {timeout} seconds")
-                    
-        except Exception as e:
-            print(f"Failed to start model server: {str(e)}")
-            if self.server_process:
-                self.server_process.terminate()
-                self.server_process.wait(timeout=5)
-            raise
+    # Get the path to the model-specific script
+    model_script_path = os.path.join(
+        ADDAXAI_ROOT, "classification", "model_types", model_type, "classify_detections.py"
+    )
     
-    def _read_stderr(self):
-        """Read stderr in a separate thread to prevent blocking."""
-        try:
-            while self.server_process and self.server_process.poll() is None:
-                line = self.server_process.stderr.readline()
-                if line:
-                    self.stderr_queue.put(line.strip())
-                else:
-                    break
-        except Exception as e:
-            self.stderr_queue.put(f"Error reading stderr: {str(e)}")
+    if not os.path.exists(model_script_path):
+        raise ValueError(f"Model script not found: {model_script_path}")
     
-    def classify_crop(self, image_pil, bbox_coords=None):
-        """
-        Classify a single crop using the persistent model server.
-        
-        Args:
-            image_pil (PIL.Image): Image as PIL Image
-            bbox_coords (list, optional): Normalized bounding box [x,y,w,h]
-        
-        Returns:
-            list: Classification results as [["species_name", confidence], ...]
-        """
-        if self.server_process is None or self.server_process.poll() is not None:
-            if self.server_process:
-                # Try to get any remaining output
-                try:
-                    stdout, stderr = self.server_process.communicate(timeout=0.1)
-                except:
-                    pass
-            return []
-        
-        try:
-            # Encode image as base64 JPEG
-            buffer = io.BytesIO()
-            image_pil.save(buffer, format='JPEG', quality=85)
-            image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
-            # Create request
-            request = {
-                "request_id": str(uuid.uuid4()),
-                "image_data": image_data,
-                "bbox": bbox_coords
-            }
-            
-            # Send request to server
-            request_json = json.dumps(request) + '\n'
-            self.server_process.stdin.write(request_json)
-            self.server_process.stdin.flush()
-            
-            # Check for any stderr output
-            stderr_messages = []
-            while not self.stderr_queue.empty():
-                try:
-                    msg = self.stderr_queue.get_nowait()
-                    stderr_messages.append(msg)
-                except queue.Empty:
-                    break
-            
-            # Read response
-            response_line = self.server_process.stdout.readline()
-            if not response_line:
-                # Check if server is still alive
-                if self.server_process.poll() is not None:
-                    # Get any remaining stderr
-                    import time
-                    time.sleep(0.2)
-                    while not self.stderr_queue.empty():
-                        try:
-                            msg = self.stderr_queue.get_nowait()
-                        except queue.Empty:
-                            break
-                return []
-            
-            response = json.loads(response_line.strip())
-            
-            if response.get('error'):
-                print(f"Model server error: {response['error']}")
-                return []
-            
-            return response.get('classifications', [])
-            
-        except Exception as e:
-            # Check for any stderr messages
-            while not self.stderr_queue.empty():
-                try:
-                    msg = self.stderr_queue.get_nowait()
-                except queue.Empty:
-                    break
-            return []
+    # Load the module dynamically
+    spec = importlib.util.spec_from_file_location("model_module", model_script_path)
+    model_module = importlib.util.module_from_spec(spec)
     
-    def shutdown(self):
-        """Shutdown the model server."""
-        if self.server_process and self.server_process.poll() is None:
-            try:
-                # Send shutdown signal
-                shutdown_request = json.dumps({"shutdown": True}) + '\n'
-                self.server_process.stdin.write(shutdown_request)
-                self.server_process.stdin.flush()
-                
-                # Wait for graceful shutdown
-                self.server_process.wait(timeout=10)
-                
-            except Exception:
-                # Force kill if graceful shutdown fails
-                self.server_process.terminate()
-                self.server_process.wait(timeout=5)
-            finally:
-                self.server_process = None
+    # Set up the model arguments
+    original_argv = sys.argv.copy()
+    sys.argv = ['classify_detections.py', '--model-path', model_path, '--json-path', '/dev/null']
+    
+    try:
+        # Execute the module to define functions and classes
+        spec.loader.exec_module(model_module)
         
-        # Cleanup stderr thread
-        if self.stderr_thread and self.stderr_thread.is_alive():
-            self.stderr_thread.join(timeout=1)
+        # Set the model path in the module
+        model_module.cls_model_fpath = model_path
+        model_module.json_path = '/dev/null'
+        
+        # Load the model (trigger lazy loading)
+        if hasattr(model_module, 'load_model'):
+            model_module.load_model()
+        
+        # Get the required functions
+        get_crop = getattr(model_module, 'get_crop', None)
+        get_classification = getattr(model_module, 'get_classification', None)
+        
+        if get_crop is None or get_classification is None:
+            raise ValueError(f"Model script must define 'get_crop' and 'get_classification' functions")
+        
+        print(f"Model loaded successfully: {model_type}")
+        return get_crop, get_classification
+        
+    except Exception as e:
+        raise ValueError(f"Error loading model from {model_script_path}: {str(e)}")
+    finally:
+        # Restore original sys.argv
+        sys.argv = original_argv
 
 
 def fetch_label_map_from_json(path_to_json):
@@ -245,13 +93,12 @@ def fetch_label_map_from_json(path_to_json):
     """
     with open(path_to_json, "r") as json_file:
         data = json.load(json_file)
-    label_map = data['detection_categories']
-    return label_map
+    return data['detection_categories']
 
 
-def create_raw_classifications_subprocess(json_path, model_path, model_type, model_env):
+def create_raw_classifications_simple(json_path, model_path, model_type, model_env):
     """
-    Create raw classifications for animal detections using persistent model server.
+    Create raw classifications for animal detections using direct model loading.
     
     Args:
         json_path (str): Path to JSON file containing image detection data
@@ -263,19 +110,20 @@ def create_raw_classifications_subprocess(json_path, model_path, model_type, mod
     # Get directory containing images from JSON path
     img_dir = os.path.dirname(json_path)
     
-    # Set classification detection threshold for filtering low-confidence detections
+    # Set classification detection threshold
     cls_detec_thresh = 0.1
     
-    # Load JSON data and label mapping once to avoid repeated file I/O
-    with open(json_path) as image_recognition_file_content:
-        data = json.load(image_recognition_file_content)
-        label_map = fetch_label_map_from_json(json_path)
+    # Load JSON data and label mapping
+    with open(json_path) as f:
+        data = json.load(f)
     
-    # First pass: count valid animal crops and filter detections by confidence
+    label_map = fetch_label_map_from_json(json_path)
+    
+    # Count valid animal crops and filter detections
     n_crops_to_classify = 0
     for image in data['images']:
         if 'detections' in image:
-            # Filter detections in place to remove low-confidence animal detections
+            # Filter detections in place
             filtered_detections = []
             for detection in image['detections']:
                 conf = detection["conf"]
@@ -287,69 +135,71 @@ def create_raw_classifications_subprocess(json_path, model_path, model_type, mod
                     if conf >= cls_detec_thresh:
                         filtered_detections.append(detection)
                         n_crops_to_classify += 1
-                    # Low confidence animal detections are excluded
                 else:
                     # Keep non-animal detections regardless of confidence
                     filtered_detections.append(detection)
             
-            # Update the detections list with filtered results
+            # Update detections list
             image['detections'] = filtered_detections
     
-    # Early return if no animals to classify - prevents unnecessary processing
+    # Early return if no animals to classify
     if n_crops_to_classify == 0:
         print("n_crops_to_classify is zero. Nothing to classify.")
         return
 
-    # Begin crop and classification phase
     print(f"Processing {n_crops_to_classify} animal detections with model: {model_type}")
     
-    # Initialize classification categories if not present
+    # Initialize classification categories
     if 'classification_categories' not in data:
         data['classification_categories'] = {}
     
-    # Create reverse mapping from category names to IDs for efficient lookup
+    # Create reverse mapping from category names to IDs
     inverted_cls_label_map = {v: k for k, v in data['classification_categories'].items()}
     
-    # Start persistent model server - loads model ONCE
-    model_server_client = None
-    try:
-        model_server_client = ModelServerClient(model_path, model_type, model_env)
-        
-        # Process each animal detection with progress tracking
-        with tqdm(total=n_crops_to_classify, desc="Classifying") as pbar:
-            for image in data['images']:
-                # Get image filename for cropping
-                fname = image['file']
-                if 'detections' in image:
-                    # Get full path to image and load it once per image file
-                    img_fpath = os.path.join(img_dir, fname)
+    # Load classification model ONCE
+    get_crop, get_classification = load_classification_model(model_path, model_type, model_env)
+    
+    # Process each animal detection
+    with tqdm(total=n_crops_to_classify, desc="Classifying") as pbar:
+        for image in data['images']:
+            # Get image filename
+            fname = image['file']
+            if 'detections' in image:
+                # Load image once per image file
+                img_fpath = os.path.join(img_dir, fname)
+                
+                try:
+                    image_pil = Image.open(img_fpath)
+                except Exception as e:
+                    print(f"Error loading image {fname}: {str(e)}")
+                    continue
+                
+                for detection in image['detections']:
+                    conf = detection["conf"]
+                    category_id = detection['category']
+                    category = label_map[category_id]
                     
-                    # Load image once per image file
-                    image_pil = None
-                    try:
-                        image_pil = Image.open(img_fpath)
-                    except Exception as e:
-                        print(f"Error loading image {fname}: {str(e)}")
-                        continue
-                    
-                    for detection in image['detections']:
-                        conf = detection["conf"]
-                        category_id = detection['category']
-                        category = label_map[category_id]
+                    # Process only animals (already filtered for confidence)
+                    if category == 'animal':
+                        bbox = detection['bbox']
                         
-                        # Process only animals (already filtered for confidence in first pass)
-                        if category == 'animal':  # No need to check conf again
-                            bbox = detection['bbox']
+                        try:
+                            # Get crop using model-specific function
+                            crop = get_crop(image_pil, bbox)
+                            if crop is None:
+                                detection['classifications'] = []
+                                pbar.update(1)
+                                continue
                             
-                            # Call persistent model server - no subprocess overhead!
-                            name_classifications = model_server_client.classify_crop(image_pil, bbox)
+                            # Classify the crop
+                            name_classifications = get_classification(crop)
 
-                            # Convert classification results to indexed format for JSON storage
+                            # Convert classification results to indexed format
                             idx_classifications = []
                             for name, confidence in name_classifications:
                                 # Build label mapping for new classification names
                                 if name not in inverted_cls_label_map:
-                                    # Find highest existing index to assign next sequential ID
+                                    # Find highest existing index
                                     highest_index = 0
                                     for key, value in inverted_cls_label_map.items():
                                         value = int(value)
@@ -358,40 +208,38 @@ def create_raw_classifications_subprocess(json_path, model_path, model_type, mod
                                     inverted_cls_label_map[name] = str(highest_index + 1)
                                 
                                 # Convert to indexed format
-                                idx_classifications.append([inverted_cls_label_map[name], round(float(confidence), 5)])
+                                idx_classifications.append([
+                                    inverted_cls_label_map[name], 
+                                    round(float(confidence), 5)
+                                ])
                             
                             # Sort classifications by confidence (highest first)
                             idx_classifications = sorted(idx_classifications, key=lambda x: x[1], reverse=True)
                             
-                            # Keep only the top classification result (if any classifications exist)
+                            # Keep only the top classification result
                             if idx_classifications:
-                                only_top_classification = [idx_classifications[0]]
-                                detection['classifications'] = only_top_classification
+                                detection['classifications'] = [idx_classifications[0]]
                             else:
-                                # No valid classifications for this detection (e.g., invalid bounding box)
                                 detection['classifications'] = []
 
-                            # Update progress bar
-                            pbar.update(1)
-    
-    finally:
-        # Always shutdown the model server
-        if model_server_client:
-            model_server_client.shutdown()
+                        except Exception as e:
+                            print(f"Error processing detection in {fname}: {str(e)}")
+                            detection['classifications'] = []
 
-    # Update classification categories mapping in data structure
+                        # Update progress bar
+                        pbar.update(1)
+
+    # Update classification categories mapping
     data['classification_categories'] = {v: k for k, v in inverted_cls_label_map.items()}
     
-    # Write updated data back to JSON file with formatting
+    # Write updated data back to JSON file
     with open(json_path, "w") as json_file:
         json.dump(data, json_file, indent=1)
 
 
 def main():
-    """Main function for subprocess-based classification."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Subprocess-based classification inference for AddaxAI')
+    """Main function for simple image classification."""
+    parser = argparse.ArgumentParser(description='Simple image classification for AddaxAI')
     parser.add_argument('--model-path', required=True, help='Path to classification model file')
     parser.add_argument('--model-type', required=True, help='Type of classification model')
     parser.add_argument('--model-env', required=True, help='Environment name for the model')
@@ -402,7 +250,7 @@ def main():
     args = parser.parse_args()
     
     try:
-        create_raw_classifications_subprocess(
+        create_raw_classifications_simple(
             args.json_path, args.model_path, args.model_type, args.model_env
         )
         print("Classification completed successfully!")
