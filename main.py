@@ -1,8 +1,12 @@
 
 # WAAR WAS IK? 
 # TODO: 
+# - Adding new project does not auto select it, it stays on the previous project. Fix that.
+# - zorg voor dat de data van de deployments wordt opgehaald in een session state df wordt gezet, test het op windows inclusief de instalatie, en zorg voor dat de vrijwilliger aan de slag kan
 # - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
+# - make the stepper bar vertical, so we can keep adding more steps without running out of space, and it makes it more clear we're working towards the queue
+# - make the format for classify_detections.py simpler for collaborators. Bascially, we need three functions, one to lead the model, one to crop an image, and one to classify a crop. Three functions, always the same. 
 
 """
 AddaxAI Streamlit Application - Main Entry Point

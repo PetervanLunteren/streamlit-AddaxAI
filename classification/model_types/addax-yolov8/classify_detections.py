@@ -9,19 +9,28 @@
 ############### MODEL GENERIC ###############
 #############################################
 # Parse command line arguments
+import sys
 import argparse
 
-parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
-parser.add_argument('--model-path', required=True, help='Path to the classification model file')
-parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
-parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
-parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+# Global variables for arguments
+cls_model_fpath = None
+json_path = None
+country = None
+state = None
 
-args = parser.parse_args()
-cls_model_fpath = args.model_path
-json_path = args.json_path
-country = args.country
-state = args.state
+# Only parse args if running as main script or if args are provided
+if __name__ == '__main__' or len(sys.argv) > 1:
+    parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
+    parser.add_argument('--model-path', required=True, help='Path to the classification model file')
+    parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
+    parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
+    parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+    
+    args = parser.parse_args()
+    cls_model_fpath = args.model_path
+    json_path = args.json_path
+    country = args.country
+    state = args.state
 
 # lets not freak out over truncated images
 from PIL import ImageFile
@@ -41,8 +50,8 @@ import platform
 plt = platform.system()
 if plt != 'Windows': pathlib.WindowsPath = pathlib.PosixPath
 
-# load model
-animal_model = YOLO(cls_model_fpath)
+# Global variables for model (will be initialized when needed)
+animal_model = None
 
 # check GPU availability
 GPU_availability = False
@@ -54,6 +63,20 @@ except:
 if not GPU_availability:
     GPU_availability = torch.cuda.is_available()
 
+def load_model():
+    """Load the model if not already loaded."""
+    global animal_model, cls_model_fpath
+    
+    if animal_model is not None:
+        return  # Model already loaded
+    
+    # Ensure we have a model path
+    if cls_model_fpath is None:
+        raise ValueError("Model path not set. Cannot load model.")
+    
+    # load model
+    animal_model = YOLO(cls_model_fpath)
+
 # read label map
 # # not neccesary for yolov8 models to retrieve label map exernally, as it is incorporated into the model itself
 
@@ -62,13 +85,21 @@ if not GPU_availability:
 # output: unsorted classifications formatted as [['aardwolf', 2.3025326090220233e-09], ['african wild cat', 5.658252888451898e-08], ... ]
 # no need to remove forbidden classes from the predictions, that will happen in infrence_lib.py
 def get_classification(PIL_crop):
-    results = animal_model(PIL_crop, verbose=False)
-    names_dict = results[0].names
-    probs = results[0].probs.data.tolist()
-    classifications = []
-    for idx, v in names_dict.items():
-        classifications.append([v, probs[idx]])
-    return classifications
+    try:
+        load_model()  # Ensure model is loaded
+    except Exception as e:
+        return []
+    
+    try:
+        results = animal_model(PIL_crop, verbose=False)
+        names_dict = results[0].names
+        probs = results[0].probs.data.tolist()
+        classifications = []
+        for idx, v in names_dict.items():
+            classifications.append([v, float(probs[idx])])  # Convert numpy float32 to Python float
+        return classifications
+    except Exception as e:
+        return []
 
 # method of removing background
 # input: image = full image PIL.Image.open(img_fpath) <class 'PIL.JpegImagePlugin.JpegImageFile'>
@@ -115,10 +146,12 @@ def pad_crop(box_size):
 #############################################
 ############### MODEL GENERIC ###############
 #############################################
-# run main function
-import classification.cls_inference as ea
-
-ea.create_raw_classifications(json_path= json_path,
-                               GPU_availability= GPU_availability,
-                               crop_function=get_crop,
-                               inference_function=get_classification,)
+# run main function only when script is executed directly
+if __name__ == '__main__':
+    load_model()  # Load model for direct execution
+    import classification.cls_inference as ea
+    
+    ea.create_raw_classifications(json_path= json_path,
+                                   GPU_availability= GPU_availability,
+                                   crop_function=get_crop,
+                                   inference_function=get_classification,)

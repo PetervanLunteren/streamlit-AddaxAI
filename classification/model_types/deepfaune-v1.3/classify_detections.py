@@ -12,19 +12,28 @@
 ############### MODEL GENERIC ###############
 #############################################
 # Parse command line arguments
+import sys
 import argparse
 
-parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
-parser.add_argument('--model-path', required=True, help='Path to the classification model file')
-parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
-parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
-parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+# Global variables for arguments
+cls_model_fpath = None
+json_path = None
+country = None
+state = None
 
-args = parser.parse_args()
-cls_model_fpath = args.model_path
-json_path = args.json_path
-country = args.country
-state = args.state
+# Only parse args if running as main script or if args are provided
+if __name__ == '__main__' or len(sys.argv) > 1:
+    parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
+    parser.add_argument('--model-path', required=True, help='Path to the classification model file')
+    parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
+    parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
+    parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+    
+    args = parser.parse_args()
+    cls_model_fpath = args.model_path
+    json_path = args.json_path
+    country = args.country
+    state = args.state
 
 # lets not freak out over truncated images
 from PIL import ImageFile
@@ -101,7 +110,7 @@ def fetch_device():
 CROP_SIZE = 182
 BACKBONE = "vit_large_patch14_dinov2.lvd142m"
 # weight_path = "deepfaune-vit_large_patch14_dinov2.lvd142m.pt"
-weight_path = cls_model_fpath # ADJUSTMENT 1
+# weight_path will be set in load_model() function
 
 txt_animalclasses = {
     'fr': ['bison', 'blaireau', 'bouquetin', 'castor', 'cerf', 'chamois', 'chat', 'chevre', 'chevreuil', 'chien', 'daim', 'ecureuil', 'elan', 'equide', 'genette', 'glouton', 'herisson', 'lagomorphe', 'loup', 'loutre', 'lynx', 'marmotte', 'micromammifere', 'mouflon', 'mouton', 'mustelide', 'oiseau', 'ours', 'ragondin', 'raton laveur', 'renard', 'renne', 'sanglier', 'vache'],
@@ -112,8 +121,8 @@ txt_animalclasses = {
 
 
 class Classifier:
-    def __init__(self):
-        self.model = Model()
+    def __init__(self, weight_path):
+        self.model = Model(weight_path)
         self.model.loadWeights(weight_path)
         self.transforms = transforms.Compose([
             transforms.Resize(size=(CROP_SIZE, CROP_SIZE), interpolation=InterpolationMode.BICUBIC, max_size=None, antialias=None),
@@ -129,14 +138,15 @@ class Classifier:
         return preprocessimage.unsqueeze(dim=0)
 
 class Model(nn.Module):
-    def __init__(self):
+    def __init__(self, weight_path=None):
         """
         Constructor of model classifier
         """
         super().__init__()
         self.base_model = timm.create_model(BACKBONE, pretrained=False, num_classes=len(txt_animalclasses['fr']),
                                             dynamic_img_size=True)
-        print(f"Using {BACKBONE} with weights at {weight_path}, in resolution {CROP_SIZE}x{CROP_SIZE}")
+        if weight_path:
+            print(f"Using {BACKBONE} with weights at {weight_path}, in resolution {CROP_SIZE}x{CROP_SIZE}")
         self.backbone = BACKBONE
         self.nbclasses = len(txt_animalclasses['fr'])
 
@@ -186,41 +196,68 @@ class Model(nn.Module):
         except Exception as e:
             print("\n/!\ Can't load checkpoint model /!\ because :\n\n " + str(e), file=sys.stderr)
             raise e
-
 ##############################################
 ############## CLASSIFTOOLS END ##############
 ##############################################
 
-# load model
-classifier = Classifier()
+# Global variables for lazy loading
+classifier = None
+GPU_availability = None
 
-# check GPU availability
-GPU_availability = False
-try:
-    if torch.backends.mps.is_built() and torch.backends.mps.is_available():
-        GPU_availability = True
-except:
-    pass
-if not GPU_availability:
-    GPU_availability = torch.cuda.is_available()
-
+def load_model():
+    """Load the model if not already loaded."""
+    global classifier, GPU_availability, cls_model_fpath
+    
+    if classifier is not None:
+        return  # Model already loaded
+    
+    # load model
+    classifier = Classifier(cls_model_fpath)
+    
+    # check GPU availability
+    GPU_availability = False
+    try:
+        if torch.backends.mps.is_built() and torch.backends.mps.is_available():
+            GPU_availability = True
+    except:
+        pass
+    if not GPU_availability:
+        GPU_availability = torch.cuda.is_available()
 # read label map
 # not necessary for yolov8 models to retrieve label map exernally, as it is incorporated into the model itself
-
 # predict from cropped image
 # input: cropped PIL image
 # output: unsorted classifications formatted as [['aardwolf', 2.3025326090220233e-09], ['african wild cat', 5.658252888451898e-08], ... ]
 # no need to remove forbidden classes from the predictions, that will happen in infrence_lib.py
 # this is also the place to preprocess the image if that need to happen
 def get_classification(PIL_crop):
-    PIL_crop = PIL_crop.convert('RGB')
-    tensor_cropped = classifier.preprocessImage(PIL_crop)
-    confs = classifier.predictOnBatch(tensor_cropped)[0,]
-    lbls = txt_animalclasses['en']
-    classifications = []
-    for i in range(len(confs)):
-        classifications.append([lbls[i], confs[i]])
-    return classifications
+    try:
+        load_model()  # Ensure model is loaded
+    except Exception as e:
+        return []
+    
+    try:
+        PIL_crop = PIL_crop.convert('RGB')
+        tensor_cropped = classifier.preprocessImage(PIL_crop)
+        confs = classifier.predictOnBatch(tensor_cropped)[0,]
+        lbls = txt_animalclasses['en']
+        classifications = []
+        for i in range(len(confs)):
+            classifications.append([lbls[i], float(confs[i])])  # Convert numpy float32 to Python float
+        
+        # Clear GPU memory cache to prevent memory issues
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                torch.mps.empty_cache()
+        except:
+            pass
+        
+        return classifications
+    except Exception as e:
+        return []
 
 # method of removing background
 # input: image = full image PIL.Image.open(img_fpath) <class 'PIL.JpegImagePlugin.JpegImageFile'>
@@ -248,10 +285,12 @@ def get_crop(image, bbox):
 #############################################
 ############### MODEL GENERIC ###############
 #############################################
-# run main function
-import classification.cls_inference as ea
-
-ea.create_raw_classifications(json_path= json_path,
-                               GPU_availability= GPU_availability,
-                               crop_function=get_crop,
-                               inference_function=get_classification,)
+# run main function only when script is executed directly
+if __name__ == '__main__':
+    load_model()  # Load model for direct execution
+    import classification.cls_inference as ea
+    
+    ea.create_raw_classifications(json_path= json_path,
+                                   GPU_availability= GPU_availability,
+                                   crop_function=get_crop,
+                                   inference_function=get_classification,)

@@ -21,6 +21,9 @@ import subprocess
 import base64
 import io
 import uuid
+import threading
+import queue
+import time
 from tqdm import tqdm
 
 # Add MegaDetector to path for video utilities
@@ -123,9 +126,9 @@ class ModelServerClient:
                 image_np = (image_np * 255).astype('uint8')
             image_pil = Image.fromarray(image_np)
             
-            # Encode image as base64 JPEG
+            # Encode image as base64 JPEG with reduced quality for memory efficiency
             buffer = io.BytesIO()
-            image_pil.save(buffer, format='JPEG', quality=85)
+            image_pil.save(buffer, format='JPEG', quality=60)
             image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
             
             # Create request
@@ -143,10 +146,20 @@ class ModelServerClient:
             # Read response
             response_line = self.server_process.stdout.readline()
             if not response_line:
-                print("No response from model server")
+                # Check if server died
+                if self.server_process.poll() is not None:
+                    print(f"Model server process died (exit code: {self.server_process.poll()})")
                 return []
             
-            response = json.loads(response_line.strip())
+            response_line = response_line.strip()
+            if not response_line:
+                return []
+            
+            try:
+                response = json.loads(response_line)
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse server response: {response_line[:100]}... (JSON error: {str(e)})")
+                return []
             
             if response.get('error'):
                 print(f"Model server error: {response['error']}")
@@ -156,6 +169,9 @@ class ModelServerClient:
             
         except Exception as e:
             print(f"Error communicating with model server: {str(e)}")
+            # Check if server is still alive
+            if self.server_process and self.server_process.poll() is not None:
+                print(f"Server died during request processing")
             return []
     
     def shutdown(self):

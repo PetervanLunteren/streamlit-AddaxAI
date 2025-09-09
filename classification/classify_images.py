@@ -14,6 +14,8 @@ import subprocess
 import base64
 import io
 import uuid
+import threading
+import queue
 from tqdm import tqdm
 from PIL import Image
 
@@ -39,6 +41,8 @@ class ModelServerClient:
         self.model_type = model_type
         self.model_env = model_env
         self.server_process = None
+        self.stderr_queue = queue.Queue()
+        self.stderr_thread = None
         self.start_server()
     
     def start_server(self):
@@ -72,20 +76,59 @@ class ModelServerClient:
                 universal_newlines=True
             )
             
+            # Start stderr reader thread
+            self.stderr_thread = threading.Thread(target=self._read_stderr, daemon=True)
+            self.stderr_thread.start()
+            
             # Wait for server to be ready
-            while True:
-                line = self.server_process.stderr.readline()
-                if 'Model server ready' in line:
-                    print("Model server started successfully")
-                    break
-                elif self.server_process.poll() is not None:
+            import time
+            timeout = 30  # 30 seconds timeout
+            start_time = time.time()
+            server_ready = False
+            
+            while time.time() - start_time < timeout:
+                # Check stderr queue for messages
+                try:
+                    line = self.stderr_queue.get(timeout=0.1)
+                    if 'Model server ready' in line:
+                        server_ready = True
+                        break
+                except queue.Empty:
+                    pass
+                
+                # Check if process died
+                if self.server_process.poll() is not None:
                     # Process died
-                    stdout, stderr = self.server_process.communicate()
-                    raise RuntimeError(f"Model server failed to start. stderr: {stderr}")
+                    time.sleep(0.5)  # Let stderr reader catch remaining output
+                    remaining_stderr = []
+                    while not self.stderr_queue.empty():
+                        try:
+                            remaining_stderr.append(self.stderr_queue.get_nowait())
+                        except queue.Empty:
+                            break
+                    raise RuntimeError(f"Model server failed to start")
+            
+            if not server_ready:
+                raise RuntimeError(f"Model server did not start within {timeout} seconds")
                     
         except Exception as e:
             print(f"Failed to start model server: {str(e)}")
+            if self.server_process:
+                self.server_process.terminate()
+                self.server_process.wait(timeout=5)
             raise
+    
+    def _read_stderr(self):
+        """Read stderr in a separate thread to prevent blocking."""
+        try:
+            while self.server_process and self.server_process.poll() is None:
+                line = self.server_process.stderr.readline()
+                if line:
+                    self.stderr_queue.put(line.strip())
+                else:
+                    break
+        except Exception as e:
+            self.stderr_queue.put(f"Error reading stderr: {str(e)}")
     
     def classify_crop(self, image_pil, bbox_coords=None):
         """
@@ -99,7 +142,12 @@ class ModelServerClient:
             list: Classification results as [["species_name", confidence], ...]
         """
         if self.server_process is None or self.server_process.poll() is not None:
-            print("Model server is not running")
+            if self.server_process:
+                # Try to get any remaining output
+                try:
+                    stdout, stderr = self.server_process.communicate(timeout=0.1)
+                except:
+                    pass
             return []
         
         try:
@@ -120,10 +168,28 @@ class ModelServerClient:
             self.server_process.stdin.write(request_json)
             self.server_process.stdin.flush()
             
+            # Check for any stderr output
+            stderr_messages = []
+            while not self.stderr_queue.empty():
+                try:
+                    msg = self.stderr_queue.get_nowait()
+                    stderr_messages.append(msg)
+                except queue.Empty:
+                    break
+            
             # Read response
             response_line = self.server_process.stdout.readline()
             if not response_line:
-                print("No response from model server")
+                # Check if server is still alive
+                if self.server_process.poll() is not None:
+                    # Get any remaining stderr
+                    import time
+                    time.sleep(0.2)
+                    while not self.stderr_queue.empty():
+                        try:
+                            msg = self.stderr_queue.get_nowait()
+                        except queue.Empty:
+                            break
                 return []
             
             response = json.loads(response_line.strip())
@@ -135,7 +201,12 @@ class ModelServerClient:
             return response.get('classifications', [])
             
         except Exception as e:
-            print(f"Error communicating with model server: {str(e)}")
+            # Check for any stderr messages
+            while not self.stderr_queue.empty():
+                try:
+                    msg = self.stderr_queue.get_nowait()
+                except queue.Empty:
+                    break
             return []
     
     def shutdown(self):
@@ -156,6 +227,10 @@ class ModelServerClient:
                 self.server_process.wait(timeout=5)
             finally:
                 self.server_process = None
+        
+        # Cleanup stderr thread
+        if self.stderr_thread and self.stderr_thread.is_alive():
+            self.stderr_thread.join(timeout=1)
 
 
 def fetch_label_map_from_json(path_to_json):

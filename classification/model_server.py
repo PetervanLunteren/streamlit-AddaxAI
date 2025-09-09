@@ -68,10 +68,18 @@ class ModelServer:
             if base_dir not in sys.path:
                 sys.path.insert(0, base_dir)
             
+            # Execute the module first to define everything
             try:
-                # Execute the module to load the model and define functions
                 spec.loader.exec_module(model_module)
-                
+            except Exception as e:
+                # This is expected since the module tries to parse args
+                pass
+            
+            # Now set the model path directly in the module after execution
+            model_module.cls_model_fpath = self.model_path
+            model_module.json_path = '/dev/null'
+            
+            try:
                 # Extract the functions we need
                 self.get_crop = getattr(model_module, 'get_crop', None)
                 self.get_classification = getattr(model_module, 'get_classification', None)

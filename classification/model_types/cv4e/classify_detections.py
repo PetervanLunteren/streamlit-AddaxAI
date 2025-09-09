@@ -12,19 +12,28 @@
 #############################################
 
 # Parse command line arguments
+import sys
 import argparse
 
-parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
-parser.add_argument('--model-path', required=True, help='Path to the classification model file')
-parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
-parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
-parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+# Global variables for arguments
+cls_model_fpath = None
+json_path = None
+country = None
+state = None
 
-args = parser.parse_args()
-cls_model_fpath = args.model_path
-json_path = args.json_path
-country = args.country
-state = args.state
+# Only parse args if running as main script or if args are provided
+if __name__ == '__main__' or len(sys.argv) > 1:
+    parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
+    parser.add_argument('--model-path', required=True, help='Path to the classification model file')
+    parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
+    parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
+    parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+    
+    args = parser.parse_args()
+    cls_model_fpath = args.model_path
+    json_path = args.json_path
+    country = args.country
+    state = args.state
 
 # lets not freak out over truncated images
 from PIL import ImageFile
@@ -85,40 +94,65 @@ if not GPU_availability:
         GPU_availability = True
         device_str = 'cuda'
 
-# load model
-class_csv_fpath = os.path.join(os.path.dirname(cls_model_fpath), 'classes.csv')
-classes = pd.read_csv(class_csv_fpath)
-model = CustomResNet18(len(classes))
-checkpoint = torch.load(cls_model_fpath, map_location=torch.device(device_str))
-model.load_state_dict(checkpoint['model'])
-model.to(torch.device(device_str))
-model.eval()
-device = torch.device(device_str)
+# Global variables for model (will be initialized when needed)
+model = None
+device = None
+preprocess = None
+classes = None
 
-# image preprocessing 
-preprocess = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-])
+def load_model():
+    """Load the model if not already loaded."""
+    global model, device, preprocess, classes, cls_model_fpath
+    
+    if model is not None:
+        return  # Model already loaded
+    
+    # Ensure we have a model path
+    if cls_model_fpath is None:
+        raise ValueError("Model path not set. Cannot load model.")
+    
+    # load model
+    class_csv_fpath = os.path.join(os.path.dirname(cls_model_fpath), 'classes.csv')
+    classes = pd.read_csv(class_csv_fpath)
+    model = CustomResNet18(len(classes))
+    checkpoint = torch.load(cls_model_fpath, map_location=torch.device(device_str))
+    model.load_state_dict(checkpoint['model'])
+    model.to(torch.device(device_str))
+    model.eval()
+    device = torch.device(device_str)
+    
+    # image preprocessing 
+    preprocess = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+    ])
 
 # predict from cropped image
 # input: cropped PIL image
 # output: unsorted classifications formatted as [['aardwolf', 2.3025326090220233e-09], ['african wild cat', 5.658252888451898e-08], ... ]
 # no need to remove forbidden classes from the predictions, that will happen in inference_lib.py
 def get_classification(PIL_crop):
-    input_tensor = preprocess(PIL_crop)
-    input_batch = input_tensor.unsqueeze(0)  
-    input_batch = input_batch.to(device)
-    output = model(input_batch)
-    probabilities = F.softmax(output, dim=1)
-    probabilities_np = probabilities.cpu().detach().numpy()
-    confidence_scores = probabilities_np[0]
-    classifications = []
-    for i in range(len(confidence_scores)):
-        pred_class = classes.iloc[i].values[1]
-        pred_conf = confidence_scores[i]
-        classifications.append([pred_class, pred_conf])
-    return classifications
+    try:
+        load_model()  # Ensure model is loaded
+    except Exception as e:
+        return []
+    
+    try:
+        input_tensor = preprocess(PIL_crop)
+        input_batch = input_tensor.unsqueeze(0)  
+        input_batch = input_batch.to(device)
+        output = model(input_batch)
+        probabilities = F.softmax(output, dim=1)
+        probabilities_np = probabilities.cpu().detach().numpy()
+        confidence_scores = probabilities_np[0]
+        classifications = []
+        for i in range(len(confidence_scores)):
+            pred_class = classes.iloc[i].values[1]
+            pred_conf = float(confidence_scores[i])  # Convert numpy float32 to Python float
+            classifications.append([pred_class, pred_conf])
+        return classifications
+    except Exception as e:
+        return []
 
 # method of removing background
 # input: image = full image PIL.Image.open(img_fpath) <class 'PIL.JpegImagePlugin.JpegImageFile'>
@@ -144,10 +178,12 @@ def get_crop(img, bbox_norm):
 #############################################
 ############### MODEL GENERIC ###############
 #############################################
-# run main function
-import classification.cls_inference as ea
-
-ea.create_raw_classifications(json_path= json_path,
-                               GPU_availability= GPU_availability,
-                               crop_function=get_crop,
-                               inference_function=get_classification,)
+# run main function only when script is executed directly
+if __name__ == '__main__':
+    load_model()  # Load model for direct execution
+    import classification.cls_inference as ea
+    
+    ea.create_raw_classifications(json_path= json_path,
+                                   GPU_availability= GPU_availability,
+                                   crop_function=get_crop,
+                                   inference_function=get_classification,)

@@ -14,19 +14,28 @@
 ############### MODEL GENERIC ###############
 #############################################
 # Parse command line arguments
+import sys
 import argparse
 
-parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
-parser.add_argument('--model-path', required=True, help='Path to the classification model file')
-parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
-parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
-parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+# Global variables for arguments
+cls_model_fpath = None
+json_path = None
+country = None
+state = None
 
-args = parser.parse_args()
-cls_model_fpath = args.model_path
-json_path = args.json_path
-country = args.country
-state = args.state
+# Only parse args if running as main script or if args are provided
+if __name__ == '__main__' or len(sys.argv) > 1:
+    parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
+    parser.add_argument('--model-path', required=True, help='Path to the classification model file')
+    parser.add_argument('--json-path', required=True, help='Path to the JSON file with detection results')
+    parser.add_argument('--country', default=None, help='Country code for geofencing (e.g., "USA", "KEN")')
+    parser.add_argument('--state', default=None, help='State code for geofencing (e.g., "CA", "TX" - US only)')
+    
+    args = parser.parse_args()
+    cls_model_fpath = args.model_path
+    json_path = args.json_path
+    country = args.country
+    state = args.state
 
 # lets not freak out over truncated images 
 from PIL import ImageFile
@@ -279,6 +288,7 @@ def get_crop(image: Image.Image,
              bbox: List[float]):
     '''Wrapper to make the form consistent with AddaxAI
        Uses the global instance of ImageTransforms(): transforms'''
+    load_model()  # Ensure transforms is initialized
     crop =  transforms.make_crop(image, bbox)
     return crop
 
@@ -297,23 +307,34 @@ def predict_one_image(crop):
     Returns a list of lists [[class_1, pred],[class_2, pred_2]...] 
     Uses the global instance of CustomModel()
     '''
-
-    classifications = []
-    classes = model.classes 
-
-    if crop.ndim == 3:
-        crop = crop.unsqueeze(0)
-    crop = crop.to(model.device)
+    try:
+        load_model()  # Ensure model is loaded
+    except Exception as e:
+        return []
     
-    with torch.no_grad():
-        logits = model(crop)
-        probs = F.sigmoid(logits)
-        cpu_probs = probs.detach().squeeze().cpu().numpy()
-    
-    for i in range(len(classes)):
-        classifications.append([classes[i], cpu_probs[i]])
+    try:
+        classifications = []
+        classes = model.classes 
 
-    return classifications
+        if crop.ndim == 3:
+            crop = crop.unsqueeze(0)
+        crop = crop.to(model.device)
+        
+        with torch.no_grad():
+            logits = model(crop)
+            probs = F.sigmoid(logits)
+            cpu_probs = probs.detach().squeeze().cpu().numpy()
+        
+        for i in range(len(classes)):
+            classifications.append([classes[i], float(cpu_probs[i])])  # Convert numpy float32 to Python float
+
+        return classifications
+    except Exception as e:
+        return []
+
+def get_classification(PIL_crop):
+    """Wrapper function for compatibility with model server."""
+    return predict_one_image(PIL_crop)
 
 #############################################
 ############### MODEL GENERIC ###############
@@ -345,21 +366,39 @@ species_list = ["banded_dotterel", "banded_rail", "bellbird", "black_backed_gull
                 "wallaby", "weasel", "weka", "white_faced_heron", "wrybill", "yellow_eyed_penguin", 
                 "yellowhammer"]
 
-#Instantiate methods & models
-image_config = ImageConfig()
-transforms = ImageTransformer(image_config)
-model = get_model(classes=species_list,
-                    backbone='tf_efficientnetv2_s.in21k',
-                    weights=cls_model_fpath)
+# Global variables for model (will be initialized when needed)
+image_config = None
+transforms = None
+model = None
+
+def load_model():
+    """Load the model if not already loaded."""
+    global model, image_config, transforms, cls_model_fpath
+    
+    if model is not None:
+        return  # Model already loaded
+    
+    # Ensure we have a model path
+    if cls_model_fpath is None:
+        raise ValueError("Model path not set. Cannot load model.")
+    
+    # Instantiate methods & models
+    image_config = ImageConfig()
+    transforms = ImageTransformer(image_config)
+    model = get_model(classes=species_list,
+                        backbone='tf_efficientnetv2_s.in21k',
+                        weights=cls_model_fpath)
 
 
 #############################################
 ############### MODEL GENERIC ###############
 #############################################
-# run main function
-import classification.cls_inference as ea
-
-ea.create_raw_classifications(json_path= json_path,
-                               GPU_availability= GPU_availability,
-                               crop_function=get_crop,
-                               inference_function=predict_one_image,)
+# run main function only when script is executed directly
+if __name__ == '__main__':
+    load_model()  # Load model for direct execution
+    import classification.cls_inference as ea
+    
+    ea.create_raw_classifications(json_path= json_path,
+                                   GPU_availability= GPU_availability,
+                                   crop_function=get_crop,
+                                   inference_function=predict_one_image,)
