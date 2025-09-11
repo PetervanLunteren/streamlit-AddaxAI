@@ -455,6 +455,7 @@ mode_selected = st.sidebar.segmented_control(
     help=txts["mode_explanation_txt"],
     key="mode_selection",
     on_change=on_mode_change,
+    width="stretch",
     default=mode)
 
 @logged_callback

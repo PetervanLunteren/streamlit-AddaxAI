@@ -156,6 +156,9 @@ if get_session_var("analyse_advanced", "show_modal_species_selector", False):
             "analyse_advanced", "modal_species_leaf_values", [])
         species_selector_modal(nodes, all_leaf_values)
 
+result = st.segmented_control("Pick one:", ["**No**",
+                                   "**Yes**"], key="segmented_control", width="stretch")
+st.write("You selected:", result)
 
 st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a  task of rearrangin the previous code.*")
 
