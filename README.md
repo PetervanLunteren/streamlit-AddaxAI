@@ -1,12 +1,10 @@
 # AddaxAI Streamlit Application
 
-A temporary repository to buid a new AddaxAI version. Completely separate from its original repo https://github.com/PetervanLunteren/addaxai so that we can mess around and dont have to be gentle. 
+A multi-page Streamlit app for wildlife camera trap analysis. This repo is independent of the original AddaxAI repository.
 
 ## Prerequisites
 
-**macOS Only**: This application is currently designed for macOS systems only.
-
-No external dependencies required! The application includes its own micromamba binary for managing Python environments.
+The application supports macOS and Windows. It includes its own micromamba binary for managing Python environments; no external conda installation is required.
 
 ## Installation
 
@@ -20,47 +18,34 @@ cd streamlit-AddaxAI
 
 ### 2. Create Environment and Install Packages
 
-The application includes its own micromamba binary, so no external conda installation is needed:
+Use the included micromamba to create the base environment:
 
 ```bash
-# Create environment using included micromamba (installs in ./envs/env-addaxai-base)
+# macOS / Linux
 ./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
+
+# Windows (use .exe)
+./bin/macos/micromamba.exe env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
 ```
 
 ### 3. Launch Application
 
 ```bash
-# Run the application using the created environment
+# macOS / Linux
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
+
+# Windows
+./bin/macos/micromamba.exe run -p ./envs/env-addaxai-base streamlit run main.py
 ```
 
 The application will open in your default web browser at `http://localhost:8501`.
 
 ## Project Structure
 
-```
-streamlit-AddaxAI/
-├── main.py                    # Application entry point
-├── pages/                     # Streamlit pages
-│   ├── analysis_advanced.py   # Advanced analysis workflow
-│   ├── analysis_quick.py      # Quick analysis interface
-│   ├── human_verification.py  # Manual review interface
-│   ├── remove_duplicates.py   # Duplicate detection
-│   ├── explore_results.py     # Results visualization
-│   ├── post_processing.py     # Post-processing tools
-│   ├── camera_management.py   # Metadata management
-│   └── settings.py            # Application settings
-├── components/                # Reusable UI components
-├── utils/                     # Core utilities and business logic
-├── config/                    # Application configuration
-├── data/                      # Test data and samples
-├── assets/                    # Static assets (CSS, images, etc.)
-├── models/                    # AI model files
-├── classification/            # Classification inference system
-└── envs/                      # Conda environments
-```
+For an overview of the folder layout and where to find key files, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 
 ## Documentation
 
 - **[DEVELOPERS.md](DEVELOPERS.md)**: Development guidelines and architecture
 - **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)**: Detailed project structure documentation
+- **[CLAUDE.md](CLAUDE.md)**: Context for AI-assisted tasks
