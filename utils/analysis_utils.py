@@ -493,7 +493,7 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None, media_type
         log(line)
         # st.code(line)
         progress_label = "Video Classification" if media_type == "video" else "Image Classification" if media_type == "image" else "Classification"
-        pbars.update_from_tqdm_string(progress_label, line)
+        pbars.update_from_tqdm_string(progress_label, line, overwrite_unit="animal")
 
     process.stdout.close()
     process.wait()
@@ -542,7 +542,8 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars, media
         line = line.strip()
         print(line)
         progress_label = "Video Detection" if media_type == "video" else "Image Detection" if media_type == "image" else "Detection"
-        pbars.update_from_tqdm_string(progress_label, line)
+        overwrite_unit = "video" if media_type == "video" else "image" if media_type == "image" else None
+        pbars.update_from_tqdm_string(progress_label, line, overwrite_unit=overwrite_unit)
 
     process.stdout.close()
     process.wait()
@@ -606,7 +607,8 @@ def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars)
         line = line.strip()
         print(line)
         progress_label = "Video Detection"
-        pbars.update_from_tqdm_string(progress_label, line)
+        
+        pbars.update_from_tqdm_string(progress_label, line, overwrite_unit="video")
 
     process.stdout.close()
     process.wait()

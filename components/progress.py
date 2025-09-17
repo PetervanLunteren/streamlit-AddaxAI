@@ -112,8 +112,14 @@ class MultiProgressBars:
 
         self.bars[pbar_id].progress(progress, text=display_text)
         
-    def update_from_tqdm_string(self, pbar_id, tqdm_line: str):
-        """Parse a tqdm output string and update the corresponding Streamlit progress bar, including ETA."""
+    def update_from_tqdm_string(self, pbar_id, tqdm_line: str, overwrite_unit=None):
+        """Parse a tqdm output string and update the corresponding Streamlit progress bar, including ETA.
+        
+        Args:
+            pbar_id: Progress bar identifier
+            tqdm_line: Raw tqdm output line to parse
+            overwrite_unit: Optional unit to display instead of the parsed unit (e.g., "frames", "videos", "images")
+        """
         # Check for GPU availability info if show_device is enabled
         if pbar_id in self.show_device and self.show_device[pbar_id] and self.device_info[pbar_id] is None:
             if "GPU available: True" in tqdm_line:
@@ -134,22 +140,37 @@ class MultiProgressBars:
         elapsed_str = match.group(4).strip()
         eta_str = match.group(5).strip()
         rate = float(match.group(6))
-        unit_prefix = match.group(7) or ""  # e.g., "s" from "3.64s"
-        unit_suffix = match.group(8) or ""  # e.g., "it" from "/it"
+        first_unit = match.group(7) or ""  # First unit component
+        second_unit = match.group(8) or ""  # Second unit component
+        
+        # Define time units that tqdm uses
+        time_units = {"s", "min", "h", "hour", "hours", "d", "day", "days"}
+        
+        # Determine which is the time unit and which is the processing unit
+        if first_unit in time_units:
+            time_unit = first_unit
+            processing_unit = second_unit
+        elif second_unit in time_units:
+            time_unit = second_unit  
+            processing_unit = first_unit
+        else:
+            # Fallback: assume standard format where second is time unit
+            time_unit = "s"
+            processing_unit = second_unit
 
         self.set_max_value(pbar_id, total)
         self.states[pbar_id] = n  # Sync directly to avoid increment error
 
         # Build label components
-        if unit_prefix and unit_suffix:
-            # Video format: "3.64s/it" 
-            rate_display = f"{rate:.2f} {unit_prefix}/{unit_suffix}"
-        elif unit_suffix:
-            # Standard format: "11.25it/s" - just show rate without making up units
-            rate_display = f"{rate:.2f}"
+        display_unit = overwrite_unit if overwrite_unit else processing_unit
+        
+        # Determine if this is time-per-item or items-per-time format
+        if first_unit in time_units:
+            # Format: "3.67s/video" (time per item) - preserve this format
+            rate_display = f"{rate:.2f} {time_unit}/{display_unit}"
         else:
-            # Fallback
-            rate_display = f"{rate:.2f}"
+            # Format: "4.27video/s" (items per time) - preserve this format  
+            rate_display = f"{rate:.2f} {display_unit}/{time_unit}"
         
         label_parts = [
             f":material/clock_loader_40: {percent}%",
@@ -169,8 +190,14 @@ class MultiProgressBars:
 
         self.update(pbar_id, n - self.states[pbar_id], text=label)
 
-    def update_from_tqdm_object(self, pbar_id, pbar):
-        """Update the progress bar directly from a tqdm object."""
+    def update_from_tqdm_object(self, pbar_id, pbar, overwrite_unit=None):
+        """Update the progress bar directly from a tqdm object.
+        
+        Args:
+            pbar_id: Progress bar identifier
+            pbar: The tqdm object to read from
+            overwrite_unit: Optional unit to display instead of the tqdm unit (e.g., "frames", "videos", "images")
+        """
         if pbar_id not in self.bars:
             return
         
@@ -212,6 +239,9 @@ class MultiProgressBars:
         percent = int(n / total * 100) if total > 0 else 0
         percent_str = f":material/clock_loader_40: {percent}%"
         
+        # Use overwrite_unit if provided, otherwise use the original unit
+        display_unit = overwrite_unit if overwrite_unit else unit
+        
         # Format current/total - only format bytes if unit is "B"
         if unit == "B":
             n_formatted = fmt_bytes(n)
@@ -221,8 +251,8 @@ class MultiProgressBars:
             rate_str = f":material/speed: {rate_formatted}" if rate else ""
         else:
             # For other units (files, items, animals, etc.), show as-is
-            laps_str = f":material/laps: {int(n)} {unit} / {int(total)} {unit}"
-            rate_str = f":material/speed: {rate:.1f} {unit}/s" if rate else ""
+            laps_str = f":material/laps: {int(n)} / {int(total)}"
+            rate_str = f":material/speed: {rate:.1f} {display_unit}/s" if rate else ""
         
         elapsed_str = f":material/timer: {fmt_time(elapsed)}" if elapsed else ""
         eta_str = f":material/sports_score: {fmt_time((total - n) / rate)}" if rate and total > n else ""
