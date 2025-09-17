@@ -37,6 +37,48 @@ from utils.config import *
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
+# Global frame cache for video processing
+FRAME_CACHE = {}
+
+def extract_video_frames_to_cache(video_path, frame_numbers):
+    """
+    Extract specific frames from video into memory cache using MegaDetector's video_utils.
+    
+    Args:
+        video_path (str): Path to video file
+        frame_numbers (list): List of frame numbers to extract
+    """
+    # Import MegaDetector's video utilities
+    sys.path.append("/Users/peter/Documents/Scripting/repos/streamlit-AddaxAI/envs/env-megadetector/lib/python3.11/site-packages")
+    from megadetector.detection.video_utils import run_callback_on_frames
+    import cv2
+    
+    def frame_callback(image_np, frame_id):
+        """Callback to store frame in memory cache"""
+        # Convert numpy array (BGR) to PIL Image (RGB)
+        image_rgb = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+        image_pil = Image.fromarray(image_rgb)
+        FRAME_CACHE[frame_id] = image_pil
+        return None
+    
+    try:
+        # Extract only the required frames
+        run_callback_on_frames(
+            video_path, 
+            frame_callback,
+            frames_to_process=frame_numbers,
+            verbose=False
+        )
+        print(f"Extracted {len(frame_numbers)} frames from video {video_path} to memory")
+    except Exception as e:
+        print(f"Error extracting frames from {video_path}: {e}")
+
+def clear_frame_cache():
+    """Clear all frames from memory cache to save memory"""
+    global FRAME_CACHE
+    FRAME_CACHE.clear()
+    print("Cleared video frame cache from memory")
+
 def fetch_label_map_from_json(path_to_json):
     """
     Extract detection category labels from MegaDetector JSON output.
@@ -77,8 +119,10 @@ def create_raw_classifications(json_path,
         data = json.load(image_recognition_file_content)
         label_map = fetch_label_map_from_json(json_path)
     
-    # First pass: count valid animal crops and filter detections by confidence
+    # First pass: count valid animal crops, filter detections, and group by video files
     n_crops_to_classify = 0
+    video_files_to_process = {}  # video_path -> list of image entries
+    
     for image in data['images']:
         if 'detections' in image:
             # Filter detections in place to remove low-confidence animal detections
@@ -100,6 +144,13 @@ def create_raw_classifications(json_path,
             
             # Update the detections list with filtered results
             image['detections'] = filtered_detections
+            
+            # Group video files for per-video processing
+            if 'frames_processed' in image:
+                video_path = os.path.join(img_dir, image['file'])
+                if video_path not in video_files_to_process:
+                    video_files_to_process[video_path] = []
+                video_files_to_process[video_path].append(image)
     
     # Early return if no animals to classify - prevents unnecessary processing
     if n_crops_to_classify == 0:
@@ -121,8 +172,89 @@ def create_raw_classifications(json_path,
     
     # Process each animal detection with progress tracking
     with tqdm(total=n_crops_to_classify) as pbar:
+        
+        # === STEP 1: Process all video files one by one ===
+        for video_path, video_images in video_files_to_process.items():
+            print(f"Processing video: {video_path}")
+            
+            # Extract frames for this video only
+            frame_numbers = video_images[0]['frames_processed']  # All entries should have same frames_processed
+            extract_video_frames_to_cache(video_path, frame_numbers)
+            
+            # Process all detections for this video
+            for image in video_images:
+                fname = image['file']
+                if 'detections' in image:
+                    for detection in image['detections']:
+                        conf = detection["conf"]
+                        category_id = detection['category']
+                        category = label_map[category_id]
+                        
+                        # Process only animals (already filtered for confidence in first pass)
+                        if category == 'animal':
+                            # For video frames: get frame from memory cache
+                            frame_number = detection.get('frame_number')
+                            frame_key = f"frame{frame_number:06d}.jpg"  # Match MegaDetector format
+                            
+                            if frame_key in FRAME_CACHE:
+                                # Load frame from memory cache
+                                frame_image = FRAME_CACHE[frame_key]
+                                bbox = detection['bbox']
+                                crop = crop_function(frame_image, bbox)
+                                
+                                # Run classification inference on the cropped image
+                                name_classifications = inference_function(crop)
+
+                                # Convert classification results to indexed format for JSON storage
+                                idx_classifications = []
+                                for elem in name_classifications:
+                                    name = elem[0]
+                                    
+                                    # On first iteration, build label mapping for new classification names
+                                    if initial_it:
+                                        if name not in inverted_cls_label_map:
+                                            # Find highest existing index to assign next sequential ID
+                                            highest_index = 0
+                                            for key, value in inverted_cls_label_map.items():
+                                                value = int(value)
+                                                if value > highest_index:
+                                                    highest_index = value
+                                            inverted_cls_label_map[name] = str(highest_index + 1)
+                                    
+                                    # Convert numpy float32 to Python float for JSON serialization compatibility
+                                    confidence = float(elem[1])
+                                    idx_classifications.append([inverted_cls_label_map[name], round(confidence, 5)])
+                                
+                                # Set flag to false after first iteration
+                                initial_it = False
+
+                                # Sort classifications by confidence (highest first)
+                                idx_classifications = sorted(idx_classifications, key=lambda x:x[1], reverse=True)
+                                
+                                # Keep only the top classification result (if any classifications exist)
+                                if idx_classifications:
+                                    only_top_classification = [idx_classifications[0]]
+                                    detection['classifications'] = only_top_classification
+                                else:
+                                    # No valid classifications for this detection (e.g., invalid bounding box)
+                                    detection['classifications'] = []
+
+                                # Update progress bar
+                                pbar.update(1)
+                            else:
+                                # Fallback: skip this detection if frame not in cache
+                                print(f"Warning: Frame {frame_key} not found in cache")
+            
+            # Clear frame cache after processing this video to save memory
+            clear_frame_cache()
+            print(f"Completed video: {video_path} - cache cleared")
+        
+        # === STEP 2: Process regular images ===
         for image in data['images']:
-            # Get image filename for cropping
+            # Skip video files (already processed above)
+            if 'frames_processed' in image:
+                continue
+                
             fname = image['file']
             if 'detections' in image:
                 for detection in image['detections']:
@@ -131,8 +263,8 @@ def create_raw_classifications(json_path,
                     category = label_map[category_id]
                     
                     # Process only animals (already filtered for confidence in first pass)
-                    if category == 'animal':  # No need to check conf again
-                        # Load image and extract crop using bounding box
+                    if category == 'animal':
+                        # Normal image processing: load from disk
                         img_fpath = os.path.join(img_dir, fname)
                         bbox = detection['bbox']
                         crop = crop_function(Image.open(img_fpath), bbox)

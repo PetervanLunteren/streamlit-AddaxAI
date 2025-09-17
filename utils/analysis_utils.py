@@ -176,6 +176,41 @@ def invalidate_map_cache():
         del st.session_state[map_cache_key]
 
 
+def detect_media_types(deployment_folder):
+    """
+    Scan deployment folder to detect videos and images.
+    
+    Args:
+        deployment_folder (str): Path to deployment folder
+        
+    Returns:
+        dict: {
+            'has_videos': bool,
+            'has_images': bool, 
+            'video_files': list,
+            'image_files': list
+        }
+    """
+    video_files = []
+    image_files = []
+    
+    # Walk through folder recursively
+    for root, dirs, files in os.walk(deployment_folder):
+        for file in files:
+            file_lower = file.lower()
+            if file_lower.endswith(VIDEO_EXTENSIONS):
+                video_files.append(os.path.join(root, file))
+            elif file_lower.endswith(IMG_EXTENSIONS):
+                image_files.append(os.path.join(root, file))
+    
+    return {
+        'has_videos': len(video_files) > 0,
+        'has_images': len(image_files) > 0,
+        'video_files': video_files,
+        'image_files': image_files
+    }
+
+
 def run_process_queue(
     process_queue: str,
 ):
@@ -199,8 +234,11 @@ def run_process_queue(
     # overall_progress = st.empty()
     pbars = MultiProgressBars(container_label="Processing...",)
 
-    pbars.add_pbar(label="Detection", show_device=True)
-    pbars.add_pbar(label="Classification", show_device=True, done_text="Finalizing...")
+    # Updated progress bars for video and image processing
+    pbars.add_pbar(label="Video Detection", show_device=True)
+    pbars.add_pbar(label="Video Classification", show_device=True)
+    pbars.add_pbar(label="Image Detection", show_device=True)
+    pbars.add_pbar(label="Image Classification", show_device=True, done_text="Finalizing...")
 
     # calculate the total number of deployments to process
     process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
@@ -251,44 +289,84 @@ def run_process_queue(
         selected_state = deployment.get('selected_state', None)
 
 
-        # Create JSON file with in-progress suffix during processing
-        in_progress_json_path = os.path.join(
-            selected_folder, "addaxai-deployment-in-progress.json")
-        final_json_path = os.path.join(
-            selected_folder, "addaxai-deployment.json")
-
-        # run the MegaDetector
+        # Detect media types in deployment folder
+        media_info = detect_media_types(selected_folder)
+        
         pbars.update_label(
             f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
 
         model_meta = get_cached_model_meta()  # ✅ OPTIMIZED: Uses session state cache
 
-        # Check for cancellation before starting detection
-        if st.session_state.get(cancel_key, False):
-            break
+        # Create separate JSON files for videos and images
+        video_json_path = os.path.join(selected_folder, "addaxai-deployment-video-in-progress.json")
+        image_json_path = os.path.join(selected_folder, "addaxai-deployment-image-in-progress.json") 
+        final_json_path = os.path.join(selected_folder, "addaxai-deployment.json")
+        
+        json_files_to_merge = []
 
-        detection_success = run_md(
-            selected_det_modelID, model_meta["det"][selected_det_modelID], selected_folder, in_progress_json_path, pbars)
-
-        # If detection was cancelled or failed, skip to next iteration
-        if detection_success is False:
-            continue
-
-        # run the classifier
-        if selected_cls_modelID:
-            # Check for cancellation before starting classification
+        # === PHASE 1: Process Videos ===
+        if media_info['has_videos']:
+            # Check for cancellation before starting video detection
             if st.session_state.get(cancel_key, False):
                 break
 
-            classification_success = run_cls(
-                selected_cls_modelID, in_progress_json_path, pbars, selected_country, selected_state)
+            video_detection_success = run_md_video(
+                selected_det_modelID, model_meta["det"][selected_det_modelID], 
+                selected_folder, video_json_path, pbars)
 
-            # If classification was cancelled or failed, skip to next iteration
-            if classification_success is False:
+            if video_detection_success is False:
                 continue
 
-        # if all processes are done, update the map file and rename to final
-        if os.path.exists(in_progress_json_path):
+            # Video classification
+            if selected_cls_modelID:
+                # Check for cancellation before starting video classification
+                if st.session_state.get(cancel_key, False):
+                    break
+
+                video_classification_success = run_cls_video(
+                    selected_cls_modelID, video_json_path, pbars, selected_country, selected_state)
+
+                if video_classification_success is False:
+                    continue
+            
+            json_files_to_merge.append(video_json_path)
+
+        # === PHASE 2: Process Images ===
+        if media_info['has_images']:
+            # Check for cancellation before starting image detection
+            if st.session_state.get(cancel_key, False):
+                break
+
+            image_detection_success = run_md(
+                selected_det_modelID, model_meta["det"][selected_det_modelID], 
+                selected_folder, image_json_path, pbars, media_type="image")
+
+            if image_detection_success is False:
+                continue
+
+            # Image classification
+            if selected_cls_modelID:
+                # Check for cancellation before starting image classification
+                if st.session_state.get(cancel_key, False):
+                    break
+
+                image_classification_success = run_cls(
+                    selected_cls_modelID, image_json_path, pbars, selected_country, selected_state, media_type="image")
+
+                if image_classification_success is False:
+                    continue
+            
+            json_files_to_merge.append(image_json_path)
+
+        # === PHASE 3: Merge Results ===
+        if json_files_to_merge:
+            merge_success = merge_deployment_jsons(json_files_to_merge, final_json_path)
+            if not merge_success:
+                st.error("Failed to merge video and image results")
+                continue
+
+        # if all processes are done, update the map file 
+        if os.path.exists(final_json_path):
 
             # first add the deployment info to the map file
             map, map_file = get_cached_map()
@@ -312,10 +390,10 @@ def run_process_queue(
             # Invalidate map cache after update
             invalidate_map_cache()
 
-            # Move from in-progress to final location only after successful completion
-            if os.path.exists(final_json_path):
-                os.remove(final_json_path)  # Remove existing if any
-            os.rename(in_progress_json_path, final_json_path)
+            # Clean up temporary JSON files
+            for temp_file in [video_json_path, image_json_path]:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
 
             # # once that is done, remove the deployment from the process queue, so that it resumes the next deployment if something happens
             replace_vars(section="analyse_advanced", new_vars={
@@ -333,7 +411,7 @@ def run_process_queue(
     st.rerun()
 
 
-def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None):
+def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None, media_type="combined"):
     """
     Run the classifier on the given deployment folder using the specified model ID.
     
@@ -414,7 +492,8 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None):
         line = line.strip()
         log(line)
         # st.code(line)
-        pbars.update_from_tqdm_string("Classification", line)
+        progress_label = "Video Classification" if media_type == "video" else "Image Classification" if media_type == "image" else "Classification"
+        pbars.update_from_tqdm_string(progress_label, line)
 
     process.stdout.close()
     process.wait()
@@ -425,7 +504,7 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None):
 
 
 
-def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
+def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars, media_type="combined"):
 
     model_file = os.path.join(
         ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
@@ -462,7 +541,8 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
 
         line = line.strip()
         print(line)
-        pbars.update_from_tqdm_string("Detection", line)
+        progress_label = "Video Detection" if media_type == "video" else "Image Detection" if media_type == "image" else "Detection"
+        pbars.update_from_tqdm_string(progress_label, line)
 
     process.stdout.close()
     process.wait()
@@ -472,9 +552,127 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars):
             f"Failed with exit code {process.returncode}.")
         return False
     
-#     # Clean up malformed bounding boxes after MegaDetector completes
-#     _clean_malformed_bboxes(output_file)
-#     return True
+    return True
+
+
+def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars):
+    """
+    Run MegaDetector on videos using process_video.py from MegaDetector package.
+    
+    Args:
+        det_modelID (str): Detection model ID
+        model_meta (dict): Model metadata
+        deployment_folder (str): Path to deployment folder containing videos
+        output_file (str): Path to output JSON file
+        pbars: Progress bar manager
+    """
+    model_file = os.path.join(
+        ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
+    
+    command = [
+        f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python",
+        "-m", "megadetector.detection.process_video",
+        model_file,
+        deployment_folder,
+        "--output_json_file", output_file,
+        "--recursive",
+        "--time_sample", "1.0",  # 1 frame per second
+        "--json_confidence_threshold", "0.1"
+    ]
+
+    # Log the command for debugging/audit purposes
+    log(f"\n\nRunning MegaDetector video command:\n{' '.join(command)}\n")
+
+    status_placeholder = st.empty()
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        shell=False,
+        universal_newlines=True,
+        cwd=ADDAXAI_ROOT  # Set working directory to project root
+    )
+
+    for line in process.stdout:
+        # Check if processing was cancelled
+        if st.session_state.get("cancel_processing", False):
+            log("Video detection cancelled by user - terminating subprocess")
+            process.terminate()
+            process.wait()
+            return False
+
+        line = line.strip()
+        print(line)
+        progress_label = "Video Detection"
+        pbars.update_from_tqdm_string(progress_label, line)
+
+    process.stdout.close()
+    process.wait()
+
+    if not process.returncode == 0:
+        status_placeholder.error(
+            f"Video detection failed with exit code {process.returncode}.")
+        return False
+    
+    return True
+
+
+def run_cls_video(cls_modelID, json_fpath, pbars, country=None, state=None):
+    """
+    Run classification on video results using the modified cls_inference.py.
+    """
+    return run_cls(cls_modelID, json_fpath, pbars, country, state, media_type="video")
+
+
+def merge_deployment_jsons(json_files, output_file):
+    """
+    Merge multiple JSON files (video and image results) into a single deployment JSON.
+    
+    Args:
+        json_files (list): List of paths to JSON files to merge
+        output_file (str): Path to output merged JSON file
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        merged_data = {
+            'images': [],
+            'detection_categories': {},
+            'classification_categories': {},
+            'info': {}
+        }
+        
+        for json_file in json_files:
+            if not os.path.exists(json_file):
+                continue
+                
+            with open(json_file, 'r') as f:
+                data = json.load(f)
+                
+            # Merge images arrays
+            merged_data['images'].extend(data.get('images', []))
+            
+            # Use detection/classification categories from first file (should be same)
+            if not merged_data['detection_categories']:
+                merged_data['detection_categories'] = data.get('detection_categories', {})
+            if not merged_data['classification_categories']:
+                merged_data['classification_categories'] = data.get('classification_categories', {})
+            if not merged_data['info']:
+                merged_data['info'] = data.get('info', {})
+        
+        # Write merged results
+        with open(output_file, 'w') as f:
+            json.dump(merged_data, f, indent=2)
+            
+        log(f"Successfully merged {len(json_files)} JSON files into {output_file}")
+        return True
+        
+    except Exception as e:
+        log(f"Error merging JSON files: {e}")
+        return False
 
 
 # def _clean_malformed_bboxes(json_file_path):

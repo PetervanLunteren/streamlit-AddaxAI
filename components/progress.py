@@ -121,7 +121,8 @@ class MultiProgressBars:
             elif "GPU available: False" in tqdm_line:
                 self.device_info[pbar_id] = "CPU"
         
-        tqdm_pattern = r"(\d+)%\|.*\|\s*(\d+)/(\d+).*?\[(.*?)<([^,]+),\s*([\d.]+)\s*(\S+)?/s\]"
+        # Updated pattern to handle both it/s and s/it formats from different MegaDetector modules
+        tqdm_pattern = r"(\d+)%\|.*\|\s*(\d+)/(\d+).*?\[(.*?)<([^,]+),\s*([\d.]+)(\S*)/(\S+)\]"
         match = re.search(tqdm_pattern, tqdm_line)
 
         if not match:
@@ -133,16 +134,27 @@ class MultiProgressBars:
         elapsed_str = match.group(4).strip()
         eta_str = match.group(5).strip()
         rate = float(match.group(6))
-        unit = match.group(7) or ""
+        unit_prefix = match.group(7) or ""  # e.g., "s" from "3.64s"
+        unit_suffix = match.group(8) or ""  # e.g., "it" from "/it"
 
         self.set_max_value(pbar_id, total)
         self.states[pbar_id] = n  # Sync directly to avoid increment error
 
         # Build label components
+        if unit_prefix and unit_suffix:
+            # Video format: "3.64s/it" 
+            rate_display = f"{rate:.2f} {unit_prefix}/{unit_suffix}"
+        elif unit_suffix:
+            # Standard format: "11.25it/s" - just show rate without making up units
+            rate_display = f"{rate:.2f}"
+        else:
+            # Fallback
+            rate_display = f"{rate:.2f}"
+        
         label_parts = [
             f":material/clock_loader_40: {percent}%",
-            f":material/laps: {n} {unit} / {total} {unit}",
-            f":material/speed: {rate:.2f} {unit}/s",
+            f":material/laps: {n} / {total}",
+            f":material/speed: {rate_display}",
             f":material/timer: {elapsed_str}",
             f":material/sports_score: {eta_str}"
         ]
