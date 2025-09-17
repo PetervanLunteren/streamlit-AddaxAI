@@ -71,7 +71,7 @@ import piexif
 
 
 from utils.common import load_vars, update_vars, replace_vars, load_map, clear_vars, unique_animal_string, get_session_var, set_session_var, update_session_vars
-from components import MultiProgressBars, print_widget_label, info_box, success_box, warning_box
+from components import MultiProgressBars, print_widget_label, info_box, success_box, warning_box, code_span
 
 
 from utils.config import *
@@ -1684,77 +1684,31 @@ def install_env(env_name: str):
 
 
 def project_selector_widget():
-    # load persisted projects and (optionally) a remembered selection
-    projects, remembered_project_id = load_known_projects()
-
-    if not projects:
-        if st.button(":material/add_circle: Define your first project", use_container_width=True):
-            set_session_var("analyse_advanced", "show_modal_add_project", True)
-            st.rerun()
+    # Get current project from persistent storage first, then fall back to session state
+    general_settings_vars = get_cached_vars(section="general_settings")
+    current_project_id = general_settings_vars.get("selected_projectID", None)
+    
+    # If not in persistent storage, check session state as fallback
+    if not current_project_id:
+        current_project_id = get_session_var("shared", "selected_projectID", None)
+    
+    if not current_project_id:
+        # No project selected - show message to create first project
+        info_box("No project selected. Create your first project using the sidebar.", icon=":material/info:")
         return None
-
-    col1, col2 = st.columns([3, 1])
-
-    with col1:
-        # make option order stable
-        options = list(projects.keys())  # or sorted(projects.keys()) if order doesn't matter
-
-        ss_key = "selected_project_id"
-        widget_key = "project_selector"
-
-        # initialize session state once, or repair if invalid
-        if ss_key not in st.session_state or st.session_state[ss_key] not in options:
-            st.session_state[ss_key] = remembered_project_id if remembered_project_id in options else options[0]
-
-        # keep index in sync with session state, don't recompute from old vars
-        cur_idx = options.index(st.session_state[ss_key])
-
-        def on_change():
-            # streamlit stores the current widget value under `widget_key`
-            st.session_state[ss_key] = st.session_state[widget_key]
-            # optionally persist this choice here if you like (e.g., write to disk/db)
-
-        st.selectbox(
-            "Existing projects",
-            options=options,
-            index=cur_idx,
-            key=widget_key,                 # <<< unique, stable key
-            label_visibility="collapsed",
-            on_change=on_change
-        )
-
-        # button to add a new project
-        with col2:
-            if st.button(":material/add_circle: New", use_container_width=True, help="Add a new project"):
-                # Set session state flag to show modal on next rerun
-                set_session_var("analyse_advanced",
-                                "show_modal_add_project", True)
-                st.rerun()
-
-        # Get the current selection from session state
-        selected_projectID = st.session_state[ss_key]
-        
-        # adjust the selected project
-        # map, _ = load_map()
-        general_settings_vars = get_cached_vars(section="general_settings")
-        previous_projectID = general_settings_vars.get(
-            "selected_projectID", None)
-        if previous_projectID != selected_projectID:
-            # general_settings_vars["selected_projectID"] = selected_projectID
-            update_vars("general_settings", {
-                "selected_projectID": selected_projectID
-            })
-            set_session_var("shared", "selected_projectID", selected_projectID)
-            # with open(map_file, "w") as file:
-            #     json.dump(map, file, indent=2)
-            st.rerun()
-
-        # Store current project selection in session state for deployment workflow
-        set_session_var("analyse_advanced",
-                        "selected_projectID", selected_projectID)
-
-        # return
-        return selected_projectID
+    
+    # Load projects to get the current project name
+    projects, _ = load_known_projects()
+    current_project_data = projects.get(current_project_id, {})
+    current_project_name = current_project_data.get("name", current_project_id)
+    
+    # Show informational message about current project
+    info_box(f"You're currently in project {code_span(current_project_name)}. Data will be listed under this project. You can change projects in the sidebar if desired.", icon=":material/folder:")
+    
+    # Store current project selection in session state for deployment workflow
+    set_session_var("analyse_advanced", "selected_projectID", current_project_id)
+    
+    return current_project_id
 
 
 def location_selector_widget():
@@ -1831,13 +1785,13 @@ def location_selector_widget():
         if coords_found_in_exif:
 
             # define message based on whether a closest location was found
-            message = f"Coordinates extracted from image metadata: ({exif_lat:.5f}, {exif_lng:.5f}). "
+            message = f"Coordinates extracted from image metadata: {code_span(f'({exif_lat:.5f}, {exif_lng:.5f})')}. "
             if closest_location is not None:
                 name, dist = closest_location
                 if dist > 0:
-                    message += f"Matches known location <i>{name}</i>, about {dist} meters away."
+                    message += f"Matches known location {code_span(name)}, about {dist} meters away."
                 else:
-                    message += f"Matches known location <i>{name}</i>."
+                    message += f"Matches known location {code_span(name)}."
             else:
                 message += f"No known location found within 50 meters."
             info_box(message)

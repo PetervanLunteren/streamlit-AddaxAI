@@ -81,3 +81,16 @@ def success_box(msg, title=None, icon=":material/check_circle:"):
                      background_color="#d9e3e7af",
                      font_color="#086164",
                      icon_size=23)
+
+
+def code_span(text):
+    """
+    Wrap text in a styled code span with monospace font and specific color.
+    
+    Args:
+        text: The text to wrap in code styling
+        
+    Returns:
+        str: HTML formatted code span
+    """
+    return f"<code style='color:#086164; font-family:monospace;'>{text}</code>"

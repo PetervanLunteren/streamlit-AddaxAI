@@ -8,7 +8,7 @@
 # others:
 # - if the cancel button is pressed on model downloads, it still downloads it in the background. That was solved before, just go back to the commit before the revert.
 # - if added a new project, it shoudl be selected automatically. On second thought, better better remove the project dropdown from the deployment page. Just use the sidebar. 
-
+# - make placeholder ReadTheDocs for this repo as the DeepDocsAI github bot is asking for it.
 
 
 
@@ -62,6 +62,7 @@ import json
 # Third-party imports
 from streamlit_lottie import st_lottie
 from appdirs import user_config_dir, user_cache_dir
+from st_modal import Modal
  
 
 # Local imports - global config must be imported before anything else
@@ -194,9 +195,11 @@ if st.session_state == {}:
     general_settings_vars = load_vars(section = "general_settings")
     lang = general_settings_vars["lang"]
     mode = general_settings_vars["mode"]
+    selected_projectID = general_settings_vars.get("selected_projectID", None)
     
     set_session_var("shared", "lang", lang)
     set_session_var("shared", "mode", mode)
+    set_session_var("shared", "selected_projectID", selected_projectID)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Load and cache expensive resources (language, models, UI assets)
@@ -313,7 +316,7 @@ pg.run()
 # Import utils and components
 from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, logged_callback
 from components import print_widget_label
-from utils.analysis_utils import load_known_projects, load_model_metadata
+from utils.analysis_utils import load_known_projects, load_model_metadata, add_project_modal
 
 # Mode selection options
 mode_options = {
@@ -373,13 +376,39 @@ if mode == 1:  # Advanced mode requires project context
         # Find index of currently selected project
         selected_index = options.index(selected_projectID) if selected_projectID in options else 0
 
-        # Project selector in sidebar
-        print_widget_label("Project", help_text="Selected project applies to all tools. Add new projects via + add deployment.", sidebar=True)
-        selected_projectID = st.sidebar.selectbox(
-            "Project",
-            options=options,
-            index=selected_index,
-            label_visibility="collapsed",
-            key="project_selection_sidebar",
-            on_change=on_project_change
-        )
+        # Project selector in sidebar with columns for selectbox and new project button
+        print_widget_label("Project", help_text="Selected project applies to all tools.", sidebar=True)
+        col1, col2 = st.sidebar.columns([3, 1])
+        
+        with col1:
+            selected_projectID = st.selectbox(
+                "Project",
+                options=options,
+                index=selected_index,
+                label_visibility="collapsed",
+                key="project_selection_sidebar",
+                on_change=on_project_change
+            )
+        
+        with col2:
+            if st.button(":material/add_circle:", help="Add new project", use_container_width=True):
+                set_session_var("analyse_advanced", "show_modal_add_project", True)
+                st.rerun()
+    
+    else:
+        # No projects exist - show button to create first project
+        print_widget_label("Project", help_text="Create your first project to get started.", sidebar=True)
+        if st.sidebar.button(":material/add_circle: Create first project", use_container_width=True):
+            set_session_var("analyse_advanced", "show_modal_add_project", True)
+            st.rerun()
+
+# ─────────────────────────────────────────────────────────────────────────
+# Modal handling for project creation (triggered from sidebar)
+# ─────────────────────────────────────────────────────────────────────────
+
+# Modal for adding new project - only create when needed
+if get_session_var("analyse_advanced", "show_modal_add_project", False):
+    modal_add_project = Modal(
+        title="#### Describe new project", key="add_project", show_close_button=False)
+    with modal_add_project.container():
+        add_project_modal()
