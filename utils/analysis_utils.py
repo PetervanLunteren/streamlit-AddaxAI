@@ -328,6 +328,9 @@ def run_process_queue(
 
             if video_detection_success is False:
                 continue
+            
+            # Inject datetime information into video JSON
+            inject_datetime_into_video_json(video_json_path, deployment.get('filename_datetime_dict', {}))
 
             # Video classification
             if selected_cls_modelID:
@@ -372,7 +375,7 @@ def run_process_queue(
 
         # === PHASE 3: Merge Results ===
         if json_files_to_merge:
-            merge_success = merge_deployment_jsons(json_files_to_merge, final_json_path)
+            merge_success = merge_deployment_jsons(json_files_to_merge, final_json_path, deployment)
             if not merge_success:
                 st.error("Failed to merge video and image results")
                 continue
@@ -640,13 +643,52 @@ def run_cls_video(cls_modelID, json_fpath, pbars, country=None, state=None):
     return run_cls(cls_modelID, json_fpath, pbars, country, state, media_type="video")
 
 
-def merge_deployment_jsons(json_files, output_file):
+def inject_datetime_into_video_json(video_json_path, filename_datetime_dict):
+    """
+    Inject datetime information into video JSON entries.
+    
+    Args:
+        video_json_path (str): Path to the video detection JSON file
+        filename_datetime_dict (dict): Mapping of filenames to ISO datetime strings
+    """
+    try:
+        # Read the video JSON file
+        with open(video_json_path, 'r') as f:
+            video_data = json.load(f)
+        
+        # Process each video entry in the images array
+        for video_entry in video_data.get('images', []):
+            filename = video_entry.get('file', '')
+            
+            # Look up datetime in the dict
+            iso_datetime = filename_datetime_dict.get(filename)
+            
+            if iso_datetime:
+                # Convert from ISO format "2022-03-01T00:53:00" to desired format "2022:03:01 00:53:00"
+                formatted_datetime = iso_datetime.replace('-', ':').replace('T', ' ')
+                video_entry['datetime'] = formatted_datetime
+            else:
+                # Add null if datetime not found
+                video_entry['datetime'] = None
+        
+        # Write back the modified JSON
+        with open(video_json_path, 'w') as f:
+            json.dump(video_data, f, indent=2)
+            
+        log(f"Successfully injected datetime info into {len(video_data.get('images', []))} video entries")
+        
+    except Exception as e:
+        log(f"Error injecting datetime into video JSON: {e}")
+
+
+def merge_deployment_jsons(json_files, output_file, deployment_data=None):
     """
     Merge multiple JSON files (video and image results) into a single deployment JSON.
     
     Args:
         json_files (list): List of paths to JSON files to merge
         output_file (str): Path to output merged JSON file
+        deployment_data (dict): Queue item data to include as addaxai_metadata
         
     Returns:
         bool: True if successful, False otherwise
@@ -658,6 +700,13 @@ def merge_deployment_jsons(json_files, output_file):
             'classification_categories': {},
             'info': {}
         }
+        
+        # Add AddaxAI metadata from deployment queue item
+        if deployment_data:
+            # Create filtered metadata excluding specified fields
+            excluded_fields = {'selected_folder', 'selected_projectID', 'selected_locationID', 'filename_datetime_dict'}
+            addaxai_metadata = {k: v for k, v in deployment_data.items() if k not in excluded_fields}
+            merged_data['addaxai_metadata'] = addaxai_metadata
         
         for json_file in json_files:
             if not os.path.exists(json_file):
@@ -2446,15 +2495,191 @@ def get_image_datetime(file_path):
 
 
 def get_video_datetime(file_path):
+    """
+    Extract creation date/time from video using pure Python methods.
+    
+    Args:
+        file_path: Path to the video file
+        
+    Returns:
+        datetime object or None if not found
+    """
+    from pathlib import Path
+    
     try:
-        parser = createParser(str(file_path))
-        if not parser:
+        video_path = Path(file_path)
+        
+        if not video_path.exists():
             return None
-        metadata = extractMetadata(parser)
-        if metadata and metadata.has("creation_date"):
-            return metadata.get("creation_date")
+        
+        # Try MOV/MP4 format first (QuickTime atoms)
+        if video_path.suffix.lower() in ['.mov', '.mp4', '.m4v']:
+            creation_time_str = _parse_quicktime_creation_time(video_path)
+            if creation_time_str:
+                extracted_dt = datetime.strptime(creation_time_str, '%Y:%m:%d %H:%M:%S')
+                print(f"DEBUG: Video {video_path.name} - extracted QuickTime metadata: {extracted_dt}")
+                return extracted_dt
+        
+        # Try AVI format
+        elif video_path.suffix.lower() == '.avi':
+            # AVI files typically don't have embedded creation time
+            # Could potentially parse RIFF chunks but rarely contains timestamps
+            pass
+        
+        # Fallback to filesystem modification time
+        stat_info = video_path.stat()
+        fallback_dt = datetime.fromtimestamp(stat_info.st_mtime)
+        print(f"DEBUG: Video {video_path.name} - using filesystem mtime: {fallback_dt}")
+        return fallback_dt
+        
+    except Exception as e:
+        print(f"DEBUG: Video {video_path.name} - extraction failed: {e}")
+        pass
+    return None
+
+
+def _parse_quicktime_creation_time(video_path):
+    """
+    Parse QuickTime/MOV file format to extract creation time.
+    
+    This reads the binary file structure to find the 'mvhd' (movie header) atom
+    which contains the creation timestamp.
+    """
+    import struct
+    from datetime import timezone
+    
+    try:
+        with open(video_path, 'rb') as f:
+            # Get file size for bounds checking
+            file_size = f.seek(0, 2)
+            f.seek(0)
+            
+            position = 0
+            while position < file_size - 8:
+                f.seek(position)
+                
+                # Read atom header (8 bytes: 4 bytes size + 4 bytes type)
+                atom_header = f.read(8)
+                if len(atom_header) < 8:
+                    break
+                    
+                atom_size, atom_type = struct.unpack('>I4s', atom_header)
+                atom_type = atom_type.decode('ascii', errors='ignore')
+                
+                if atom_type == 'mvhd':
+                    # Found movie header atom directly
+                    return _parse_mvhd_atom(f, atom_size - 8)
+                elif atom_type == 'moov':
+                    # Movie atom contains mvhd, search within it
+                    moov_data = f.read(atom_size - 8)
+                    return _search_mvhd_in_moov(moov_data)
+                
+                # Move to next atom
+                if atom_size > 8:
+                    position += atom_size
+                else:
+                    # Invalid atom size, skip minimally
+                    position += 8
+                        
     except Exception:
         pass
+    
+    return None
+
+
+def _parse_mvhd_atom(f, remaining_size):
+    """Parse the movie header (mvhd) atom to extract creation time."""
+    import struct
+    from datetime import timezone
+    
+    try:
+        if remaining_size < 16:
+            return None
+            
+        # Read mvhd structure
+        mvhd_data = f.read(min(remaining_size, 32))
+        
+        if len(mvhd_data) < 16:
+            return None
+        
+        # mvhd structure:
+        # 1 byte version + 3 bytes flags + 4 bytes creation_time + 4 bytes modification_time + ...
+        version = mvhd_data[0]
+        
+        if version == 0:
+            # 32-bit timestamps
+            creation_time = struct.unpack('>I', mvhd_data[4:8])[0]
+        elif version == 1:
+            # 64-bit timestamps (rare)
+            if len(mvhd_data) >= 20:
+                creation_time = struct.unpack('>Q', mvhd_data[4:12])[0]
+            else:
+                return None
+        else:
+            return None
+        
+        # QuickTime epoch is January 1, 1904 UTC
+        # Unix epoch is January 1, 1970 UTC
+        # Difference is 66 years = 2,082,844,800 seconds
+        QUICKTIME_EPOCH_OFFSET = 2082844800
+        
+        if creation_time > QUICKTIME_EPOCH_OFFSET:
+            unix_timestamp = creation_time - QUICKTIME_EPOCH_OFFSET
+            dt = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
+            return dt.strftime('%Y:%m:%d %H:%M:%S')
+            
+    except Exception:
+        pass
+    
+    return None
+
+
+def _search_mvhd_in_moov(moov_data):
+    """Search for mvhd atom within moov atom data."""
+    import struct
+    from datetime import timezone
+    
+    try:
+        offset = 0
+        while offset < len(moov_data) - 8:
+            if offset + 8 > len(moov_data):
+                break
+                
+            atom_size, atom_type = struct.unpack('>I4s', moov_data[offset:offset+8])
+            atom_type = atom_type.decode('ascii', errors='ignore')
+            
+            if atom_type == 'mvhd':
+                # Found mvhd, parse it
+                mvhd_start = offset + 8
+                mvhd_end = min(mvhd_start + atom_size - 8, len(moov_data))
+                mvhd_data = moov_data[mvhd_start:mvhd_end]
+                
+                if len(mvhd_data) >= 16:
+                    version = mvhd_data[0]
+                    
+                    if version == 0:
+                        creation_time = struct.unpack('>I', mvhd_data[4:8])[0]
+                    elif version == 1 and len(mvhd_data) >= 20:
+                        creation_time = struct.unpack('>Q', mvhd_data[4:12])[0]
+                    else:
+                        return None
+                    
+                    QUICKTIME_EPOCH_OFFSET = 2082844800
+                    
+                    if creation_time > QUICKTIME_EPOCH_OFFSET:
+                        unix_timestamp = creation_time - QUICKTIME_EPOCH_OFFSET
+                        dt = datetime.fromtimestamp(unix_timestamp, tz=timezone.utc)
+                        return dt.strftime('%Y:%m:%d %H:%M:%S')
+            
+            # Move to next atom
+            if atom_size > 0:
+                offset += atom_size
+            else:
+                offset += 8
+                
+    except Exception:
+        pass
+    
     return None
 
 
@@ -2536,7 +2761,8 @@ def check_folder_metadata():
     with st.spinner("Checking data..."):
         selected_folder = Path(selected_folder_path)
 
-        datetimes = []
+        datetime_file_pairs = []  # Store (datetime, file_path) tuples
+        filename_datetime_dict = {}  # Store {filename: datetime_iso_string} mapping
         gps_coords = []
 
         # get video and image counts
@@ -2565,7 +2791,11 @@ def check_folder_metadata():
         for i, file in enumerate(image_files):
             dt = get_image_datetime(file)
             if dt:
-                datetimes.append(dt)
+                # Store datetime with relative file path
+                relative_path = str(file.relative_to(selected_folder))
+                datetime_file_pairs.append((dt, relative_path))
+                # Store in filename-datetime dict
+                filename_datetime_dict[relative_path] = dt.isoformat()
 
             # spread GPS checks across files and early exit
             if i % check_every_nth == 0 and gps_checked < max_gps_checks and len(gps_coords) < sufficient_gps_coords:
@@ -2578,7 +2808,11 @@ def check_folder_metadata():
         for i, file in enumerate(video_files):
             dt = get_video_datetime(file)
             if dt:
-                datetimes.append(dt)
+                # Store datetime with relative file path
+                relative_path = str(file.relative_to(selected_folder))
+                datetime_file_pairs.append((dt, relative_path))
+                # Store in filename-datetime dict
+                filename_datetime_dict[relative_path] = dt.isoformat()
 
             # spread GPS checks across files and early exit
             if i % check_every_nth == 0 and gps_checked < max_gps_checks and len(gps_coords) < sufficient_gps_coords:
@@ -2587,8 +2821,23 @@ def check_folder_metadata():
                     gps_coords.append(gps)
                 gps_checked += 1
 
-        exif_min_datetime = min(datetimes) if datetimes else None
-        exif_max_datetime = max(datetimes) if datetimes else None
+        # Find min/max datetime and corresponding file paths
+        exif_min_datetime = None
+        exif_max_datetime = None
+        file_min_datetime = None
+        file_max_datetime = None
+        
+        if datetime_file_pairs:
+            # Sort by datetime to find min/max
+            datetime_file_pairs.sort(key=lambda x: x[0])
+            
+            min_dt, min_file = datetime_file_pairs[0]
+            max_dt, max_file = datetime_file_pairs[-1]
+            
+            exif_min_datetime = min_dt
+            exif_max_datetime = max_dt
+            file_min_datetime = min_file
+            file_max_datetime = max_file
 
         # Initialize variables
         coords_found_in_exif = False
@@ -2610,6 +2859,11 @@ def check_folder_metadata():
             "exif_lng": exif_lng,
             "exif_min_datetime": exif_min_datetime.isoformat() if exif_min_datetime else None,
             "exif_max_datetime": exif_max_datetime.isoformat() if exif_max_datetime else None,
+            "file_min_datetime": file_min_datetime,
+            "file_max_datetime": file_max_datetime,
+            "filename_datetime_dict": filename_datetime_dict,
+            "n_images": len(image_files),
+            "n_videos": len(video_files),
         })
 
         # Display results
@@ -2879,6 +3133,15 @@ def add_deployment_to_queue():
         "analyse_advanced", "selected_cls_modelID")
     selected_species = get_session_var("analyse_advanced", "selected_species")
     
+    # Get EXIF datetime, file paths, filename dict, and file counts from session state (computed by check_folder_metadata)
+    exif_min_datetime = get_session_var("analyse_advanced", "exif_min_datetime")
+    exif_max_datetime = get_session_var("analyse_advanced", "exif_max_datetime")
+    file_min_datetime = get_session_var("analyse_advanced", "file_min_datetime")
+    file_max_datetime = get_session_var("analyse_advanced", "file_max_datetime")
+    filename_datetime_dict = get_session_var("analyse_advanced", "filename_datetime_dict")
+    n_images = get_session_var("analyse_advanced", "n_images")
+    n_videos = get_session_var("analyse_advanced", "n_videos")
+    
     # For country/state, get the current values from the widget's session state
     # The country_selector_widget stores codes in these session vars via callbacks
     selected_country = get_session_var("analyse_advanced", "selected_country", None)
@@ -2907,7 +3170,14 @@ def add_deployment_to_queue():
         "selected_cls_modelID": selected_cls_modelID,
         "selected_species": selected_species,
         "selected_country": selected_country,
-        "selected_state": selected_state
+        "selected_state": selected_state,
+        "exif_min_datetime": exif_min_datetime,
+        "exif_max_datetime": exif_max_datetime,
+        "file_min_datetime": file_min_datetime,
+        "file_max_datetime": file_max_datetime,
+        "filename_datetime_dict": filename_datetime_dict,
+        "n_images": n_images,
+        "n_videos": n_videos
     }
 
     # Add the new deployment to the queue

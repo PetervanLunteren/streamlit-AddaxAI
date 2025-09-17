@@ -8,7 +8,7 @@
 # others:
 # - if the cancel button is pressed on model downloads, it still downloads it in the background. That was solved before, just go back to the commit before the revert.
 # - if added a new project, it shoudl be selected automatically. On second thought, better better remove the project dropdown from the deployment page. Just use the sidebar. 
-# - extract video datetime and GPS from exif. Use the videos from TIM and from email user. 
+
 
 
 

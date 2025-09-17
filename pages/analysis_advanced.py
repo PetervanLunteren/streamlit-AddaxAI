@@ -569,7 +569,9 @@ else:
                                 ("Selected species", f"{len(deployment['selected_species'])} species" if deployment['selected_species'] else None),
                                 ("Country", deployment['selected_country']),
                                 ("State", deployment['selected_state']),
-                                ("Min datetime", str(deployment['selected_min_datetime']) if deployment['selected_min_datetime'] else None)
+                                ("Start", deployment['selected_min_datetime'].replace('T', ' ') if deployment['selected_min_datetime'] else None),
+                                ("Number of images", deployment.get('n_images')),
+                                ("Number of videos", deployment.get('n_videos'))
                             ]
                             
                             # Only show fields that have values

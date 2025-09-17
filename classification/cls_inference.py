@@ -171,7 +171,8 @@ def create_raw_classifications(json_path,
     inverted_cls_label_map = {v: k for k, v in data['classification_categories'].items()}
     
     # Process each animal detection with progress tracking
-    with tqdm(total=n_crops_to_classify) as pbar:
+    # smoothing=0 because the iterations are very inconsistent as it sometimes needs to extract frames first
+    with tqdm(total=n_crops_to_classify, smoothing=0) as pbar: 
         
         # === STEP 1: Process all video files one by one ===
         for video_path, video_images in video_files_to_process.items():
