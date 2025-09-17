@@ -176,40 +176,6 @@ def invalidate_map_cache():
         del st.session_state[map_cache_key]
 
 
-def detect_media_types(deployment_folder):
-    """
-    Scan deployment folder to detect videos and images.
-    
-    Args:
-        deployment_folder (str): Path to deployment folder
-        
-    Returns:
-        dict: {
-            'has_videos': bool,
-            'has_images': bool, 
-            'video_files': list,
-            'image_files': list
-        }
-    """
-    video_files = []
-    image_files = []
-    
-    # Walk through folder recursively
-    for root, dirs, files in os.walk(deployment_folder):
-        for file in files:
-            file_lower = file.lower()
-            if file_lower.endswith(VIDEO_EXTENSIONS):
-                video_files.append(os.path.join(root, file))
-            elif file_lower.endswith(IMG_EXTENSIONS):
-                image_files.append(os.path.join(root, file))
-    
-    return {
-        'has_videos': len(video_files) > 0,
-        'has_images': len(image_files) > 0,
-        'video_files': video_files,
-        'image_files': image_files
-    }
-
 
 def run_process_queue(
     process_queue: str,
@@ -292,14 +258,15 @@ def run_process_queue(
         selected_state = deployment.get('selected_state', None)
 
 
-        # Detect media types in deployment folder
-        media_info = detect_media_types(selected_folder)
+        # Get media counts from deployment queue item (already computed during folder metadata check)
+        n_videos = deployment.get('n_videos', 0)
+        n_images = deployment.get('n_images', 0)
         
         # Show only relevant progress bars for this deployment
         visible_pbars = []
-        if media_info['has_videos']:
+        if n_videos > 0:
             visible_pbars.extend(["Video detection", "Video classification"])
-        if media_info['has_images']:
+        if n_images > 0:
             visible_pbars.extend(["Image detection", "Image classification"])
         
         pbars.set_pbar_visibility(visible_pbars)
@@ -317,7 +284,7 @@ def run_process_queue(
         json_files_to_merge = []
 
         # === PHASE 1: Process Videos ===
-        if media_info['has_videos']:
+        if n_videos > 0:
             # Check for cancellation before starting video detection
             if st.session_state.get(cancel_key, False):
                 break
@@ -347,7 +314,7 @@ def run_process_queue(
             json_files_to_merge.append(video_json_path)
 
         # === PHASE 2: Process Images ===
-        if media_info['has_images']:
+        if deployment['n_images'] > 0:
             # Check for cancellation before starting image detection
             if st.session_state.get(cancel_key, False):
                 break
