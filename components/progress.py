@@ -18,6 +18,10 @@ class MultiProgressBars:
         self.label_placeholder = self.container.empty()
         if container_label:
             self.label_placeholder.markdown(container_label)
+        
+        # Create spacing placeholders for consistent layout
+        self.top_spacer = self.container.empty()
+        
         self.bars = {}
         self.states = {}
         self.max_values = {}
@@ -28,6 +32,9 @@ class MultiProgressBars:
         self.show_device = {}
         self.device_info = {}
         self.label_divider = " \u00A0\u00A0 | \u00A0\u00A0 "
+        
+        # Will be created after bars are added
+        self.bottom_spacer = None
 
     def update_label(self, new_label):
         """Update the container label dynamically."""
@@ -60,6 +67,11 @@ class MultiProgressBars:
         # Show wait_label initially
         self.bars[pbar_id] = container.progress(0, text=wait_label)
 
+    def finalize_layout(self):
+        """Create bottom spacers after all progress bars have been added."""
+        if self.bottom_spacer is None:
+            self.bottom_spacer = self.container.empty()
+    
     def reset_pbar(self, pbar_id):
         """Reset a progress bar to 0 and show wait_label."""
         if pbar_id not in self.bars:
@@ -72,6 +84,43 @@ class MultiProgressBars:
         """Reset all progress bars to 0 and show wait_labels."""
         for pbar_id in self.bars:
             self.reset_pbar(pbar_id)
+    
+    def set_pbar_visibility(self, pbar_ids_to_show):
+        """Show only specified progress bars, hide others with consistent spacing.
+        
+        Args:
+            pbar_ids_to_show (list): List of progress bar IDs to show
+        """
+        # Reset all spacers first
+        self.top_spacer.empty()
+        if self.bottom_spacer:
+            self.bottom_spacer.empty()
+        
+        # Determine which media types are visible
+        video_bars = ["Video detection", "Video classification"]
+        image_bars = ["Image detection", "Image classification"]
+        
+        video_visible = any(bar in pbar_ids_to_show for bar in video_bars)
+        image_visible = any(bar in pbar_ids_to_show for bar in image_bars)
+        
+        # Add whitespace based on what's visible
+        if video_visible:
+            # Videos present: add top whitespace
+            self.top_spacer.markdown("")
+        
+        if image_visible:
+            # Images present: add bottom whitespace
+            if self.bottom_spacer:
+                self.bottom_spacer.markdown("")
+        
+        # Show/hide progress bars
+        for pbar_id in self.bars:
+            if pbar_id in pbar_ids_to_show:
+                # Reset and show the progress bar
+                self.reset_pbar(pbar_id)
+            else:
+                # Hide by setting to empty state
+                self.bars[pbar_id].empty()
 
     def start_pbar(self, pbar_id):
         """Transition from wait_label to pre_label state."""

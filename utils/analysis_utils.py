@@ -234,11 +234,14 @@ def run_process_queue(
     # overall_progress = st.empty()
     pbars = MultiProgressBars(container_label="Processing...",)
 
-    # Updated progress bars for video and image processing
-    pbars.add_pbar(label="Video Detection", show_device=True)
-    pbars.add_pbar(label="Video Classification", show_device=True)
-    pbars.add_pbar(label="Image Detection", show_device=True)
-    pbars.add_pbar(label="Image Classification", show_device=True, done_text="Finalizing...")
+    # Create all possible progress bars (they'll be shown/hidden per deployment)
+    pbars.add_pbar(label="Video detection", show_device=True)
+    pbars.add_pbar(label="Video classification", show_device=True)
+    pbars.add_pbar(label="Image detection", show_device=True)
+    pbars.add_pbar(label="Image classification", show_device=True, done_text="Finalizing...")
+    
+    # Create bottom spacers after all progress bars
+    pbars.finalize_layout()
 
     # calculate the total number of deployments to process
     process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
@@ -291,6 +294,15 @@ def run_process_queue(
 
         # Detect media types in deployment folder
         media_info = detect_media_types(selected_folder)
+        
+        # Show only relevant progress bars for this deployment
+        visible_pbars = []
+        if media_info['has_videos']:
+            visible_pbars.extend(["Video detection", "Video classification"])
+        if media_info['has_images']:
+            visible_pbars.extend(["Image detection", "Image classification"])
+        
+        pbars.set_pbar_visibility(visible_pbars)
         
         pbars.update_label(
             f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
@@ -492,7 +504,7 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None, media_type
         line = line.strip()
         log(line)
         # st.code(line)
-        progress_label = "Video Classification" if media_type == "video" else "Image Classification" if media_type == "image" else "Classification"
+        progress_label = "Video classification" if media_type == "video" else "Image classification" if media_type == "image" else "Classification"
         pbars.update_from_tqdm_string(progress_label, line, overwrite_unit="animal")
 
     process.stdout.close()
@@ -541,7 +553,7 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars, media
 
         line = line.strip()
         print(line)
-        progress_label = "Video Detection" if media_type == "video" else "Image Detection" if media_type == "image" else "Detection"
+        progress_label = "Video detection" if media_type == "video" else "Image detection" if media_type == "image" else "Detection"
         overwrite_unit = "video" if media_type == "video" else "image" if media_type == "image" else None
         pbars.update_from_tqdm_string(progress_label, line, overwrite_unit=overwrite_unit)
 
@@ -606,7 +618,7 @@ def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars)
 
         line = line.strip()
         print(line)
-        progress_label = "Video Detection"
+        progress_label = "Video detection"
         
         pbars.update_from_tqdm_string(progress_label, line, overwrite_unit="video")
 
