@@ -21,10 +21,8 @@ import json
 # import pandas as pd
 from tqdm import tqdm
 from PIL import Image
-import sys
 # from collections import defaultdict
 
-sys.path.append("/Applications/AddaxAI_files/cameratraps")
 from megadetector.data_management import read_exif
 
 from utils.config import *
@@ -46,7 +44,6 @@ def extract_video_frames_to_cache(video_path, frame_numbers):
         frame_numbers (list): List of frame numbers to extract
     """
     # Import MegaDetector's video utilities
-    sys.path.append("/Users/peter/Documents/Scripting/repos/streamlit-AddaxAI/envs/env-megadetector/lib/python3.11/site-packages")
     from megadetector.detection.video_utils import run_callback_on_frames
     import cv2
     

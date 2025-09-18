@@ -73,15 +73,17 @@ models/cls/[MODEL-ID]/
 - Environment names always start with "env-"
 
 **Key Environments**:
-- `env-addaxai-base`: Main Streamlit application
+- `env-addaxai-base`: Main Streamlit application, MegaDetector, and SpeciesNet
 - `env-pytorch`: PyTorch-based models
-- `env-tensorflow-v1/v2`: TensorFlow models  
-- `env-megadetector`: MegaDetector and SpeciesNet
+- `env-tensorflow-v1/v2`: TensorFlow models
 
 **Common Commands**:
 ```bash
 # Create environment
 ./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
+
+# Install SpeciesNet (requires special flag on macOS)
+./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install --use-pep517 speciesnet==5.0.1
 
 # Run in environment
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py

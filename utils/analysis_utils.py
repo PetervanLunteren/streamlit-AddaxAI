@@ -491,7 +491,7 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars, media
     model_file = os.path.join(
         ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
     command = [
-        f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python",
+        f"{ADDAXAI_ROOT}/envs/env-addaxai-base/bin/python",
         "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data",
         model_file,
         deployment_folder,
@@ -553,7 +553,7 @@ def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars)
         ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
     
     command = [
-        f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python",
+        f"{ADDAXAI_ROOT}/envs/env-addaxai-base/bin/python",
         "-m", "megadetector.detection.process_video",
         model_file,
         deployment_folder,
@@ -1625,34 +1625,7 @@ def install_env(env_name: str):
                                 f"Installation failed with exit code {rc}")
                             return
 
-                        # Success - run post-install command if env-megadetector
-                        # to install speciesnet on macos, we need the --use-pep517 flag
-                        # which cannot be added to the environment.yml file
-                        # hence a separate post-install command
-                        if env_name == "megadetector":
-                            last_lines.append(
-                                f"\nInstalling additional package: speciesnet...\n")
-                            output_placeholder.code(
-                                "".join(last_lines), language="bash")
-                            post_cmd = [
-                                MICROMAMBA, "run", "-p", temp_path,
-                                "pip", "install", "--use-pep517", "speciesnet==5.0.1",
-                            ]
-
-                            post_process = subprocess.run(
-                                post_cmd, capture_output=True, text=True)
-                            if post_process.returncode != 0:
-                                last_lines.append(
-                                    f"Post-install failed: {post_process.stderr}\n")
-                                output_placeholder.code(
-                                    "".join(last_lines), language="bash")
-                                status_placeholder.error("Post-install failed")
-                                return
-                            else:
-                                last_lines.append(
-                                    f"speciesnet installed successfully!\n")
-                                output_placeholder.code(
-                                    "".join(last_lines), language="bash")
+                        # Success - environment created
 
                         # Move from temp to final location
                         last_lines.append(

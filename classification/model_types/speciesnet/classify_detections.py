@@ -55,7 +55,7 @@ def run_speciesnet_classification():
     
     # Build command for run_md_and_speciesnet
     command = [
-        f"{ADDAXAI_ROOT}/envs/env-megadetector/bin/python",
+        f"{ADDAXAI_ROOT}/envs/env-addaxai-base/bin/python",
         "-m", "megadetector.detection.run_md_and_speciesnet",
         deployment_folder,  # source folder
         output_file,        # output file  
