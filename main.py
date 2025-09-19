@@ -86,36 +86,23 @@ st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
 if st.session_state == {}:
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Display loading animation and status during startup
+    # Display loading overlay during startup
     # ─────────────────────────────────────────────────────────────────────────
     
-    # Load Lottie animation for startup loading screen
-    lottie_animation_fpath = os.path.join(ADDAXAI_ROOT, "assets", "loaders", "squirrel.json")
-    with open(lottie_animation_fpath, "r") as f:
-        lottie_animation = json.load(f)
-
-    _, col_animation, _ = st.columns([1, 2, 1])
-    with col_animation:
-        # Create a container for the animation that we can clear later
-        animation_container = st.empty()
-        
-        with animation_container:
-            st_lottie(
-                lottie_animation,
-                speed=1,
-                reverse=False,
-                loop=True,
-                quality="high",
-                key="lottie_animation"
-            )
-
-    status_placeholder = st.empty()
-    status_placeholder.status("Loading AddaxAI Streamlit app...")
+    # Import BlockingLoader class
+    from components.ui_helpers import BlockingLoader
+    
+    # Create and open the blocking loader
+    loader = BlockingLoader()
+    loader.open("Loading AddaxAI Streamlit app...")
+    
     time.sleep(0.5)  # Simulate loading time
     
     # ─────────────────────────────────────────────────────────────────────────
     # Initialize session state and directory structure
     # ─────────────────────────────────────────────────────────────────────────
+    
+    loader.update_text("Initializing session state...")
     
     # Initialize shared session state container for cross-tool temporary variables
     st.session_state["shared"] = {}
@@ -135,6 +122,8 @@ if st.session_state == {}:
     # ─────────────────────────────────────────────────────────────────────────
     # Load utility modules and initialize settings cache
     # ─────────────────────────────────────────────────────────────────────────
+    
+    loader.update_text("Loading utility modules...")
     
     # Import utils now that shared session state exists (modules depend on it)
     from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, fetch_latest_model_info
@@ -188,6 +177,8 @@ if st.session_state == {}:
     # ─────────────────────────────────────────────────────────────────────────
     # Load and cache expensive resources (language, models, UI assets)
     # ─────────────────────────────────────────────────────────────────────────
+    
+    loader.update_text("Loading language and model data...")
     
     # Load and cache language texts to avoid file I/O on reruns
     if not st.session_state.get("txts"):
@@ -243,9 +234,8 @@ if st.session_state == {}:
     except Exception as e:
         print(f"Error setting up logging: {e}")
     
-    # Clean up loading UI elements
-    status_placeholder.empty()
-    animation_container.empty()
+    # Close the blocking loader
+    loader.close()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN APPLICATION (runs on startup and every rerun)
