@@ -34,6 +34,6 @@ dependencies:
     - st-modal
     
     # MegaDetector and detection packages
-    - megadetector
+    - megadetector==10.0.8
     - ultralytics==8.3.177
     # Note: speciesnet must be installed separately with --use-pep517 flag
