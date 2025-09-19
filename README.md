@@ -24,7 +24,7 @@ Create environment using included micromamba (installs in ./envs/env-addaxai-bas
 ```bash
 ./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
 ```
-Install SpeciesNet with the required flag for macOS (ignore package conflict about yolov5)
+Install SpeciesNet with the required flag for macOS (ignore package conflict about `protobuf`)
 ```bash 
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install --use-pep517 speciesnet==5.0.2
 ```

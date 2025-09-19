@@ -1,0 +1,42 @@
+site_name: AddaxAI Documentation
+site_description: Wildlife Camera Analysis Platform - Official Documentation
+site_author: Peter van Lunteren
+site_url: https://addaxai.readthedocs.io/
+
+repo_name: PetervanLunteren/streamlit-AddaxAI
+repo_url: https://github.com/PetervanLunteren/streamlit-AddaxAI
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: green
+      accent: light green
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - User Guide: user-guide.md
+  - Developer Guide: developer-guide.md
+  - API Reference: api-reference.md
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/PetervanLunteren/streamlit-AddaxAI

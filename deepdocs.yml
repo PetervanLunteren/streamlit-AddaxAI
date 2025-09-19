@@ -1,0 +1,22 @@
+name: AddaxAI Documentation
+description: Wildlife Camera Analysis Platform - Official Documentation
+
+# Documentation configuration
+docs:
+  source: docs/
+  format: mkdocs
+  
+# Build settings
+build:
+  requirements: docs/requirements.txt
+  
+# Repository settings  
+repo:
+  branch: main
+  
+# Additional metadata
+project:
+  name: AddaxAI
+  version: "1.0.0"
+  author: Peter van Lunteren
+  url: https://github.com/PetervanLunteren/streamlit-AddaxAI
