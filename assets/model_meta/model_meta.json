@@ -6,7 +6,7 @@
             "model_fname": "always_crop_99710272_22x8_v12_epoch_00148.pt",
             "description": "SpeciesNet is an image classifier designed to accelerate the review of images from motion-triggered wildlife cameras ('camera traps'). This classifier was trained at Google using a large dataset of camera trap images and an EfficientNet V2 M architecture (https://arxiv.org/abs/2104.00574). It is designed to classify images into one of more than 2000 labels, covering diverse animal species, higher-level taxa (like 'mammalia' or 'felidae'), and non-animal classes ('blank', 'vehicle'). The SpeciesNet classifier is typically run in an ensemble with MegaDetector (https://github.com/agentmorris/MegaDetector), an object detector that identifies the locations and types of objects present in camera trap images, categorizing them as animals, humans, or vehicles. The SpeciesNet ensemble combines these two models using a set of heuristics and, optionally, geofencing rules and taxonomic aggregation that take into account the geographical origin of the image to improve the reliability of its species classification. This ensemble is used for image classification in the Wildlife Insights platform (https://www.wildlifeinsights.org/).",
             "developer": "Google",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "type": "speciesnet",
             "citation": "https://doi.org/10.1049/cvi2.12318",
             "license": "https://github.com/google/cameratrapai/blob/main/LICENSE",
@@ -188,7 +188,7 @@
         "MD5A-0-0": {
             "friendly_name": "MegaDetector 5a",
             "emoji": "\ud83d\udc05",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "model_fname": "md_v5a.0.0.pt",
             "description": "MegaDetector is an object detection model that identifies animals, people, and vehicles in camera trap images (which also makes it useful for eliminating blank images). This model is trained on several hundred thousand bounding boxes from a variety of ecosystems. The animals located by this model with be further identified by the species recognition models.",
             "developer": "Dan Morris",
@@ -199,7 +199,7 @@
         "MD5B-0-0": {
             "friendly_name": "MegaDetector 5b",
             "emoji": "\ud83e\udd98",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "model_fname": "md_v5b.0.0.pt",
             "description": "MegaDetector 5b differs from 5a only in its training data and is also an object detection model that identifies animals, people, and vehicles in camera trap images (which also makes it useful for eliminating blank images). This model is trained on several hundred thousand bounding boxes from a variety of ecosystems. The animals located by this model with be further identified by the species recognition models.",
             "developer": "Dan Morris",
@@ -211,7 +211,7 @@
         "MD1000-REDWOOD-0-0": {
             "friendly_name": "MegaDetector 1000 Redwood",
             "emoji": "\ud83c\udf32",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "model_fname": "md_v1000.0.0-redwood.pt",
             "description": "This model is a new addition to the MegaDetector series, designed to improve accuracy, but still needs to be thoroughly tested by the community. These are object detection models designed to identify animals, people, and vehicles in camera trap images. Animals detected by this model will be passed to species recognition models for further identification. By default, if you're already using MDv5a or MDv5b, keep using it until you have time to do a thorough comparison on your data against MDv1000-redwood. If you're starting from scratch and you want the safe thing that has been studied extensively in the literature, use MDv5a. If you want to join me on the cutting edge and see some bananas-good recall, use MDv1000-redwood. Only use the smaller model MDv1000-spruce if you're sure you need them. Faster sounds better, but in a world where a regular laptop with no GPU can process 50k images per day even through MDv5, and GPUs than can do 1M images per day come standard on home PCs now, the scenario where speed makes a qualitative difference is niche, and if in practice running 2x faster means you need to lower your confidence threshold to preserve recall, you've reduced compute time to increase human time, which is almost never a tradeoff you want to make.",
             "developer": "Dan Morris",
@@ -223,7 +223,7 @@
         "MD1000-SPRUCE-0-0": {
             "friendly_name": "MegaDetector 1000 Spruce",
             "emoji": "\ud83c\udf31",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "model_fname": "md_v1000.0.0-spruce.pt",
             "description": "This model is a new addition to the MegaDetector series, designed to improve processing speed, but still needs to be thoroughly tested by the community. These are object detection models designed to identify animals, people, and vehicles in camera trap images. Animals detected by this model will be passed to species recognition models for further identification. By default, if you're already using MDv5a or MDv5b, keep using it until you have time to do a thorough comparison on your data against MDv1000-redwood. If you're starting from scratch and you want the safe thing that has been studied extensively in the literature, use MDv5a. If you want to join me on the cutting edge and see some bananas-good recall, use MDv1000-redwood. Only use the smaller model MDv1000-spruce if you're sure you need them. Faster sounds better, but in a world where a regular laptop with no GPU can process 50k images per day even through MDv5, and GPUs than can do 1M images per day come standard on home PCs now, the scenario where speed makes a qualitative difference is niche, and if in practice running 2x faster means you need to lower your confidence threshold to preserve recall, you've reduced compute time to increase human time, which is almost never a tradeoff you want to make.",
             "developer": "Dan Morris",
@@ -235,7 +235,7 @@
         "MD1000-CEDAR-0-0": {
             "friendly_name": "MegaDetector 1000 Cedar",
             "emoji": "\ud83c\udf33",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "model_fname": "md_v1000.0.0-cedar.pt",
             "description": "This model is a new addition to the MegaDetector series, but still needs to be thoroughly tested by the community. These are object detection models designed to identify animals, people, and vehicles in camera trap images. Animals detected by this model will be passed to species recognition models for further identification. By default, if you're already using MDv5a or MDv5b, keep using it until you have time to do a thorough comparison on your data against MDv1000-redwood. If you're starting from scratch and you want the safe thing that has been studied extensively in the literature, use MDv5a. If you want to join me on the cutting edge and see some bananas-good recall, use MDv1000-redwood. Only use the smaller model MDv1000-spruce if you're sure you need them. Faster sounds better, but in a world where a regular laptop with no GPU can process 50k images per day even through MDv5, and GPUs than can do 1M images per day come standard on home PCs now, the scenario where speed makes a qualitative difference is niche, and if in practice running 2x faster means you need to lower your confidence threshold to preserve recall, you've reduced compute time to increase human time, which is almost never a tradeoff you want to make.",
             "developer": "Dan Morris",
@@ -247,7 +247,7 @@
         "MD1000-LARCH-0-0": {
             "friendly_name": "MegaDetector 1000 Larch",
             "emoji": "\ud83c\udf42",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "model_fname": "md_v1000.0.0-larch.pt",
             "description": "This model is a new addition to the MegaDetector series, designed to improve processing speed, but still needs to be thoroughly tested by the community. These are object detection models designed to identify animals, people, and vehicles in camera trap images. Animals detected by this model will be passed to species recognition models for further identification. By default, if you're already using MDv5a or MDv5b, keep using it until you have time to do a thorough comparison on your data against MDv1000-redwood. If you're starting from scratch and you want the safe thing that has been studied extensively in the literature, use MDv5a. If you want to join me on the cutting edge and see some bananas-good recall, use MDv1000-redwood. Only use the smaller model MDv1000-spruce if you're sure you need them. Faster sounds better, but in a world where a regular laptop with no GPU can process 50k images per day even through MDv5, and GPUs than can do 1M images per day come standard on home PCs now, the scenario where speed makes a qualitative difference is niche, and if in practice running 2x faster means you need to lower your confidence threshold to preserve recall, you've reduced compute time to increase human time, which is almost never a tradeoff you want to make.",
             "developer": "Dan Morris",
@@ -259,7 +259,7 @@
         "MD1000-SORREL-0-0": {
             "friendly_name": "MegaDetector 1000 Sorrel",
             "emoji": "\ud83c\udf3f",
-            "env": "megadetector",
+            "env": "addaxai-base",
             "model_fname": "md_v1000.0.0-sorrel.pt",
             "description": "This model is a new addition to the MegaDetector series, designed to improve processing speed, but still needs to be thoroughly tested by the community. These are object detection models designed to identify animals, people, and vehicles in camera trap images. Animals detected by this model will be passed to species recognition models for further identification. By default, if you're already using MDv5a or MDv5b, keep using it until you have time to do a thorough comparison on your data against MDv1000-redwood. If you're starting from scratch and you want the safe thing that has been studied extensively in the literature, use MDv5a. If you want to join me on the cutting edge and see some bananas-good recall, use MDv1000-redwood. Only use the smaller model MDv1000-spruce if you're sure you need them. Faster sounds better, but in a world where a regular laptop with no GPU can process 50k images per day even through MDv5, and GPUs than can do 1M images per day come standard on home PCs now, the scenario where speed makes a qualitative difference is niche, and if in practice running 2x faster means you need to lower your confidence threshold to preserve recall, you've reduced compute time to increase human time, which is almost never a tradeoff you want to make.",
             "developer": "Dan Morris",
