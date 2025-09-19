@@ -11,29 +11,27 @@ No external dependencies required! The application includes its own micromamba b
 ## Installation
 
 ### 1. Clone Repository
-
+Clone this repository to your desired location
 ```bash
-# Clone this repository to your desired location
 git clone https://github.com/PetervanLunteren/streamlit-AddaxAI.git
 cd streamlit-AddaxAI
 ```
 
 ### 2. Create Environment and Install Packages
 
-The application includes its own micromamba binary, so no external conda installation is needed:
+Create environment using included micromamba (installs in ./envs/env-addaxai-base)
 
 ```bash
-# Create environment using included micromamba (installs in ./envs/env-addaxai-base)
 ./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
-
-# Install SpeciesNet with the required flag for macOS
+```
+Install SpeciesNet with the required flag for macOS (ignore package conflict about yolov5)
+```bash 
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install --use-pep517 speciesnet==5.0.2
 ```
 
 ### 3. Launch Application
-
+Run the application using the created environment
 ```bash
-# Run the application using the created environment
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 ```
 
