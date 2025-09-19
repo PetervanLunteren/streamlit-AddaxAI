@@ -19,6 +19,7 @@ import re
 import random
 from datetime import datetime
 import requests
+import pandas as pd
 
 
 from utils.config import *
@@ -511,3 +512,4 @@ def check_model_availability(model_type, model_id, model_meta):
         'model_fname': model_fname,
         'friendly_name': friendly_name
     }
+

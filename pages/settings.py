@@ -74,6 +74,11 @@ with st.expander("Current settings", expanded=False):
     st.write("map:", map)
 with st.expander("st.session_state", expanded=False):
     st.write(st.session_state)
+with st.expander("Detection Results DataFrame", expanded=False):
+    if "results_detections" in st.session_state:
+        st.dataframe(st.session_state["results_detections"], use_container_width=True)
+    else:
+        st.warning("Detection results not loaded in session state")
 
 save_btn = st.button(":material/save: Save settings", use_container_width=True,
                         type = "primary", key = "language_btn")

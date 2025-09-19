@@ -1,11 +1,3 @@
-
-# WAAR WAS IK? 
-# TODO: 
-# - dan testen op windows, werkt het ook zonder in de folder van addaxai te zitten?
-# - dan opschonen, commenten, teksten, readme, mds, etc. 
-# - create a claude.md for the project with the env micromamba instructions, and an quick overview of the project etc.
-
-
 """
 AddaxAI Streamlit Application - Main Entry Point
 
@@ -25,12 +17,13 @@ Run with micromamba:
 TODOs:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
-- RDE
+- Repeat detection elimination
 - material icons must be offline, but I can only do that at the end when I know which icons I'm using.
-- if NONE cls model is selected, then dont show the cls pbars. 
+- CHECK: if NONE cls model is selected, then dont show the cls pbars. 
 - if no CLS is selected, it should skip species selection and the button should be add to queue. 
-- the license warning should be for all models, not just the yolov11 models. Where?
-- delete the all_classes from the variables json? It should probabaly take it from the taxon csv right? That is redundant and error prone.
+- the license warning should be for all models, not just the yolov11 models. Where? During the installation wizard probabaly. The user has to agree to the licenses when installing addaxai.
+- CHECK: delete the all_classes from the variables json? It should probabaly take it from the taxon csv right? That is redundant and error prone.
+- The loader is not blocking... I need to thinik of how to do that. I think I hgad it working with a st_modal() before, but I lost those commits... st_modal is blocking, and you can use streamlit widgets, like the squirell animation and st.loaders
 """
 
 # Standard library imports
@@ -44,6 +37,7 @@ import json
 from streamlit_lottie import st_lottie
 from appdirs import user_config_dir, user_cache_dir
 from st_modal import Modal
+import pandas as pd
  
 
 # Local imports - global config must be imported before anything else
@@ -198,6 +192,31 @@ if st.session_state == {}:
     
     # Reload model metadata after download to ensure session state has latest data
     st.session_state["model_meta"] = load_model_metadata()
+    
+    # ─────────────────────────────────────────────────────────────────────────
+    # Load all detection results into dataframe for analysis and visualization
+    # ─────────────────────────────────────────────────────────────────────────
+    
+    loader.update_text("Loading detection results...")
+    
+    time.sleep(0.5)  # Simulate loading time
+    
+    try:
+        from utils.data_loading import load_detection_results_dataframe
+        results_df = load_detection_results_dataframe()
+        st.session_state["results_detections"] = results_df
+        
+        if len(results_df) > 0:
+            log(f"Loaded {len(results_df)} detections from {len(results_df['deployment_id'].unique())} deployments")
+        else:
+            log("No detection results found in completed deployments")
+            
+    except Exception as e:
+        error_msg = f"Failed to load detection results: {str(e)}"
+        log(error_msg)
+        st.warning(error_msg)
+        # Create empty dataframe as fallback
+        st.session_state["results_detections"] = pd.DataFrame()
     
     # Archive previous session log and create fresh log (only on startup)
     log_fpath = os.path.join(ADDAXAI_ROOT, "assets", "logs", "log.txt")
