@@ -5,9 +5,6 @@
 # - dan opschonen, commenten, teksten, readme, mds, etc. 
 # - create a claude.md for the project with the env micromamba instructions, and an quick overview of the project etc.
 
-# others:
-# - do the loading squirell in a modal too, to you cant click anything else while loading
-
 
 """
 AddaxAI Streamlit Application - Main Entry Point
