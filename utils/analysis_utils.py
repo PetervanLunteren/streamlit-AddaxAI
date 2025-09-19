@@ -1657,17 +1657,12 @@ def install_env(env_name: str):
 
 
 def project_selector_widget():
-    # Get current project from persistent storage first, then fall back to session state
-    general_settings_vars = get_cached_vars(section="general_settings")
-    current_project_id = general_settings_vars.get("selected_projectID", None)
-    
-    # If not in persistent storage, check session state as fallback
-    if not current_project_id:
-        current_project_id = get_session_var("shared", "selected_projectID", None)
+    # Get current project directly from session state (which is updated by sidebar)
+    current_project_id = get_session_var("shared", "selected_projectID", None)
     
     if not current_project_id:
         # No project selected - show message to create first project
-        info_box("No project selected. Create your first project using the sidebar.", icon=":material/info:")
+        info_box("No project selected. Create your first project using the sidebar.")
         return None
     
     # Load projects to get the current project name
@@ -1676,7 +1671,7 @@ def project_selector_widget():
     current_project_name = current_project_data.get("name", current_project_id)
     
     # Show informational message about current project
-    info_box(f"You're currently in project {code_span(current_project_name)}. Data will be listed under this project. You can change projects in the sidebar if desired.", icon=":material/folder:")
+    info_box(f"You're currently in project {code_span(current_project_name)}. Data will be listed under this project. You can change projects in the sidebar if desired.")
     
     # Store current project selection in session state for deployment workflow
     set_session_var("analyse_advanced", "selected_projectID", current_project_id)
@@ -1710,7 +1705,7 @@ def location_selector_widget():
         # # show info box if coordinates are found in metadata
         if coords_found_in_exif:  # SESSION
             info_box(
-                f"Coordinates ({exif_lat:.5f}, {exif_lng:.5f}) were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
+                f"Coordinates {code_span(f'({exif_lat:.5f}, {exif_lng:.5f})')} were automatically extracted from the image metadata. They will be pre-filled when adding the new location.")
 
     # if there are locations, show dropdown and button
     else:
@@ -1718,7 +1713,7 @@ def location_selector_widget():
 
         # dropdown for existing locations
         with col1:
-            options = list(locations.keys())
+            options = list(locations.keys()) 
 
             # set to last selected location if it exists
             selected_index = options.index(

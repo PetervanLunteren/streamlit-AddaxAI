@@ -344,6 +344,7 @@ mode_selected = st.sidebar.segmented_control(
     help=txts["mode_explanation_txt"],
     key="mode_selection",
     on_change=on_mode_change,
+    width = "stretch",
     default=mode)
 
 @logged_callback
@@ -385,6 +386,11 @@ if mode == 1:  # Advanced mode requires project context
                 key="project_selection_sidebar",
                 on_change=on_project_change
             )
+            
+            # Ensure the currently selected project is stored in session state
+            # (handles case where selectbox shows a project but session state is None)
+            if selected_projectID and get_session_var("shared", "selected_projectID", None) != selected_projectID:
+                set_session_var("shared", "selected_projectID", selected_projectID)
         
         with col2:
             if st.button(":material/add_circle:", help="Add new project", use_container_width=True):
