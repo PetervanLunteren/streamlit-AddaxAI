@@ -6,13 +6,8 @@
 # - create a claude.md for the project with the env micromamba instructions, and an quick overview of the project etc.
 
 # others:
-# - if the cancel button is pressed on model downloads, it still downloads it in the background. That was solved before, just go back to the commit before the revert.
 # - if added a new project, it shoudl be selected automatically. On second thought, better better remove the project dropdown from the deployment page. Just use the sidebar. 
 # - make placeholder ReadTheDocs for this repo as the DeepDocsAI github bot is asking for it.
-
-# errors:
-# there are paths hardcoded here (classification/cls_inference.py:49) and here (classification/cls_inference.py:27). Maybe we need to merge megadetector env with base. That would solve it. 
-
 
 
 """
