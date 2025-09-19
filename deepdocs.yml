@@ -5,8 +5,6 @@ description: Wildlife Camera Analysis Platform - Official Documentation
 reinit: "addaxai_docs_init_2024"
 target:
   - url: "https://github.com/PetervanLunteren/streamlit-AddaxAI/blob/main/README.md"
-  - url: "https://github.com/PetervanLunteren/streamlit-AddaxAI/blob/main/DEVELOPERS.md"
-  - url: "https://github.com/PetervanLunteren/streamlit-AddaxAI/blob/main/PROJECT_STRUCTURE.md"
 
 # Documentation configuration
 docs:
