@@ -19,11 +19,10 @@ import json
 # import datetime
 # import contextlib
 # import pandas as pd
+import sys
 from tqdm import tqdm
 from PIL import Image
 # from collections import defaultdict
-
-from megadetector.data_management import read_exif
 
 from utils.config import *
 
@@ -43,9 +42,10 @@ def extract_video_frames_to_cache(video_path, frame_numbers):
         video_path (str): Path to video file
         frame_numbers (list): List of frame numbers to extract
     """
-    # Import MegaDetector's video utilities
-    from megadetector.detection.video_utils import run_callback_on_frames
     import cv2
+    
+    # import from a separated utils file to avoid megadetector dependency for every model type
+    from utils.md_video_utils import run_callback_on_frames
     
     def frame_callback(image_np, frame_id):
         """Callback to store frame in memory cache"""

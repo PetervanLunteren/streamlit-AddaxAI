@@ -101,6 +101,8 @@ if st.session_state == {}:
     
     loader.update_text("Initializing session state...")
     
+    time.sleep(0.5)  # Simulate loading time
+    
     # Initialize shared session state container for cross-tool temporary variables
     st.session_state["shared"] = {}
     
@@ -121,6 +123,8 @@ if st.session_state == {}:
     # ─────────────────────────────────────────────────────────────────────────
     
     loader.update_text("Loading utility modules...")
+    
+    time.sleep(0.5)  # Simulate loading time
     
     # Import utils now that shared session state exists (modules depend on it)
     from utils.common import load_lang_txts, load_vars, update_vars, set_session_var, get_session_var, fetch_latest_model_info
@@ -176,6 +180,8 @@ if st.session_state == {}:
     # ─────────────────────────────────────────────────────────────────────────
     
     loader.update_text("Loading language and model data...")
+    
+    time.sleep(0.5)  # Simulate loading time
     
     # Load and cache language texts to avoid file I/O on reruns
     if not st.session_state.get("txts"):
