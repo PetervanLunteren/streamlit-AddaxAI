@@ -293,6 +293,8 @@ elif mode == 1:  # Advanced mode - full toolkit
         os.path.join("pages", "depth_estimation.py"), title="Depth estimation", icon=":material/square_foot:")
     explore_results_page = st.Page(
         os.path.join("pages", "explore_results.py"), title="Explore results", icon=":material/bar_chart_4_bars:")
+    aggrid_viewer_page = st.Page(
+        os.path.join("pages", "aggrid_viewer_simple.py"), title="AggGrid viewer", icon=":material/grid_on:")
     post_processing_page = st.Page(
         os.path.join("pages", "post_processing.py"), title=txts["postprocess_txt"], icon=":material/stylus_note:")
     camera_management_page = st.Page(
@@ -300,7 +302,7 @@ elif mode == 1:  # Advanced mode - full toolkit
     settings_page = st.Page(
         os.path.join("pages", "settings.py"), title=txts["settings_txt"], icon=":material/settings:")
     pg = st.navigation([analysis_advanced_page, remove_duplicates_page, human_verification_page,
-                       depth_estimation_page, explore_results_page, post_processing_page, camera_management_page, settings_page])
+                       depth_estimation_page, explore_results_page, aggrid_viewer_page, post_processing_page, camera_management_page, settings_page])
 
 # Run the selected page
 pg.run()

@@ -1,8 +1,8 @@
 """
-AddaxAI Results Explorer
+AddaxAI Results Explorer - DATA EDITOR BACKUP VERSION
 
-Simple, clean data table for exploring camera trap detection results using
-Streamlit's built-in st.data_editor with direct image display.
+This is a backup of the st.data_editor implementation.
+The main file has been converted to use st.dataframe for selection support.
 """
 
 import warnings
@@ -16,10 +16,9 @@ if 'warnings' not in sys.modules:
 import streamlit as st
 import base64
 import os
-from PIL import Image, ImageDraw
+from PIL import Image
 import io
 import pandas as pd
-from utils.explore_results_utils import load_filter_state, save_filter_state
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CONSTANTS
@@ -45,7 +44,8 @@ IMAGE_COLUMN_WIDTHS = {
 }
 
 # Image processing
-THUMBNAIL_SIZE = 300  # Standard thumbnail size in pixels (300x300)
+IMAGE_BORDER_WIDTH = 2  # Border thickness in pixels
+IMAGE_BORDER_COLOR = (20, 95, 100)  # #145f64 in RGB
 IMAGE_BACKGROUND_COLOR = (220, 227, 232)  # #dce3e8 in RGB
 IMAGE_PADDING_PERCENT = 0.01  # 1% padding
 IMAGE_PADDING_MIN = 10  # Minimum padding in pixels
@@ -60,32 +60,18 @@ CONFIDENCE_DECIMALS = 2  # Decimal places for confidence values
 COORDINATE_DECIMALS = 4  # Decimal places for bbox coordinates
 LAT_LON_DECIMALS = 6  # Decimal places for lat/lon
 
-# Pagination
-DEFAULT_PAGE_SIZE = 20  # Default number of rows per page
-PAGE_SIZE_OPTIONS = [20, 50, 100]  # Available page size options
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE CONFIGURATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
 st.set_page_config(layout="wide")
 
-# Spacer
-st.markdown("")
-
-# Load saved settings for the entire page
-saved_settings = load_filter_state()
-
-# Controls row
-col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(10)
-
-with col9:
-    # Download popover with material icon
-    download_popover = st.popover(":material/download:", help="Download results without images", use_container_width=True)
-
-with col10:
-    # Settings popover with material icon
-    with st.popover(":material/settings:", help="Image Size Settings", use_container_width=True):        
+# Title with settings popover
+col1, col2 = st.columns([10, 1])
+with col1:
+    st.title("🔍 Explore Detection Results (Data Editor Backup)")
+with col2:
+    with st.popover("⚙️", help="Image Size Settings"):        
         # Image size controls both row height and image column width
         # Proportion: 1 row height = 1.5 image column width
         image_size_options = {
@@ -93,16 +79,27 @@ with col10:
             for size, height in ROW_HEIGHT_OPTIONS.items()
         }
         
-        # Get the saved or default value for the segmented control
-        default_image_size = saved_settings.get('image_size_control', DEFAULT_SIZE_OPTION)
-        
         selected_size = st.segmented_control(
             "Image Size",
             options=list(image_size_options.keys()),
-            default=default_image_size,
+            default=DEFAULT_SIZE_OPTION,
             key="image_size_control",
             width="stretch"
         )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOWNLOAD CONTROLS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Add download popover at the top
+col1, col2 = st.columns([10, 1])
+with col1:
+    pass  # Empty space for alignment
+with col2:
+    download_popover = st.popover("⬇️ Download", help="Download results without images")
+
+# Get settings values
+image_size = st.session_state.get("image_size_setting", 300)
 
 # Get row height and image width from segmented control
 image_size_options = {
@@ -111,21 +108,10 @@ image_size_options = {
 }
 selected_size = st.session_state.get("image_size_control", DEFAULT_SIZE_OPTION)
 size_config = image_size_options.get(selected_size, image_size_options[DEFAULT_SIZE_OPTION])
-row_height = size_config["height"]
+row_height_val = size_config["height"]
 image_width = size_config["width"]
 
-# Save image size setting if it changed
-if 'last_image_size' not in st.session_state:
-    st.session_state.last_image_size = selected_size
-elif st.session_state.last_image_size != selected_size:
-    st.session_state.last_image_size = selected_size
-    # Save both settings
-    save_filter_state({
-        'page_size': st.session_state.page_size,
-        'image_size_control': selected_size
-    })
-
-# Table height will be calculated after we know the actual number of rows on the page
+table_height = st.session_state.get("table_height_setting", TABLE_HEIGHT_DEFAULT)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DATA LOADING
@@ -147,42 +133,6 @@ if df.empty:
     st.write("- All deployments failed to process")
     st.write("- Detection result files are missing or corrupted")
     st.stop()
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGINATION STATE
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Load saved settings (already loaded in segmented control above)
-# saved_settings = load_filter_state()  # Already loaded above
-
-# Initialize pagination state from saved settings or defaults
-if 'page_size' not in st.session_state:
-    st.session_state.page_size = saved_settings.get('page_size', DEFAULT_PAGE_SIZE)
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = 1  # Always start at page 1
-if 'image_size_control' not in st.session_state:
-    st.session_state.image_size_control = saved_settings.get('image_size_control', DEFAULT_SIZE_OPTION)
-
-# Calculate total pages
-total_rows = len(df)
-total_pages = max(1, (total_rows + st.session_state.page_size - 1) // st.session_state.page_size)
-
-# Ensure current page is valid
-if st.session_state.current_page > total_pages:
-    st.session_state.current_page = total_pages
-
-# Calculate row indices for current page
-start_idx = (st.session_state.current_page - 1) * st.session_state.page_size
-end_idx = min(start_idx + st.session_state.page_size, total_rows)
-
-# Get current page data
-df_page = df.iloc[start_idx:end_idx].copy()
-
-# Calculate table height to fit exactly the current page
-# Height = (actual number of rows on page * row height) + padding for headers
-header_padding = 40  # Approximate height for column headers
-actual_rows_on_page = len(df_page)
-table_height = (actual_rows_on_page * row_height) + header_padding
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DATA PREPARATION
@@ -261,19 +211,6 @@ def image_to_base64_url(image_path, bbox_data, max_size):
                         canvas.paste(cropped, (paste_x, paste_y))
                     
                     img = canvas
-                    
-                    # Calculate bounding box position within the square canvas
-                    bbox_x_in_crop = x - x1_square
-                    bbox_y_in_crop = y - y1_square
-                    
-                    # Store crop info for bbox drawing after thumbnail creation
-                    crop_info = {
-                        'bbox_x_in_crop': bbox_x_in_crop,
-                        'bbox_y_in_crop': bbox_y_in_crop,
-                        'bbox_w': w,
-                        'bbox_h': h,
-                        'crop_size': square_size
-                    }
                 else:
                     # Regular crop within bounds
                     x1_square = max(0, x1_square)
@@ -283,55 +220,23 @@ def image_to_base64_url(image_path, bbox_data, max_size):
                     
                     if x2_square > x1_square and y2_square > y1_square:
                         img = img.crop((x1_square, y1_square, x2_square, y2_square))
-                
-                # Calculate bounding box position within the cropped square image
-                # Original bbox coordinates relative to the cropped square
-                bbox_x_in_crop = x - x1_square
-                bbox_y_in_crop = y - y1_square
-                
-                # Store crop info for bbox drawing after thumbnail creation
-                crop_info = {
-                    'bbox_x_in_crop': bbox_x_in_crop,
-                    'bbox_y_in_crop': bbox_y_in_crop,
-                    'bbox_w': w,
-                    'bbox_h': h,
-                    'crop_size': square_size
-                }
-            else:
-                crop_info = None
             
-            # Create thumbnail to reduce size
-            original_size = img.size
-            img.thumbnail(max_size, Image.Resampling.LANCZOS)
-            thumbnail_size = img.size
+            # Define border settings
+            border_color = IMAGE_BORDER_COLOR
+            border_width = IMAGE_BORDER_WIDTH
             
-            # Draw red border around exact bounding box if we have crop info
-            if crop_info and bbox_data:
-                # Calculate scale factor from original crop to thumbnail
-                scale_x = thumbnail_size[0] / crop_info['crop_size']
-                scale_y = thumbnail_size[1] / crop_info['crop_size']
-                
-                # Scale bounding box coordinates to thumbnail size
-                bbox_x_thumb = crop_info['bbox_x_in_crop'] * scale_x
-                bbox_y_thumb = crop_info['bbox_y_in_crop'] * scale_y
-                bbox_w_thumb = crop_info['bbox_w'] * scale_x
-                bbox_h_thumb = crop_info['bbox_h'] * scale_y
-                
-                # Draw red border (1px)
-                draw = ImageDraw.Draw(img)
-                x1 = int(bbox_x_thumb)
-                y1 = int(bbox_y_thumb)
-                x2 = int(bbox_x_thumb + bbox_w_thumb)
-                y2 = int(bbox_y_thumb + bbox_h_thumb)
-                
-                # Ensure coordinates are within image bounds
-                x1 = max(0, min(x1, thumbnail_size[0] - 1))
-                y1 = max(0, min(y1, thumbnail_size[1] - 1))
-                x2 = max(0, min(x2, thumbnail_size[0] - 1))
-                y2 = max(0, min(y2, thumbnail_size[1] - 1))
-                
-                # Draw 1px red rectangle outline
-                draw.rectangle([x1, y1, x2, y2], outline='red', width=1)
+            # Reduce max_size to account for border that will be added
+            adjusted_max_size = (max_size[0] - border_width * 2, max_size[1] - border_width * 2)
+            
+            # Create thumbnail to reduce size (accounting for border)
+            img.thumbnail(adjusted_max_size, Image.Resampling.LANCZOS)
+            
+            # Create new image with border space
+            w, h = img.size
+            bordered_img = Image.new('RGB', (w + border_width * 2, h + border_width * 2), border_color)
+            # Paste the image inside the border
+            bordered_img.paste(img, (border_width, border_width))
+            img = bordered_img
             
             # Convert to base64
             buffer = io.BytesIO()
@@ -344,42 +249,22 @@ def image_to_base64_url(image_path, bbox_data, max_size):
         # Return None silently if image cannot be processed
         return None
 
-# Initialize thumbnail cache if needed
-if 'thumbnail_cache' not in st.session_state:
-    st.session_state.thumbnail_cache = {}
-
-# Clear cache if page changed (thumbnails are now standard size, independent of UI setting)
-cache_key = f"page_{st.session_state.current_page}_size_{st.session_state.page_size}"
-if 'last_cache_key' in st.session_state and st.session_state.last_cache_key != cache_key:
-    st.session_state.thumbnail_cache = {}
-st.session_state.last_cache_key = cache_key
-
-# Convert images to base64 data URLs for ImageColumn - ONLY FOR CURRENT PAGE
+# Convert images to base64 data URLs for ImageColumn
 # Process images and create new dataframe with image column
 with st.spinner("Processing images..."):
-    # Check if thumbnails for this page are cached
-    if cache_key not in st.session_state.thumbnail_cache:
-        # Create the image URLs list for current page only
-        image_urls = []
-        for index, row in df_page.iterrows():
-            bbox_data = {
-                'x': row['bbox_x'] if 'bbox_x' in row else None,
-                'y': row['bbox_y'] if 'bbox_y' in row else None,
-                'width': row['bbox_width'] if 'bbox_width' in row else None,
-                'height': row['bbox_height'] if 'bbox_height' in row else None
-            }
-            # Use standard thumbnail size (200x200)
-            image_url = image_to_base64_url(row['absolute_path'], bbox_data, max_size=(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
-            image_urls.append(image_url)
-        
-        # Cache the thumbnails for this page
-        st.session_state.thumbnail_cache[cache_key] = image_urls
-    else:
-        # Use cached thumbnails
-        image_urls = st.session_state.thumbnail_cache[cache_key]
+    # Create the image URLs list first
+    image_urls = []
+    for index, row in df.iterrows():
+        bbox_data = {
+            'x': row['bbox_x'] if 'bbox_x' in row else None,
+            'y': row['bbox_y'] if 'bbox_y' in row else None,
+            'width': row['bbox_width'] if 'bbox_width' in row else None,
+            'height': row['bbox_height'] if 'bbox_height' in row else None
+        }
+        image_urls.append(image_to_base64_url(row['absolute_path'], bbox_data, max_size=(image_size, image_size)))
     
-    # Create new dataframe with all original columns plus image_url - FOR CURRENT PAGE
-    display_df = pd.DataFrame(df_page)
+    # Create new dataframe with all original columns plus image_url
+    display_df = pd.DataFrame(df)
     display_df.insert(0, 'image_url', image_urls)  # Insert at beginning
 
 # Convert timestamp to datetime if it exists and isn't already
@@ -405,22 +290,22 @@ for col in ['latitude', 'longitude']:
 column_order = [
     'image_url',  # Will be displayed as image (base64 data URL)
     'relative_path',
+    'project_id',
+    'location_id', 
+    'deployment_id',
     'detection_label',
     'detection_confidence',
     'classification_label',
     'classification_confidence',
     'timestamp',
-    'project_id',  # Hidden
-    'location_id', 
-    'deployment_id',
     'bbox_x',
     'bbox_y', 
     'bbox_width',
     'bbox_height',
-    'image_width',
-    'image_height',
     'latitude',
     'longitude',
+    'image_width',
+    'image_height',
     'detection_model_id',
     'classification_model_id'
 ]
@@ -469,8 +354,8 @@ with download_popover:
 # DATA DISPLAY
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Display dataframe with image column and selection support
-event = st.dataframe(
+# Display data editor with image column
+edited_df = st.data_editor(
     display_df,
     column_config={
         "image_url": st.column_config.ImageColumn(
@@ -479,10 +364,13 @@ event = st.dataframe(
             width=image_width
         ),
         "absolute_path": None,  # Hide the original absolute path column
-        "project_id": None,  # Hide the project column
         "relative_path": st.column_config.TextColumn(
             "File",
             help="Image filename",
+            width=COLUMN_WIDTH_STANDARD
+        ),
+        "project_id": st.column_config.TextColumn(
+            "Project",
             width=COLUMN_WIDTH_STANDARD
         ),
         "location_id": st.column_config.TextColumn(
@@ -568,83 +456,16 @@ event = st.dataframe(
         ),
     },
     column_order=column_order,
-    use_container_width=True,  # Full width display
+    disabled=True,  # Read-only mode
+    width="stretch",  # Full width display
     hide_index=True,
     height=table_height,  # Dynamic height from settings
-    row_height=row_height,  # Dynamic row height from settings
-    on_select="rerun",  # Trigger rerun on selection
-    selection_mode="single-row"  # Allow single row selection
+    num_rows="fixed",
+    row_height=row_height_val  # Dynamic row height from settings
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ROW SELECTION HANDLER
+# FOOTER
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Handle row selection if supported
-if hasattr(event, 'selection') and event.selection:
-    selected_rows = event.selection.get('rows', [])
-    if selected_rows:
-        selected_index = selected_rows[0]
-        selected_data = display_df.iloc[selected_index]
-        
-        # Display selected row details in an expander
-        with st.expander(f"📋 Selected Row Details (Row {selected_index + 1})", expanded=True):
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                st.write("**Detection Info:**")
-                st.write(f"• Label: {selected_data.get('detection_label', 'N/A')}")
-                st.write(f"• Confidence: {selected_data.get('detection_confidence', 0):.2f}")
-                st.write("")
-                st.write("**Classification Info:**")
-                st.write(f"• Species: {selected_data.get('classification_label', 'N/A')}")
-                st.write(f"• Confidence: {selected_data.get('classification_confidence', 0):.2f}")
-                
-            with col2:
-                st.write("**File Info:**")
-                st.write(f"• Path: {selected_data.get('relative_path', 'N/A')}")
-                st.write(f"• Timestamp: {selected_data.get('timestamp', 'N/A')}")
-                st.write(f"• Project: {selected_data.get('project_id', 'N/A')}")
-                st.write(f"• Location: {selected_data.get('location_id', 'N/A')}")
-                st.write(f"• Deployment: {selected_data.get('deployment_id', 'N/A')}")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGINATION CONTROLS (BOTTOM)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Pagination controls at the bottom
-bottom_menu = st.columns((4, 1, 1))
-
-with bottom_menu[0]:
-    st.markdown(f"Page **{st.session_state.current_page}** of **{total_pages}** "
-                f"(Showing rows {start_idx + 1}-{end_idx} of {total_rows:,})")
-
-with bottom_menu[1]:
-    new_page = st.number_input(
-        "Page",
-        min_value=1,
-        max_value=total_pages,
-        step=1,
-        value=st.session_state.current_page,
-        key="page_input"
-    )
-    if new_page != st.session_state.current_page:
-        st.session_state.current_page = new_page
-        st.rerun()
-
-with bottom_menu[2]:
-    new_page_size = st.selectbox(
-        "Page Size",
-        options=PAGE_SIZE_OPTIONS,
-        index=PAGE_SIZE_OPTIONS.index(st.session_state.page_size),
-        key="page_size_input"
-    )
-    if new_page_size != st.session_state.page_size:
-        st.session_state.page_size = new_page_size
-        st.session_state.current_page = 1  # Reset to first page
-        # Save page size setting
-        save_filter_state({
-            'page_size': new_page_size,
-            'image_size_control': st.session_state.get('image_size_control', DEFAULT_SIZE_OPTION)
-        })
-        st.rerun()
+st.caption(f"Showing {len(display_df):,} detection results")

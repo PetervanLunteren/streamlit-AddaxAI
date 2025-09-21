@@ -352,7 +352,7 @@ def run_process_queue(
 
             # first add the deployment info to the map file
             map, map_file = get_cached_map()
-            deployment_id = f"dep-{unique_animal_string()}"
+            deployment_id = {unique_animal_string()}
             deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get(
                 "deployments", {})
             deployments[deployment_id] = {
