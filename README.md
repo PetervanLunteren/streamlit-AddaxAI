@@ -48,6 +48,7 @@ streamlit-AddaxAI/
 │   ├── human_verification.py  # Manual review interface
 │   ├── remove_duplicates.py   # Duplicate detection
 │   ├── explore_results.py     # Results visualization
+│   ├── aggrid_viewer_simple.py # AggGrid viewer
 │   ├── post_processing.py     # Post-processing tools
 │   ├── camera_management.py   # Metadata management
 │   └── settings.py            # Application settings
