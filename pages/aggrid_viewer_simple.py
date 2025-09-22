@@ -241,8 +241,8 @@ image_jscode = JsCode("""
             const img = document.createElement('img');
             if (params.value) {
                 img.src = params.value;
-                img.style.width = '100px';
-                img.style.height = '100px';
+                img.style.width = '500px';
+                img.style.height = '500px';
                 img.style.objectFit = 'contain';
                 img.style.border = '1px solid #ddd';
                 img.style.cursor = 'pointer';
@@ -270,7 +270,7 @@ gb.configure_column(
     "image",
     headerName="Image",
     cellRenderer=image_jscode,
-    width=120,
+    width=520,
     autoHeight=True
 )
 
@@ -323,7 +323,7 @@ column_order = [
 gb.configure_default_column(resizable=True, sortable=True, filter=True)
 
 # Configure row selection
-gb.configure_selection(selection_mode='single', use_checkbox=False)
+gb.configure_selection(selection_mode='single', use_checkbox=True)
 
 # Build grid options
 grid_options = gb.build()
@@ -347,7 +347,7 @@ selected_row_placeholder = st.empty()
 
 # Calculate grid height based on actual rows on this page
 actual_rows = len(display_df)
-row_height = 120  # Height per row for images
+row_height = 520  # Height per row for images
 header_height = 40  # Header height
 grid_height = min(800, (actual_rows * row_height) + header_height)  # Max 800px
 
@@ -374,32 +374,14 @@ if (grid_response['selected_rows'] is not None and len(grid_response['selected_r
     selected_row = grid_response['selected_rows'].iloc[0]
     
     with selected_row_placeholder.container():
-        st.info("📋 **Selected Row Details** (Click any part of the row, preferably the image)")
+        image_name = selected_row.get('relative_path', 'N/A')
+        det_label = selected_row.get('detection_label', 'N/A')
+        det_conf = selected_row.get('detection_confidence', 0)
         
-        # Create two columns for the details
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.write("**Detection Info:**")
-            st.write(f"• Label: {selected_row.get('detection_label', 'N/A')}")
-            st.write(f"• Confidence: {selected_row.get('detection_confidence', 0):.2f}" if selected_row.get('detection_confidence') else "• Confidence: N/A")
-            st.write("")
-            st.write("**Classification Info:**")
-            st.write(f"• Species: {selected_row.get('classification_label', 'N/A')}")
-            st.write(f"• Confidence: {selected_row.get('classification_confidence', 0):.2f}" if selected_row.get('classification_confidence') else "• Confidence: N/A")
-            
-        with col2:
-            st.write("**File Info:**")
-            st.write(f"• Path: {selected_row.get('relative_path', 'N/A')}")
-            st.write(f"• Timestamp: {selected_row.get('timestamp', 'N/A')}")
-            st.write(f"• Project: {selected_row.get('project_id', 'N/A')}")
-            st.write(f"• Location: {selected_row.get('location_id', 'N/A')}")
-            st.write(f"• Deployment: {selected_row.get('deployment_id', 'N/A')}")
-            
-            st.write("**Image Dimensions:**")
-            st.write(f"• Size: {selected_row.get('image_width', 'N/A')} × {selected_row.get('image_height', 'N/A')}")
-            if selected_row.get('latitude') and selected_row.get('longitude'):
-                st.write(f"• Location: {selected_row.get('latitude', 0):.6f}, {selected_row.get('longitude', 0):.6f}")
+        if det_conf and det_conf != 0:
+            st.info(f"Selected image {image_name} with detection {det_label} at conf {det_conf:.2f}")
+        else:
+            st.info(f"Selected image {image_name} with detection {det_label} at conf N/A")
 else:
     # Clear the placeholder when no row is selected
     selected_row_placeholder.empty()
