@@ -14,7 +14,11 @@ Architecture:
 Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
-TODOs:
+TODOs FOR NOW:
+- Make the agggrid the default. Remove the other tables and rename the pages to something meaningful.
+- There is a bug in the bounding box visualisation, or somewhere else. The boxes are not in the right place. See example images here: /Users/peter/Downloads/wrong-boxes
+
+TODOs FOR LATER:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 - Repeat detection elimination

@@ -16,11 +16,13 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 from st_aggrid.shared import JsCode
 import base64
 import os
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 import io
 import pandas as pd
 from datetime import datetime, timedelta
-from utils.common import load_vars, update_vars
+from utils.common import load_vars, update_vars, get_session_var, set_session_var
+from utils.explore_results_utils import image_viewer_modal
+from st_modal import Modal
 
 def parse_timestamps(timestamp_series):
     """Parse timestamps in EXIF format: 2013:01:17 13:05:40"""
@@ -43,11 +45,18 @@ IMAGE_COLUMN_WIDTHS = {
     for size, height in ROW_HEIGHT_OPTIONS.items()
 }
 
+# Thumbnail generation settings
 IMAGE_BACKGROUND_COLOR = (220, 227, 232)
-IMAGE_PADDING_PERCENT = 0.01
-IMAGE_PADDING_MIN = 10
+IMAGE_PADDING_PIXELS = 100  # Padding around bbox in pixels (new padding system)
+IMAGE_BLUR_RADIUS = 15  # Blur radius for background extension
+IMAGE_CORNER_RADIUS = 20  # Corner radius for rounded thumbnails (pixels)
+IMAGE_BBOX_COLOR = 'red'  # Color for bounding box outline
 IMAGE_QUALITY = 85
 DEFAULT_SIZE_OPTION = "medium"  # Default size selection
+
+# Legacy padding settings (no longer used)
+IMAGE_PADDING_PERCENT = 0.01
+IMAGE_PADDING_MIN = 10
 
 # Page config
 st.set_page_config(layout="wide")
@@ -238,7 +247,7 @@ with col9:
                 data=xlsx_data,
                 file_name=f"addaxai-export-{timestamp}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
+                width="stretch"
             )
         
         with download_col2:
@@ -250,7 +259,7 @@ with col9:
                 data=csv_data,
                 file_name=f"addaxai-export-{timestamp}.csv",
                 mime="text/csv",
-                use_container_width=True
+                width="stretch"
             )
         
         with download_col3:
@@ -262,7 +271,7 @@ with col9:
                 data=tsv_data,
                 file_name=f"addaxai-export-{timestamp}.tsv",
                 mime="text/tab-separated-values",
-                use_container_width=True
+                width="stretch"
             )
         
         with download_col4:
@@ -274,7 +283,7 @@ with col9:
                 data=json_data,
                 file_name=f"addaxai-export-{timestamp}.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
 
 with col10:
@@ -404,50 +413,90 @@ def image_to_base64_url(image_path, bbox_data, max_size):
                 w = int(bbox_data['width'] * img_width)
                 h = int(bbox_data['height'] * img_height)
                 
-                # Calculate padding
-                padding_x = max(IMAGE_PADDING_MIN, int(w * IMAGE_PADDING_PERCENT))
-                padding_y = max(IMAGE_PADDING_MIN, int(h * IMAGE_PADDING_PERCENT))
+                # New padding procedure: max(bbox_width, bbox_height) + padding pixels
+                target_size = max(w, h) + (IMAGE_PADDING_PIXELS * 2)
                 
-                # Apply padding
-                x1_padded = x - padding_x
-                y1_padded = y - padding_y
-                x2_padded = x + w + padding_x
-                y2_padded = y + h + padding_y
+                # Calculate bbox center
+                bbox_center_x = x + w // 2
+                bbox_center_y = y + h // 2
                 
-                # Make square
-                padded_width = x2_padded - x1_padded
-                padded_height = y2_padded - y1_padded
-                square_size = max(padded_width, padded_height)
+                # Try to center the square crop around bbox
+                x1_target = bbox_center_x - target_size // 2
+                y1_target = bbox_center_y - target_size // 2
+                x2_target = x1_target + target_size
+                y2_target = y1_target + target_size
                 
-                center_x = x1_padded + padded_width // 2
-                center_y = y1_padded + padded_height // 2
+                # Edge handling: shift padding if hitting boundaries
+                if x1_target < 0:
+                    # Shift right
+                    shift_right = -x1_target
+                    x1_target = 0
+                    x2_target = min(img_width, target_size)
+                elif x2_target > img_width:
+                    # Shift left
+                    shift_left = x2_target - img_width
+                    x2_target = img_width
+                    x1_target = max(0, img_width - target_size)
                 
-                x1_square = center_x - square_size // 2
-                y1_square = center_y - square_size // 2
-                x2_square = x1_square + square_size
-                y2_square = y1_square + square_size
+                if y1_target < 0:
+                    # Shift down
+                    shift_down = -y1_target
+                    y1_target = 0
+                    y2_target = min(img_height, target_size)
+                elif y2_target > img_height:
+                    # Shift up
+                    shift_up = y2_target - img_height
+                    y2_target = img_height
+                    y1_target = max(0, img_height - target_size)
                 
-                # Crop within bounds
-                x1_square = max(0, x1_square)
-                y1_square = max(0, y1_square)
-                x2_square = min(img_width, x2_square)
-                y2_square = min(img_height, y2_square)
+                # Get the actual crop size we can achieve
+                actual_crop_width = x2_target - x1_target
+                actual_crop_height = y2_target - y1_target
                 
-                if x2_square > x1_square and y2_square > y1_square:
-                    img = img.crop((x1_square, y1_square, x2_square, y2_square))
+                # Check if we can achieve target square size within image
+                if actual_crop_width == target_size and actual_crop_height == target_size:
+                    # Perfect fit - crop directly
+                    img = img.crop((x1_target, y1_target, x2_target, y2_target))
                     
                     # Store info for red border
-                    bbox_x_in_crop = x - x1_square
-                    bbox_y_in_crop = y - y1_square
+                    bbox_x_in_crop = x - x1_target
+                    bbox_y_in_crop = y - y1_target
                     crop_info = {
                         'bbox_x_in_crop': bbox_x_in_crop,
                         'bbox_y_in_crop': bbox_y_in_crop,
                         'bbox_w': w,
                         'bbox_h': h,
-                        'crop_size': square_size
+                        'crop_size': target_size
                     }
                 else:
-                    crop_info = None
+                    # Need background extension - use blurred crop as background
+                    cropped_img = img.crop((x1_target, y1_target, x2_target, y2_target))
+                    
+                    # Create blurred version of the crop for background
+                    blurred_crop = cropped_img.copy()
+                    blurred_crop = blurred_crop.filter(ImageFilter.GaussianBlur(radius=IMAGE_BLUR_RADIUS))
+                    
+                    # Resize blurred crop to fill target square (may stretch/distort)
+                    blurred_background = blurred_crop.resize((target_size, target_size), Image.Resampling.LANCZOS)
+                    
+                    # Calculate position to center original crop on blurred background
+                    paste_x = (target_size - actual_crop_width) // 2
+                    paste_y = (target_size - actual_crop_height) // 2
+                    
+                    # Paste original sharp crop onto blurred background
+                    blurred_background.paste(cropped_img, (paste_x, paste_y))
+                    img = blurred_background
+                    
+                    # Store info for red border (adjusted for blurred background)
+                    bbox_x_in_crop = (x - x1_target) + paste_x
+                    bbox_y_in_crop = (y - y1_target) + paste_y
+                    crop_info = {
+                        'bbox_x_in_crop': bbox_x_in_crop,
+                        'bbox_y_in_crop': bbox_y_in_crop,
+                        'bbox_w': w,
+                        'bbox_h': h,
+                        'crop_size': target_size
+                    }
             else:
                 crop_info = None
             
@@ -471,7 +520,34 @@ def image_to_base64_url(image_path, bbox_data, max_size):
                 x2 = int(min(thumbnail_size[0]-1, bbox_x_thumb + bbox_w_thumb))
                 y2 = int(min(thumbnail_size[1]-1, bbox_y_thumb + bbox_h_thumb))
                 
-                draw.rectangle([x1, y1, x2, y2], outline='red', width=1)
+                draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=1)
+            
+            # Apply rounded corners
+            if IMAGE_CORNER_RADIUS > 0:
+                # Create a mask for rounded corners
+                mask = Image.new('L', img.size, 0)
+                mask_draw = ImageDraw.Draw(mask)
+                
+                # Scale corner radius to thumbnail size
+                scaled_radius = int(IMAGE_CORNER_RADIUS * (thumbnail_size[0] / 250))  # Scale based on size
+                scaled_radius = max(5, min(scaled_radius, min(thumbnail_size) // 4))  # Reasonable bounds
+                
+                # Draw rounded rectangle mask
+                mask_draw.rounded_rectangle(
+                    [(0, 0), (thumbnail_size[0]-1, thumbnail_size[1]-1)],
+                    radius=scaled_radius,
+                    fill=255
+                )
+                
+                # Apply mask to create rounded corners
+                output = Image.new('RGBA', img.size, (255, 255, 255, 0))
+                output.paste(img, (0, 0))
+                output.putalpha(mask)
+                
+                # Convert back to RGB with white background
+                final = Image.new('RGB', img.size, 'white')
+                final.paste(output, (0, 0), output)
+                img = final
             
             # Convert to base64
             buffer = io.BytesIO()
@@ -567,7 +643,7 @@ image_jscode = JsCode(f"""
                 img.style.width = '{current_row_height}px';
                 img.style.height = '{current_row_height}px';
                 img.style.objectFit = 'contain';
-                img.style.border = '1px solid #ddd';
+                img.style.border = 'none';
                 img.style.cursor = 'pointer';
                 
                 // Add click handler to the image
@@ -675,6 +751,9 @@ gb.configure_default_column(
 # Configure row selection
 gb.configure_selection(selection_mode='single', use_checkbox=True)
 
+# Configure row height to match image height + padding
+gb.configure_grid_options(rowHeight=current_row_height + 3)
+
 # Build grid options
 grid_options = gb.build()
 
@@ -687,6 +766,20 @@ if 'columnDefs' in grid_options:
                 ordered_cols.append(col)
                 break
     grid_options['columnDefs'] = ordered_cols
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# IMAGE VIEWER MODAL
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Modal for image viewer - only create when needed
+if get_session_var("explore_results", "show_modal_image_viewer", False):
+    modal_image_viewer = Modal(
+        title="#### Image Viewer", 
+        key="image_viewer", 
+        show_close_button=False
+    )
+    with modal_image_viewer.container():
+        image_viewer_modal()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ROW SELECTION DISPLAY (ABOVE TABLE)
@@ -717,24 +810,36 @@ grid_response = AgGrid(
 # ROW SELECTION HANDLER
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Handle row selection and update the placeholder above the table
-# Show details for any row selection (clicking image is preferred but any column works)
+# Handle row selection and trigger modal
+# Show modal for any row selection (clicking image is preferred but any column works)
 if (grid_response['selected_rows'] is not None and len(grid_response['selected_rows']) > 0):
     # grid_response['selected_rows'] is a DataFrame, get the first row as a Series
     selected_row = grid_response['selected_rows'].iloc[0]
     
-    with selected_row_placeholder.container():
-        image_name = selected_row.get('relative_path', 'N/A')
-        det_label = selected_row.get('detection_label', 'N/A')
-        det_conf = selected_row.get('detection_confidence', 0)
+    # Find the index of the selected row in the filtered dataframe
+    # We need to match by a unique identifier since display_df is just the current page
+    selected_path = selected_row.get('relative_path')
+    
+    # Find the actual index in the full filtered dataframe
+    if selected_path and 'results_detections_filtered' in st.session_state:
+        df_filtered = st.session_state['results_detections_filtered']
+        matching_rows = df_filtered[df_filtered['relative_path'] == selected_path]
         
-        if det_conf and det_conf != 0:
-            st.info(f"Selected image {image_name} with detection {det_label} at conf {det_conf:.2f}")
-        else:
-            st.info(f"Selected image {image_name} with detection {det_label} at conf N/A")
-else:
-    # Clear the placeholder when no row is selected
-    selected_row_placeholder.empty()
+        if not matching_rows.empty:
+            # Get the index of the first match in the filtered dataframe
+            selected_index = matching_rows.index[0]
+            # Convert to position in the filtered dataframe
+            modal_index = df_filtered.index.get_loc(selected_index)
+            
+            # Set modal state and open
+            set_session_var("explore_results", "modal_current_image_index", modal_index)
+            set_session_var("explore_results", "show_modal_image_viewer", True)
+            st.rerun()
+
+# Show selection hint when no row is selected
+if not (grid_response['selected_rows'] is not None and len(grid_response['selected_rows']) > 0):
+    with selected_row_placeholder.container():
+        st.info("Click on any row to view the full-resolution image")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGINATION CONTROLS (BOTTOM) - Same as explore_results.py
