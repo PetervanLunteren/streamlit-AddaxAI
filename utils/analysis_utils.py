@@ -209,6 +209,10 @@ def run_process_queue(
     # Create bottom spacers after all progress bars
     pbars.finalize_layout()
 
+    # Load detection confidence threshold from settings
+    general_settings = get_cached_vars(section="general_settings")
+    detection_threshold = general_settings.get("INFERENCE_MIN_CONF_THRES_DETECTION", 0.1)
+
     # calculate the total number of deployments to process
     process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
     total_deployment_idx = len(process_queue)
@@ -291,7 +295,7 @@ def run_process_queue(
 
             video_detection_success = run_md_video(
                 selected_det_modelID, model_meta["det"][selected_det_modelID], 
-                selected_folder, video_json_path, pbars)
+                selected_folder, video_json_path, pbars, detection_threshold)
 
             if video_detection_success is False:
                 continue
@@ -321,7 +325,7 @@ def run_process_queue(
 
             image_detection_success = run_md(
                 selected_det_modelID, model_meta["det"][selected_det_modelID], 
-                selected_folder, image_json_path, pbars, media_type="image")
+                selected_folder, image_json_path, pbars, media_type="image", confidence_threshold=detection_threshold)
 
             if image_detection_success is False:
                 continue
@@ -352,7 +356,7 @@ def run_process_queue(
 
             # first add the deployment info to the map file
             map, map_file = get_cached_map()
-            deployment_id = {unique_animal_string()}
+            deployment_id = unique_animal_string()
             deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get(
                 "deployments", {})
             deployments[deployment_id] = {
@@ -486,13 +490,25 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None, media_type
 
 
 
-def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars, media_type="combined"):
-
+def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars, media_type="combined", confidence_threshold=0.1):
+    """
+    Run MegaDetector on images using run_detector_batch from MegaDetector package.
+    
+    Args:
+        det_modelID (str): Detection model ID
+        model_meta (dict): Model metadata
+        deployment_folder (str): Path to deployment folder containing images
+        output_file (str): Path to output JSON file
+        pbars: Progress bar manager
+        media_type (str): Type of media being processed
+        confidence_threshold (float): Minimum confidence threshold for detections
+    """
     model_file = os.path.join(
         ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
     command = [
         f"{ADDAXAI_ROOT}/envs/env-addaxai-base/bin/python",
         "-m", "megadetector.detection.run_detector_batch", "--recursive", "--output_relative_filenames", "--include_image_size", "--include_image_timestamp", "--include_exif_data",
+        "--threshold", str(confidence_threshold),
         model_file,
         deployment_folder,
         output_file
@@ -538,7 +554,7 @@ def run_md(det_modelID, model_meta, deployment_folder, output_file, pbars, media
     return True
 
 
-def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars):
+def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars, confidence_threshold=0.1):
     """
     Run MegaDetector on videos using process_video.py from MegaDetector package.
     
@@ -548,6 +564,7 @@ def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars)
         deployment_folder (str): Path to deployment folder containing videos
         output_file (str): Path to output JSON file
         pbars: Progress bar manager
+        confidence_threshold (float): Minimum confidence threshold for detections
     """
     model_file = os.path.join(
         ADDAXAI_ROOT, "models", "det", det_modelID, model_meta["model_fname"])
@@ -560,7 +577,7 @@ def run_md_video(det_modelID, model_meta, deployment_folder, output_file, pbars)
         "--output_json_file", output_file,
         "--recursive",
         "--time_sample", "1.0",  # 1 frame per second
-        "--json_confidence_threshold", "0.1"
+        "--json_confidence_threshold", str(confidence_threshold)
     ]
 
     # Log the command for debugging/audit purposes

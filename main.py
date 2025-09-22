@@ -154,10 +154,29 @@ if st.session_state == {}:
         general_settings = {
             "lang": "en",
             "mode": 1,  # 0: simple mode, 1: advanced mode
-            "selected_projectID": None
+            "selected_projectID": None,
+            "INFERENCE_MIN_CONF_THRES_DETECTION": 0.1
         }
         with open(general_settings_file, "w") as f:
             json.dump(general_settings, f, indent=2)
+
+    # Initialize explore_results.json if it doesn't exist or is empty
+    explore_results_file = os.path.join(ADDAXAI_ROOT, "config", f"explore_results.json")
+    if not os.path.exists(explore_results_file) or os.path.getsize(explore_results_file) == 0:
+        # Create default filter settings
+        explore_results_settings = {
+            "aggrid_settings": {
+                "date_start": None,
+                "date_end": None,
+                "det_conf_min": 0.0,
+                "det_conf_max": 1.0,
+                "cls_conf_min": 0.0,
+                "cls_conf_max": 1.0,
+                "image_size": "medium"
+            }
+        }
+        with open(explore_results_file, "w") as f:
+            json.dump(explore_results_settings, f, indent=2)
 
     # Load and cache general settings to avoid file reads on reruns
     general_settings_vars = load_vars(section = "general_settings")

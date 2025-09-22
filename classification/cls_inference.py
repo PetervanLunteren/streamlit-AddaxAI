@@ -105,39 +105,25 @@ def create_raw_classifications(json_path,
     # Get directory containing images from JSON path
     img_dir = os.path.dirname(json_path)
     
-    # Set classification detection threshold for filtering low-confidence detections
-    cls_detec_thresh = 0.1
-    
     # Load JSON data and label mapping once to avoid repeated file I/O
     with open(json_path) as image_recognition_file_content:
         data = json.load(image_recognition_file_content)
         label_map = fetch_label_map_from_json(json_path)
     
-    # First pass: count valid animal crops, filter detections, and group by video files
+    # First pass: count animal crops and group by video files
+    # Note: No filtering applied - all detections in JSON are processed
     n_crops_to_classify = 0
     video_files_to_process = {}  # video_path -> list of image entries
     
     for image in data['images']:
         if 'detections' in image:
-            # Filter detections in place to remove low-confidence animal detections
-            filtered_detections = []
+            # Count animal detections for progress tracking
             for detection in image['detections']:
-                conf = detection["conf"]
                 category_id = detection['category']
                 category = label_map[category_id]
                 
                 if category == 'animal':
-                    # Only keep animal detections above threshold
-                    if conf >= cls_detec_thresh:
-                        filtered_detections.append(detection)
-                        n_crops_to_classify += 1
-                    # Low confidence animal detections are excluded
-                else:
-                    # Keep non-animal detections regardless of confidence
-                    filtered_detections.append(detection)
-            
-            # Update the detections list with filtered results
-            image['detections'] = filtered_detections
+                    n_crops_to_classify += 1
             
             # Group video files for per-video processing
             if 'frames_processed' in image:
@@ -185,7 +171,7 @@ def create_raw_classifications(json_path,
                         category_id = detection['category']
                         category = label_map[category_id]
                         
-                        # Process only animals (already filtered for confidence in first pass)
+                        # Process only animals
                         if category == 'animal':
                             # For video frames: get frame from memory cache
                             frame_number = detection.get('frame_number')
@@ -257,7 +243,7 @@ def create_raw_classifications(json_path,
                     category_id = detection['category']
                     category = label_map[category_id]
                     
-                    # Process only animals (already filtered for confidence in first pass)
+                    # Process only animals
                     if category == 'animal':
                         # Normal image processing: load from disk
                         img_fpath = os.path.join(img_dir, fname)

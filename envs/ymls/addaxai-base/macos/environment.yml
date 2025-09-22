@@ -32,6 +32,7 @@ dependencies:
     - tqdm
     - huggingface_hub
     - st-modal
+    - openpyxl
     
     # MegaDetector and detection packages
     - megadetector==10.0.8

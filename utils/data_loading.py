@@ -85,6 +85,10 @@ def load_detection_results_dataframe():
                         detection_model_id = metadata.get("selected_det_modelID", "unknown")
                         classification_model_id = metadata.get("selected_cls_modelID", "unknown")
                         
+                        # Get category mapping dictionaries
+                        detection_categories = deployment_json.get("detection_categories", {})
+                        classification_categories = deployment_json.get("classification_categories", {})
+                        
                         # Get location coordinates from MAP_JSON
                         latitude = location_data.get("lat")
                         longitude = location_data.get("lon")
@@ -101,19 +105,22 @@ def load_detection_results_dataframe():
                             # Process each detection in the image
                             for detection in image_data.get("detections", []):
                                 
-                                # Extract detection data
-                                detection_category = detection.get("category", "unknown")
-                                detection_conf = detection.get("conf", 0.0)
-                                bbox = detection.get("bbox", [0, 0, 0, 0])
+                                # Extract detection data - no defaults, should always be present
+                                detection_category_id = detection["category"]
+                                detection_conf = detection["conf"]
+                                bbox = detection["bbox"]
                                 
-                                # Extract classification data (may not exist)
-                                classification_label = None
-                                classification_conf = None
-                                classifications = detection.get("classifications", [])
-                                if classifications and len(classifications) > 0:
-                                    # Take the first classification (highest confidence)
-                                    classification_label = str(classifications[0][0])
-                                    classification_conf = float(classifications[0][1])
+                                # Map detection category ID to actual label
+                                detection_label = detection_categories[detection_category_id]
+                                
+                                # Extract classification data - should always be present
+                                classifications = detection["classifications"]
+                                # Take the first classification (highest confidence)
+                                classification_id = classifications[0][0]
+                                classification_conf = float(classifications[0][1])
+                                
+                                # Map classification ID to actual label
+                                classification_label = classification_categories[classification_id]
                                 
                                 # Create row data
                                 row = {
@@ -122,7 +129,7 @@ def load_detection_results_dataframe():
                                     'deployment_id': deployment_id,
                                     'absolute_path': absolute_path,
                                     'relative_path': image_filename,
-                                    'detection_label': str(detection_category),
+                                    'detection_label': detection_label,
                                     'detection_confidence': float(detection_conf),
                                     'classification_label': classification_label,
                                     'classification_confidence': classification_conf,
