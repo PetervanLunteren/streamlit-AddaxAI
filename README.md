@@ -45,6 +45,8 @@ streamlit-AddaxAI/
 ├── pages/                     # Streamlit pages
 │   ├── analysis_advanced.py   # Advanced analysis workflow
 │   ├── analysis_quick.py      # Quick analysis interface
+│   ├── aggrid_viewer.py       # AgGrid viewer interface
+│   ├── aggrid_viewer_simple.py# Simplified AgGrid viewer
 │   ├── human_verification.py  # Manual review interface
 │   ├── remove_duplicates.py   # Duplicate detection
 │   ├── explore_results.py     # Results visualization
@@ -56,7 +58,6 @@ streamlit-AddaxAI/
 ├── config/                    # Application configuration
 ├── data/                      # Test data and samples
 ├── assets/                    # Static assets (CSS, images, etc.)
-├── models/                    # AI model files
 ├── classification/            # Classification inference system
 └── envs/                      # Conda environments
 ```
