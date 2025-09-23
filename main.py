@@ -15,8 +15,8 @@ Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
 TODOs FOR NOW:
-- Make the agggrid the default. Remove the other tables and rename the pages to something meaningful.
 - There is a bug in the bounding box visualisation, or somewhere else. The boxes are not in the right place. See example images here: /Users/peter/Downloads/wrong-boxes
+- make sure the data browser (and more specifically the conf filters allow detections of only animals, no cls values. I believe there is a bug somewhere. 
 
 TODOs FOR LATER:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
