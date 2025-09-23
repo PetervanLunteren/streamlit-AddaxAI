@@ -49,6 +49,9 @@ from utils.analysis_utils import (browse_directory_widget,
                                   check_selected_models_version_compatibility
                                   )
 
+# Page config
+st.set_page_config(layout="centered")
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # OPTIMIZED RESOURCE LOADING - Use cached session state values from main.py
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -71,6 +74,8 @@ init_session_state("analyse_advanced")
 
 # Initialize step from session state
 step = get_session_var("analyse_advanced", "step", 0)
+
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LEGACY MODALS - Now optimized to only create when needed using session state

@@ -1,9 +1,8 @@
 """
-AddaxAI Explore Results Utilities
+AddaxAI Data Browser Utilities
 
-Simplified utility functions for the explore results page.
-Since we're using st.data_editor with built-in ImageColumn,
-we no longer need complex thumbnail generation or AgGrid configuration.
+Utility functions for the data browser page.
+Provides image modal viewer and filter state management for AgGrid data browsing.
 """
 
 import json

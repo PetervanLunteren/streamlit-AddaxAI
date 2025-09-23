@@ -1,7 +1,7 @@
 """
-AddaxAI AggGrid Viewer - Simplified Version
+AddaxAI Data Browser
 
-Simple AgGrid viewer showing cropped images with detection labels.
+Interactive data browser showing cropped images with detection labels using AgGrid.
 """
 
 import warnings
@@ -21,7 +21,7 @@ import io
 import pandas as pd
 from datetime import datetime, timedelta
 from utils.common import load_vars, update_vars, get_session_var, set_session_var
-from utils.explore_results_utils import image_viewer_modal
+from utils.data_browser_utils import image_viewer_modal
 from st_modal import Modal
 
 def parse_timestamps(timestamp_series):
@@ -60,7 +60,6 @@ IMAGE_PADDING_MIN = 10
 
 # Page config
 st.set_page_config(layout="wide")
-st.title("AggGrid Viewer - Simple")
 
 # Load filter settings from config
 filter_config = load_vars("explore_results")
