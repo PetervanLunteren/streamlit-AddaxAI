@@ -45,6 +45,7 @@ streamlit-AddaxAI/
 ├── pages/                     # Streamlit pages
 │   ├── analysis_advanced.py   # Advanced analysis workflow
 │   ├── analysis_quick.py      # Quick analysis interface
+│   ├── data_browser.py        # Interactive data browser with thumbnails and modal viewer
 │   ├── human_verification.py  # Manual review interface
 │   ├── remove_duplicates.py   # Duplicate detection
 │   ├── explore_results.py     # Results visualization
@@ -53,12 +54,10 @@ streamlit-AddaxAI/
 │   └── settings.py            # Application settings
 ├── components/                # Reusable UI components
 ├── utils/                     # Core utilities and business logic
-├── config/                    # Application configuration
-├── data/                      # Test data and samples
-├── assets/                    # Static assets (CSS, images, etc.)
-├── models/                    # AI model files
 ├── classification/            # Classification inference system
-└── envs/                      # Conda environments
+├── assets/                    # Static assets (CSS, images, etc.)
+├── envs/                      # Conda environments
+└── docs/                      # Documentation files
 ```
 
 ## Documentation
