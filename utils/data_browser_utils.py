@@ -86,6 +86,7 @@ def image_viewer_modal():
         if new_show_bbox != show_bbox:
             set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
             show_bbox = new_show_bbox
+            st.rerun()
         
         # Load and display image
         try:
@@ -118,7 +119,7 @@ def image_viewer_modal():
                         img = img_with_bbox
                 
                 # Display image
-                st.image(img, use_container_width=True)
+                st.image(img, width="stretch")
             else:
                 st.error(f"Image file not found: {image_path}")
                 

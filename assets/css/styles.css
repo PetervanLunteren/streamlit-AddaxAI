@@ -1,12 +1,12 @@
 /* Hide Streamlit menu and decorations */
-#MainMenu {visibility: hidden;}
+/* #MainMenu {visibility: hidden;} */
 .stDeployButton {display: none;}
 footer {visibility: hidden;}
 #stDecoration {display: none;}
 
 /* Reduce space above widgets */
 .block-container {
-    padding-top: 25px !important;
+    padding-top: 30px !important;
 }
 
 /* Target st-modal containers - force 800px width */

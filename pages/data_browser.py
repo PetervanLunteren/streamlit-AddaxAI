@@ -77,6 +77,26 @@ if df.empty:
     st.warning("No detection results found.")
     st.stop()
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHECK IF MODAL SHOULD BE SHOWN - GUARD HEAVY CODE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Check if modal should be displayed
+if get_session_var("explore_results", "show_modal_image_viewer", False):
+    # Only render the modal, skip all heavy grid processing
+    modal_image_viewer = Modal(
+        title="#### Image Viewer", 
+        key="image_viewer", 
+        show_close_button=False
+    )
+    with modal_image_viewer.container():
+        image_viewer_modal()
+    st.stop()  # Don't render anything else
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN GRID VIEW (Only rendered when modal is NOT open)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 # Image size controls both row height and image column width
 image_size_options = {
     size: {"height": height, "width": IMAGE_COLUMN_WIDTHS[size]}
@@ -88,7 +108,7 @@ col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(10)
 
 with col8:
     # Simple date filter popover
-    with st.popover(":material/filter_alt:", help="Date Filter", use_container_width=True):
+    with st.popover(":material/filter_alt:", help="Date Filter", width="stretch"):
         with st.form("date_filter_form"):
             
             # Get min and max dates from the full data
@@ -154,12 +174,20 @@ with col8:
                 format="%.2f"
             )
             
+            # Checkbox for including unclassified detections
+            saved_include_unclassified = saved_settings.get('include_unclassified', True)
+            include_unclassified = st.checkbox(
+                "Include detections without classification",
+                value=saved_include_unclassified,
+                help="When checked, shows detections that haven't been classified for species"
+            )
+            
             # Buttons
             col1, col2 = st.columns([1, 1])
             with col1:
-                apply_filter = st.form_submit_button("Apply", use_container_width=True, type="primary")
+                apply_filter = st.form_submit_button("Apply", width="stretch", type="primary")
             with col2:
-                clear_all = st.form_submit_button("Clear All", use_container_width=True)
+                clear_all = st.form_submit_button("Clear All", width="stretch")
             
             if apply_filter:
                 # Save filter settings to config
@@ -171,6 +199,7 @@ with col8:
                         "det_conf_max": det_conf_range[1],
                         "cls_conf_min": cls_conf_range[0],
                         "cls_conf_max": cls_conf_range[1],
+                        "include_unclassified": include_unclassified,
                         "image_size": saved_settings.get('image_size', 'medium')
                     }
                 }
@@ -199,6 +228,7 @@ with col8:
                         "det_conf_max": 1.0,
                         "cls_conf_min": 0.0,
                         "cls_conf_max": 1.0,
+                        "include_unclassified": True,
                         "image_size": saved_settings.get('image_size', 'medium')
                     }
                 }
@@ -219,7 +249,7 @@ with col8:
 
 with col9:
     # Download popover with material icon
-    with st.popover(":material/download:", help="Download Data", use_container_width=True):
+    with st.popover(":material/download:", help="Download Data", width="stretch"):
         # Get the filtered dataframe from session state
         df_to_download = st.session_state.get('results_detections_filtered', df)
         
@@ -287,7 +317,7 @@ with col9:
 
 with col10:
     # Settings popover with material icon
-    with st.popover(":material/settings:", help="Image Size Settings", use_container_width=True):        
+    with st.popover(":material/settings:", help="Image Size Settings", width="stretch"):        
         # Get the saved or default value for the segmented control
         default_image_size = saved_settings.get('image_size', DEFAULT_SIZE_OPTION)
         
@@ -305,6 +335,11 @@ with col10:
                 "aggrid_settings": {
                     "date_start": saved_settings.get('date_start', ''),
                     "date_end": saved_settings.get('date_end', ''),
+                    "det_conf_min": saved_settings.get('det_conf_min', 0.0),
+                    "det_conf_max": saved_settings.get('det_conf_max', 1.0),
+                    "cls_conf_min": saved_settings.get('cls_conf_min', 0.0),
+                    "cls_conf_max": saved_settings.get('cls_conf_max', 1.0),
+                    "include_unclassified": saved_settings.get('include_unclassified', True),
                     "image_size": selected_size
                 }
             }
@@ -355,10 +390,19 @@ if 'results_detections_filtered' not in st.session_state:
         if 'classification_confidence' in filtered_df.columns:
             cls_conf_min = saved_settings['cls_conf_min']
             cls_conf_max = saved_settings['cls_conf_max']
-            filtered_df = filtered_df[
-                (filtered_df['classification_confidence'] >= cls_conf_min) & 
-                (filtered_df['classification_confidence'] <= cls_conf_max)
-            ].copy()
+            include_unclass = saved_settings.get('include_unclassified', True)
+            
+            if include_unclass:
+                # Include both classified (in range) and unclassified (NaN) detections
+                mask = (filtered_df['classification_confidence'].isna()) | \
+                       ((filtered_df['classification_confidence'] >= cls_conf_min) & 
+                        (filtered_df['classification_confidence'] <= cls_conf_max))
+            else:
+                # Only classified detections in range
+                mask = (filtered_df['classification_confidence'] >= cls_conf_min) & \
+                       (filtered_df['classification_confidence'] <= cls_conf_max)
+            
+            filtered_df = filtered_df[mask].copy()
     
     # Store filtered dataframe in session state
     st.session_state['results_detections_filtered'] = filtered_df
@@ -767,20 +811,6 @@ if 'columnDefs' in grid_options:
     grid_options['columnDefs'] = ordered_cols
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# IMAGE VIEWER MODAL
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Modal for image viewer - only create when needed
-if get_session_var("explore_results", "show_modal_image_viewer", False):
-    modal_image_viewer = Modal(
-        title="#### Image Viewer", 
-        key="image_viewer", 
-        show_close_button=False
-    )
-    with modal_image_viewer.container():
-        image_viewer_modal()
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # ROW SELECTION DISPLAY (ABOVE TABLE)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -834,11 +864,6 @@ if (grid_response['selected_rows'] is not None and len(grid_response['selected_r
             set_session_var("explore_results", "modal_current_image_index", modal_index)
             set_session_var("explore_results", "show_modal_image_viewer", True)
             st.rerun()
-
-# Show selection hint when no row is selected
-if not (grid_response['selected_rows'] is not None and len(grid_response['selected_rows']) > 0):
-    with selected_row_placeholder.container():
-        st.info("Click on any row to view the full-resolution image")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGINATION CONTROLS (BOTTOM) - Same as explore_results.py

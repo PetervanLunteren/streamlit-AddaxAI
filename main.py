@@ -15,10 +15,11 @@ Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
 TODOs FOR NOW:
-- There is a bug in the bounding box visualisation, or somewhere else. The boxes are not in the right place. See example images here: /Users/peter/Downloads/wrong-boxes
-- make sure the data browser (and more specifically the conf filters allow detections of only animals, no cls values. I believe there is a bug somewhere. 
+- 
 
 TODOs FOR LATER:
+- make sure the deploymentID is not called deploymentID, but RunID. That way we can put non-deployments under this name too. 
+- add a segmente contorl at the first step of the wizard that says: is this a deployment? Yes or no. If not, store in the map.json the same way (under projectID and runID), but location = None. 
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
 - Repeat detection elimination
@@ -176,6 +177,7 @@ if st.session_state == {}:
                 "det_conf_max": 1.0,
                 "cls_conf_min": 0.0,
                 "cls_conf_max": 1.0,
+                "include_unclassified": True,
                 "image_size": "medium"
             }
         }
@@ -418,14 +420,14 @@ if mode == 1:  # Advanced mode requires project context
                 set_session_var("shared", "selected_projectID", selected_projectID)
         
         with col2:
-            if st.button(":material/add_circle:", help="Add new project", use_container_width=True):
+            if st.button(":material/add_circle:", help="Add new project", width="stretch"):
                 set_session_var("analyse_advanced", "show_modal_add_project", True)
                 st.rerun()
     
     else:
         # No projects exist - show button to create first project
         print_widget_label("Project", help_text="Create your first project to get started.", sidebar=True)
-        if st.sidebar.button(":material/add_circle: Create first project", use_container_width=True):
+        if st.sidebar.button(":material/add_circle: Create first project", width="stretch"):
             set_session_var("analyse_advanced", "show_modal_add_project", True)
             st.rerun()
 

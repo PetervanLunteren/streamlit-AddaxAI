@@ -113,14 +113,19 @@ def load_detection_results_dataframe():
                                 # Map detection category ID to actual label
                                 detection_label = detection_categories[detection_category_id]
                                 
-                                # Extract classification data - should always be present
-                                classifications = detection["classifications"]
-                                # Take the first classification (highest confidence)
-                                classification_id = classifications[0][0]
-                                classification_conf = float(classifications[0][1])
-                                
-                                # Map classification ID to actual label
-                                classification_label = classification_categories[classification_id]
+                                # Extract classification data - may not be present if cls_modelID was "NONE"
+                                if "classifications" in detection and detection["classifications"]:
+                                    classifications = detection["classifications"]
+                                    # Take the first classification (highest confidence)
+                                    classification_id = classifications[0][0]
+                                    classification_conf = float(classifications[0][1])
+                                    # Map classification ID to actual label
+                                    classification_label = classification_categories[classification_id]
+                                else:
+                                    # No classification performed
+                                    classification_id = None
+                                    classification_conf = None
+                                    classification_label = None
                                 
                                 # Create row data
                                 row = {
