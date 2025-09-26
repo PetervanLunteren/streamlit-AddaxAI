@@ -15,10 +15,7 @@ Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
 TODOs FOR NOW:
-- ✓ FIXED: Location validation now allows spaces in location names 
-- ✓ FIXED: Project selector moved to step 0, step 1 now focuses only on deployment metadata 
-- CHECK: if NONE cls model is selected, then dont show the cls pbars. 
-- The loader is not blocking... I need to thinik of how to do that. I think I hgad it working with a st_modal() before, but I lost those commits... st_modal is blocking, and you can use streamlit widgets, like the squirell animation and st.loaders
+- continue with the data brwoser page - fix the modal view for image details
 - make the detections page for images too. 
 
 TODOs FOR LATER:

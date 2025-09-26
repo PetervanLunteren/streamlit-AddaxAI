@@ -304,7 +304,7 @@ def run_process_queue(
             inject_datetime_into_video_json(video_json_path, deployment.get('filename_datetime_dict', {}))
 
             # Video classification
-            if selected_cls_modelID:
+            if selected_cls_modelID and selected_cls_modelID != "NONE":
                 # Check for cancellation before starting video classification
                 if st.session_state.get(cancel_key, False):
                     break
@@ -331,7 +331,7 @@ def run_process_queue(
                 continue
 
             # Image classification
-            if selected_cls_modelID:
+            if selected_cls_modelID and selected_cls_modelID != "NONE":
                 # Check for cancellation before starting image classification
                 if st.session_state.get(cancel_key, False):
                     break
