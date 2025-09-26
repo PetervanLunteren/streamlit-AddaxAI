@@ -15,7 +15,6 @@ Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
 TODOs FOR NOW:
-- add a segmente contorl at the first step of the wizard that says: is this a deployment? Yes or no. If not, store in the map.json the same way (under projectID and runID), but location = None. 
 - add location: "Location ID contains invalid characters: . Only letters, numbers, hyphens, and underscores are allowed." spaces are also allowed. 
 - place the project selector widget in the first step of the wizard. The second step should only be deployment info. 
 - CHECK: if NONE cls model is selected, then dont show the cls pbars. 
