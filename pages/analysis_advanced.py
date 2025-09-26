@@ -34,8 +34,8 @@ from utils.analysis_utils import (browse_directory_widget,
                                   country_selector_widget,
                                  state_selector_widget,
                                   load_taxon_mapping_cached,
-                                  add_deployment_to_queue,
-                                  remove_deployment_from_queue,
+                                  add_run_to_queue,
+                                  remove_run_from_queue,
                                   get_model_friendly_name,
                                   install_env,
                                   run_process_queue,
@@ -100,7 +100,7 @@ if get_session_var("analyse_advanced", "show_modal_download_model", False):
 # modal for processing queue - only create when needed
 if get_session_var("analyse_advanced", "show_modal_process_queue", False):
     modal_process_queue = Modal(
-        f"#### Processing deployments...", key="process_queue", show_close_button=False)
+        f"#### Processing runs...", key="process_queue", show_close_button=False)
     with modal_process_queue.container():
         # Process queue should always be loaded from persistent storage
         process_queue = analyse_advanced_vars.get("process_queue", [])
@@ -165,17 +165,17 @@ if get_session_var("analyse_advanced", "show_modal_species_selector", False):
 st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a  task of rearrangin the previous code.*")
 
 # header
-st.header(":material/rocket_launch: Add deployment to database", divider="grey")
+st.header(":material/rocket_launch: Add data", divider="grey")
 st.write(
-    "You can analyze one deployment at a time using AI models. "
-    "A deployment refers to all the images and videos stored on a single SD card retrieved from the field. "
+    "You can analyze one folder at a time using AI models. "
+    "A folder refers to all the images and videos stored on a single SD card retrieved from the field. "
     "This typically corresponds to one physical camera at one location during a specific period. "
     "The analysis results are saved to a recognition file, which can then be used by other tools in the platform."
 )
 
 st.write("")
-st.subheader(":material/sd_card: Deployment information", divider="grey")
-st.write("Fill in the information related to this deployment. A deployment refers to all the images and videos stored on a single SD card retrieved from the field.")
+st.subheader(":material/sd_card: Run information", divider="grey")
+st.write("Fill in the information related to this run. A run refers to all the images and videos stored in a folder.")
 
 ###### STEPPER BAR ######
 
@@ -191,7 +191,7 @@ stepper = StepperBar(
 )
 stepper.set_step(step)
 
-# this is the stepper bar that will be used to navigate through the steps of the deployment creation process
+# this is the stepper bar that will be used to navigate through the steps of the run creation process
 with st.container(border=True):
 
     # stepper bar progress
@@ -202,12 +202,12 @@ with st.container(border=True):
     # folder selection
     if step == 0:
 
-        st.write("Here you can select the folder where your deployment is located. ")
+        st.write("Here you can select the folder where your data is located. ")
 
         # select folder
         with st.container(border=True):
             print_widget_label("Folder",
-                               help_text="Select the folder where your deployment is located.")
+                               help_text="Select the folder where your data is located.")
             selected_folder = browse_directory_widget()
 
             if selected_folder and os.path.isdir(selected_folder):
@@ -218,6 +218,34 @@ with st.container(border=True):
                 st.error(
                     "The selected folder does not exist. Please select a valid folder.")
                 selected_folder = None
+        
+        # Deployment type selection (only show after folder is selected)
+        if selected_folder and os.path.isdir(selected_folder):
+            with st.container(border=True):
+                print_widget_label(
+                    "Is this a deployment?",
+                    help_text="A deployment refers to data from a camera trap placed at a specific location. Select 'No' if this is just a folder of images without location context."
+                )
+                
+                # Define callback to update session state
+                def on_deployment_type_change():
+                    if "is_deployment_control" in st.session_state:
+                        set_session_var("analyse_advanced", "is_deployment", st.session_state["is_deployment_control"])
+                
+                # Get current selection or default to True (deployment)
+                is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+                
+                # Create segmented control with callback
+                deployment_options = {True: "Yes", False: "No"}
+                st.segmented_control(
+                    "Is this a deployment?",
+                    options=list(deployment_options.keys()),
+                    format_func=deployment_options.get,
+                    default=is_deployment,
+                    label_visibility="collapsed",
+                    key="is_deployment_control",
+                    on_change=on_deployment_type_change
+                )
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -237,7 +265,11 @@ with st.container(border=True):
                           key="project_next_button_dummy")
 
     elif step == 1:
-
+        
+        # Get deployment type from session state
+        is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+        
+        # Always show project selection
         with st.container(border=True):
             print_widget_label(
                 "Project", help_text="help text")
@@ -245,20 +277,36 @@ with st.container(border=True):
             selected_projectID = project_selector_widget()
 
         if selected_projectID:
-
-            # location metadata
-            with st.container(border=True):
-                print_widget_label(
-                    "Location", help_text="help text")
-                selected_locationID = location_selector_widget()
-            # st.write("")
-
-            # camera ID metadata
-            if selected_locationID:
+            
+            # Check if this is a deployment
+            if is_deployment:
+                # Show normal metadata collection for deployments
+                
+                # location metadata
                 with st.container(border=True):
                     print_widget_label(
-                        "Start", help_text="help text")
-                    selected_min_datetime = datetime_selector_widget()
+                        "Location", help_text="help text")
+                    selected_locationID = location_selector_widget()
+                # st.write("")
+
+                # camera ID metadata
+                if selected_locationID:
+                    with st.container(border=True):
+                        print_widget_label(
+                            "Start", help_text="help text")
+                        selected_min_datetime = datetime_selector_widget()
+            else:
+                # For non-deployments, show info and set defaults
+                info_box(
+                    "This is not a deployment, so location and time metadata are not required. The data will be processed without location context.",
+                    title="Non-deployment Data"
+                )
+                # Set default values for non-deployments
+                selected_locationID = None
+                selected_min_datetime = None
+                # Store these in session state
+                set_session_var("analyse_advanced", "selected_locationID", None)
+                set_session_var("analyse_advanced", "selected_min_datetime", None)
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -270,24 +318,32 @@ with st.container(border=True):
                 clear_vars("analyse_advanced")
                 st.rerun()
 
-        if selected_projectID and selected_locationID and selected_min_datetime:
+        # Adjust next button logic based on deployment type
+        if is_deployment:
+            # For deployments, require all fields
+            can_proceed = selected_projectID and selected_locationID and selected_min_datetime
+        else:
+            # For non-deployments, only require project
+            can_proceed = selected_projectID is not None
+            
+        if can_proceed:
             with col_btn_next:
-                if selected_min_datetime:
-                    if st.button(":material/arrow_forward: Next", use_container_width=True):
-                        # Store selections temporarily and advance step
-                        update_session_vars("analyse_advanced", {
-                            "step": 2,
-                            "selected_projectID": selected_projectID,
-                            "selected_locationID": selected_locationID,
-                            "selected_min_datetime": selected_min_datetime
-                        })
-                        # Update persistent general settings with committed projectID
-                        update_vars(section="general_settings",
-                                    updates={"selected_projectID": selected_projectID})
-                        st.rerun()
-                else:
-                    st.button(":material/arrow_forward: Next",
-                              use_container_width=True, disabled=True)
+                if st.button(":material/arrow_forward: Next", use_container_width=True):
+                    # Store selections temporarily and advance step
+                    update_session_vars("analyse_advanced", {
+                        "step": 2,
+                        "selected_projectID": selected_projectID,
+                        "selected_locationID": selected_locationID,
+                        "selected_min_datetime": selected_min_datetime
+                    })
+                    # Update persistent general settings with committed projectID
+                    update_vars(section="general_settings",
+                                updates={"selected_projectID": selected_projectID})
+                    st.rerun()
+        else:
+            with col_btn_next:
+                st.button(":material/arrow_forward: Next",
+                          use_container_width=True, disabled=True)
 
     elif step == 2:
         st.write("MODEL STUFF!")
@@ -458,7 +514,7 @@ with st.container(border=True):
             selected_state = None
             info_box(
                 title="No species identification model selected",
-                msg="This is where you normally would selectw hich species are present in your project area, but you have not selected a species identification model. Please proceed to add the deployment to the queue.")
+                msg="This is where you normally would select which species are present in your project area, but you have not selected a species identification model. Please proceed to add the run to the queue.")
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -499,8 +555,8 @@ with st.container(border=True):
                     # reset step to beginning
                     set_session_var("analyse_advanced", "step", 0)
 
-                    # add deployment to persistent queue
-                    add_deployment_to_queue()
+                    # add run to persistent queue
+                    add_run_to_queue()
 
                     st.rerun()
 
@@ -513,26 +569,26 @@ st.write("")
 st.subheader(":material/traffic_jam: Process queue", divider="grey")
 process_queue = analyse_advanced_vars.get("process_queue", [])
 if len(process_queue) == 0:
-    st.write("You currently have no deployments in the queue. Please add a deployment to the queue to start processing.")
+    st.write("You currently have no runs in the queue. Please add a run to the queue to start processing.")
     st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary", disabled=True,
-              help="You need to add a deployment to the queue first.")
+              help="You need to add a run to the queue first.")
 else:
 
     st.write(
-        f"You currently have {len(process_queue)} deployments in the queue.")
+        f"You currently have {len(process_queue)} runs in the queue.")
     # col1, _ = st.columns([1, 1])
     # with col1:
 
     with st.expander(":material/visibility: View queue details", expanded=False):
         with st.container(border=True, height=320):
-            for i, deployment in enumerate(process_queue):
+            for i, run in enumerate(process_queue):
                 with st.container(border=True):
-                    selected_folder = deployment['selected_folder']
-                    selected_projectID = deployment['selected_projectID']
-                    selected_locationID = deployment['selected_locationID']
-                    selected_min_datetime = deployment['selected_min_datetime']
-                    selected_det_modelID = deployment['selected_det_modelID']
-                    selected_cls_modelID = deployment['selected_cls_modelID']
+                    selected_folder = run['selected_folder']
+                    selected_projectID = run['selected_projectID']
+                    selected_locationID = run['selected_locationID']
+                    selected_min_datetime = run['selected_min_datetime']
+                    selected_det_modelID = run['selected_det_modelID']
+                    selected_cls_modelID = run['selected_cls_modelID']
                     col1, col2, col3 = st.columns([6, 1, 1])
 
                     with col1:
@@ -552,31 +608,31 @@ else:
                     with col2:
                         if st.button(":material/delete:", help="Remove from queue", key=f"remove_{i}",
                                      use_container_width=True):
-                            remove_deployment_from_queue(i)
+                            remove_run_from_queue(i)
                             st.rerun()
                     with col3:
-                        # st.popover(f"Process {deployment['selected_folder']}")
+                        # st.popover(f"Process {run['selected_folder']}")
                         with st.popover(":material/visibility:", help="Show details", use_container_width=True):
-                            # Format all deployment details with consistent styling
-                            folder_short = "..." + deployment['selected_folder'][-45:] if len(deployment['selected_folder']) > 45 else deployment['selected_folder']
+                            # Format all run details with consistent styling
+                            folder_short = "..." + run['selected_folder'][-45:] if len(run['selected_folder']) > 45 else run['selected_folder']
                             
                             # Get friendly names for models
-                            cls_model_name = get_model_friendly_name(deployment['selected_cls_modelID'], 'cls', model_meta)
-                            det_model_name = get_model_friendly_name(deployment['selected_det_modelID'], 'det', model_meta)
+                            cls_model_name = get_model_friendly_name(run['selected_cls_modelID'], 'cls', model_meta)
+                            det_model_name = get_model_friendly_name(run['selected_det_modelID'], 'det', model_meta)
                             
                             # Display all information in formatted style
                             fields = [
                                 ("Folder", folder_short),
-                                ("Project", deployment['selected_projectID']),
-                                ("Location", deployment['selected_locationID']),
+                                ("Project", run['selected_projectID']),
+                                ("Location", run['selected_locationID']),
                                 ("Species identification model", cls_model_name),
                                 ("Animal detection model", det_model_name),
-                                ("Selected species", f"{len(deployment['selected_species'])} species" if deployment['selected_species'] else None),
-                                ("Country", deployment['selected_country']),
-                                ("State", deployment['selected_state']),
-                                ("Start", deployment['selected_min_datetime'].replace('T', ' ') if deployment['selected_min_datetime'] else None),
-                                ("Number of images", deployment.get('n_images')),
-                                ("Number of videos", deployment.get('n_videos'))
+                                ("Selected species", f"{len(run['selected_species'])} species" if run['selected_species'] else None),
+                                ("Country", run['selected_country']),
+                                ("State", run['selected_state']),
+                                ("Start", run['selected_min_datetime'].replace('T', ' ') if run['selected_min_datetime'] else None),
+                                ("Number of images", run.get('n_images')),
+                                ("Number of videos", run.get('n_videos'))
                             ]
                             
                             # Only show fields that have values

@@ -493,7 +493,7 @@ with st.spinner("Processing images for current page..."):
             'timestamp': parse_timestamps(pd.Series([row.get('timestamp')])).iloc[0].strftime('%Y-%m-%d %H:%M:%S') if pd.notna(row.get('timestamp')) else '',
             'project_id': row.get('project_id') if pd.notna(row.get('project_id')) else '',
             'location_id': row.get('location_id') if pd.notna(row.get('location_id')) else '',
-            'deployment_id': row.get('deployment_id') if pd.notna(row.get('deployment_id')) else '',
+            'run_id': row.get('run_id') if pd.notna(row.get('run_id')) else '',
             'bbox_x': round(row.get('bbox_x'), 4) if pd.notna(row.get('bbox_x')) else None,
             'bbox_y': round(row.get('bbox_y'), 4) if pd.notna(row.get('bbox_y')) else None,
             'bbox_width': round(row.get('bbox_width'), 4) if pd.notna(row.get('bbox_width')) else None,
@@ -560,7 +560,7 @@ gb.configure_column("classification_confidence", headerName="Classification conf
 gb.configure_column("timestamp", headerName="Timestamp", width=150, filter=False, sortable=False)
 gb.configure_column("project_id", headerName="Project ID", width=100, hide=True, filter=False, sortable=False)  # Hidden like in explore_results
 gb.configure_column("location_id", headerName="Location ID", width=100, filter=False, sortable=False)
-gb.configure_column("deployment_id", headerName="Deployment ID", width=110, filter=False, sortable=False)
+gb.configure_column("run_id", headerName="Run ID", width=110, filter=False, sortable=False)
 gb.configure_column("bbox_x", headerName="BBox X", width=80, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
 gb.configure_column("bbox_y", headerName="BBox Y", width=80, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
 gb.configure_column("bbox_width", headerName="BBox W", width=80, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
@@ -583,7 +583,7 @@ column_order = [
     'timestamp',
     'project_id',  # Hidden
     'location_id',
-    'deployment_id',
+    'run_id',
     'bbox_x',
     'bbox_y',
     'bbox_width',

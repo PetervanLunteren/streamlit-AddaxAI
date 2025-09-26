@@ -62,7 +62,6 @@ from utils.huggingface_downloader import HuggingFaceRepoDownloader
 from utils.config import log
 
 from datetime import datetime
-
 from PIL import Image
 from PIL.ExifTags import TAGS
 from hachoir.metadata import extractMetadata
@@ -213,10 +212,10 @@ def run_process_queue(
     general_settings = get_cached_vars(section="general_settings")
     detection_threshold = general_settings.get("INFERENCE_MIN_CONF_THRES_DETECTION", 0.1)
 
-    # calculate the total number of deployments to process
+    # calculate the total number of runs to process
     process_queue = get_cached_vars(section="analyse_advanced").get("process_queue", [])
-    total_deployment_idx = len(process_queue)
-    current_deployment_idx = 1
+    total_run_idx = len(process_queue)
+    current_run_idx = 1
 
     # Check if cancelled before starting
     if st.session_state.get(cancel_key, False):
@@ -243,7 +242,7 @@ def run_process_queue(
 
         # run it on the first element
         if not process_queue:
-            success_box("All deployments have been processed!")
+            success_box("All runs have been processed!")
             break
 
         deployment = process_queue[0]
@@ -260,6 +259,7 @@ def run_process_queue(
         selected_cls_modelID = deployment['selected_cls_modelID']
         selected_country = deployment.get('selected_country', None)
         selected_state = deployment.get('selected_state', None)
+        is_deployment = deployment.get('is_deployment')
 
 
         # Get media counts from deployment queue item (already computed during folder metadata check)
@@ -276,14 +276,14 @@ def run_process_queue(
         pbars.set_pbar_visibility(visible_pbars)
         
         pbars.update_label(
-            f"Processing deployment: :gray-background[{current_deployment_idx}] of :gray-background[{total_deployment_idx}]")
+            f"Processing run: :gray-background[{current_run_idx}] of :gray-background[{total_run_idx}]")
 
         model_meta = get_cached_model_meta()  # ✅ OPTIMIZED: Uses session state cache
 
         # Create separate JSON files for videos and images
-        video_json_path = os.path.join(selected_folder, "addaxai-deployment-video-in-progress.json")
-        image_json_path = os.path.join(selected_folder, "addaxai-deployment-image-in-progress.json") 
-        final_json_path = os.path.join(selected_folder, "addaxai-deployment.json")
+        video_json_path = os.path.join(selected_folder, "addaxai-run-video-in-progress.json")
+        image_json_path = os.path.join(selected_folder, "addaxai-run-image-in-progress.json") 
+        final_json_path = os.path.join(selected_folder, "addaxai-run.json")
         
         json_files_to_merge = []
 
@@ -354,22 +354,40 @@ def run_process_queue(
         # if all processes are done, update the map file 
         if os.path.exists(final_json_path):
 
-            # first add the deployment info to the map file
+            # first add the run info to the map file
             map, map_file = get_cached_map()
-            deployment_id = unique_animal_string()
-            deployments = map["projects"][selected_projectID]["locations"][selected_locationID].get(
-                "deployments", {})
-            deployments[deployment_id] = {
+            run_id = unique_animal_string()
+            
+            # Handle None location for non-deployments
+            if selected_locationID is None:
+                # Use "NONE" as the key for no location
+                no_location_key = "NONE"
+                # Ensure the project has a locations dict
+                if "locations" not in map["projects"][selected_projectID]:
+                    map["projects"][selected_projectID]["locations"] = {}
+                # Create no location entry if it doesn't exist
+                if no_location_key not in map["projects"][selected_projectID]["locations"]:
+                    map["projects"][selected_projectID]["locations"][no_location_key] = {"runs": {}}
+                runs = map["projects"][selected_projectID]["locations"][no_location_key].get("runs", {})
+            else:
+                # Normal deployment with location
+                runs = map["projects"][selected_projectID]["locations"][selected_locationID].get("runs", {})
+            
+            runs[run_id] = {
                 "folder": selected_folder,
                 "min_datetime": selected_min_datetime,
                 "det_modelID": selected_det_modelID,
                 "cls_modelID": selected_cls_modelID,
                 "country": selected_country,
-                "state": selected_state
+                "state": selected_state,
+                "is_deployment": is_deployment
             }
 
             # write the updated map to the map file
-            map["projects"][selected_projectID]["locations"][selected_locationID]["deployments"] = deployments
+            if selected_locationID is None:
+                map["projects"][selected_projectID]["locations"]["NONE"]["runs"] = runs
+            else:
+                map["projects"][selected_projectID]["locations"][selected_locationID]["runs"] = runs
 
             with open(map_file, "w") as file:
                 json.dump(map, file, indent=2)
@@ -384,7 +402,7 @@ def run_process_queue(
             # # once that is done, remove the deployment from the process queue, so that it resumes the next deployment if something happens
             replace_vars(section="analyse_advanced", new_vars={
                          "process_queue": process_queue[1:]})
-            current_deployment_idx += 1
+            current_run_idx += 1
             
 
             
@@ -1942,7 +1960,7 @@ def add_location(location_id, lat, lon):
         "lat": lat,
         "lon": lon,
         # "selected_deployment": None,
-        "deployments": {},
+        "runs": {},
     }
 
     # add the selected location ID to session state instead of persistent vars
@@ -1986,7 +2004,7 @@ def add_project(projectID, comments):
     # Reset session state selections when new project is added
     update_session_vars("analyse_advanced", {
         "selected_locationID": None,  # reset location selection
-        "selected_deploymentID": None,  # reset deployment selection
+        "selected_runID": None,  # reset run selection
     })
 
     # update the session state variable for selected project ID
@@ -3018,7 +3036,7 @@ def get_all_leaf_values(nodes):
     return leaf_values
 
 
-def add_deployment_to_queue():
+def add_run_to_queue():
 
     # Load persistent queue from file
     analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
@@ -3038,6 +3056,7 @@ def add_deployment_to_queue():
     selected_cls_modelID = get_session_var(
         "analyse_advanced", "selected_cls_modelID")
     selected_species = get_session_var("analyse_advanced", "selected_species")
+    is_deployment = get_session_var("analyse_advanced", "is_deployment")
     
     # Get EXIF datetime, file paths, filename dict, and file counts from session state (computed by check_folder_metadata)
     exif_min_datetime = get_session_var("analyse_advanced", "exif_min_datetime")
@@ -3066,8 +3085,8 @@ def add_deployment_to_queue():
             from assets.dicts.countries import us_states_data
             selected_state = us_states_data.get(state_display, None)
 
-    # Create a new deployment entry
-    new_deployment = {
+    # Create a new run entry
+    new_run = {
         "selected_folder": selected_folder,
         "selected_projectID": selected_projectID,
         "selected_locationID": selected_locationID,
@@ -3077,6 +3096,7 @@ def add_deployment_to_queue():
         "selected_species": selected_species,
         "selected_country": selected_country,
         "selected_state": selected_state,
+        "is_deployment": is_deployment,
         "exif_min_datetime": exif_min_datetime,
         "exif_max_datetime": exif_max_datetime,
         "file_min_datetime": file_min_datetime,
@@ -3088,7 +3108,7 @@ def add_deployment_to_queue():
 
     # Add the new deployment to the queue
 
-    process_queue.append(new_deployment)
+    process_queue.append(new_run)
 
     # write back to the vars file
     replace_vars(section="analyse_advanced", new_vars={
@@ -3104,14 +3124,14 @@ def add_deployment_to_queue():
     # return
 
 
-def remove_deployment_from_queue(index):
-    """Remove a deployment from the process queue by index."""
+def remove_run_from_queue(index):
+    """Remove a run from the process queue by index."""
     
     # Load persistent queue from file
     analyse_advanced_vars = get_cached_vars(section="analyse_advanced")
     process_queue = analyse_advanced_vars.get("process_queue", [])
     
-    # Remove the deployment at the specified index
+    # Remove the run at the specified index
     if 0 <= index < len(process_queue):
         process_queue.pop(index)
         

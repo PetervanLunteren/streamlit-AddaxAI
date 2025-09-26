@@ -558,9 +558,9 @@ def image_viewer_modal():
         # Location information
         st.markdown("**Location**")
         location_id = current_row.get('location_id', 'N/A')
-        deployment_id = current_row.get('deployment_id', 'N/A')
+        run_id = current_row.get('run_id', 'N/A')
         st.write(f"• Location: {location_id}")
-        st.write(f"• Deployment: {deployment_id}")
+        st.write(f"• Run: {run_id}")
         
         # File paths
         st.markdown("**File Path**")

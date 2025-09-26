@@ -15,20 +15,19 @@ Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
 TODOs FOR NOW:
-- 
+- add a segmente contorl at the first step of the wizard that says: is this a deployment? Yes or no. If not, store in the map.json the same way (under projectID and runID), but location = None. 
+- add location: "Location ID contains invalid characters: . Only letters, numbers, hyphens, and underscores are allowed." spaces are also allowed. 
+- place the project selector widget in the first step of the wizard. The second step should only be deployment info. 
+- CHECK: if NONE cls model is selected, then dont show the cls pbars. 
+- The loader is not blocking... I need to thinik of how to do that. I think I hgad it working with a st_modal() before, but I lost those commits... st_modal is blocking, and you can use streamlit widgets, like the squirell animation and st.loaders
+- make the detections page for images too. 
 
 TODOs FOR LATER:
-- make sure the deploymentID is not called deploymentID, but RunID. That way we can put non-deployments under this name too. 
-- add a segmente contorl at the first step of the wizard that says: is this a deployment? Yes or no. If not, store in the map.json the same way (under projectID and runID), but location = None. 
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/postprocess_batch_results.py
-- Repeat detection elimination
 - material icons must be offline, but I can only do that at the end when I know which icons I'm using.
-- CHECK: if NONE cls model is selected, then dont show the cls pbars. 
 - if no CLS is selected, it should skip species selection and the button should be add to queue. 
 - the license warning should be for all models, not just the yolov11 models. Where? During the installation wizard probabaly. The user has to agree to the licenses when installing addaxai.
-- CHECK: delete the all_classes from the variables json? It should probabaly take it from the taxon csv right? That is redundant and error prone.
-- The loader is not blocking... I need to thinik of how to do that. I think I hgad it working with a st_modal() before, but I lost those commits... st_modal is blocking, and you can use streamlit widgets, like the squirell animation and st.loaders
 """
 
 # Standard library imports
@@ -232,9 +231,9 @@ if st.session_state == {}:
         st.session_state["results_detections"] = results_df
         
         if len(results_df) > 0:
-            log(f"Loaded {len(results_df)} detections from {len(results_df['deployment_id'].unique())} deployments")
+            log(f"Loaded {len(results_df)} detections from {len(results_df['run_id'].unique())} runs")
         else:
-            log("No detection results found in completed deployments")
+            log("No detection results found in completed runs")
             
     except Exception as e:
         error_msg = f"Failed to load detection results: {str(e)}"
