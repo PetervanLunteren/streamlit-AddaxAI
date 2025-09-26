@@ -183,7 +183,7 @@ st.write("Current step:", step)
 
 # --- Create stepper
 stepper = StepperBar(
-    steps=["Folder", "Deployment", "Model", "Species"],
+    steps=["Data", "Deployment", "Model", "Species"],
     orientation="horizontal",
     active_color="#086164", 
     completed_color="#0861647D",
@@ -199,14 +199,14 @@ with st.container(border=True):
     st.markdown(stepper.display(), unsafe_allow_html=True)
     st.divider()
 
-    # folder selection
+    # data selection (folder, project, deployment type)
     if step == 0:
 
-        st.write("Here you can select the folder where your data is located. ")
+        st.write("Select your data folder, project, and specify the type of data.")
 
-        # select folder
+        # folder selection (first)
         with st.container(border=True):
-            print_widget_label("Folder",
+            print_widget_label("Where is the data stored?",
                                help_text="Select the folder where your data is located.")
             selected_folder = browse_directory_widget()
 
@@ -218,95 +218,128 @@ with st.container(border=True):
                 st.error(
                     "The selected folder does not exist. Please select a valid folder.")
                 selected_folder = None
+
+        # project selection (second)
+        with st.container(border=True):
+            print_widget_label("Which project does this data belong to?", help_text="Select the project this data belongs to.")
+            selected_projectID = project_selector_widget()
         
-        # Deployment type selection (only show after folder is selected)
-        if selected_folder and os.path.isdir(selected_folder):
-            with st.container(border=True):
-                print_widget_label(
-                    "Is this a deployment?",
-                    help_text="A deployment refers to data from a camera trap placed at a specific location. Select 'No' if this is just a folder of images without location context."
-                )
-                
-                # Define callback to update session state
-                def on_deployment_type_change():
-                    if "is_deployment_control" in st.session_state:
-                        set_session_var("analyse_advanced", "is_deployment", st.session_state["is_deployment_control"])
-                
-                # Get current selection or default to True (deployment)
-                is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
-                
-                # Create segmented control with callback
-                deployment_options = {True: "Yes", False: "No"}
-                st.segmented_control(
-                    "Is this a deployment?",
-                    options=list(deployment_options.keys()),
-                    format_func=deployment_options.get,
-                    default=is_deployment,
-                    label_visibility="collapsed",
-                    key="is_deployment_control",
-                    on_change=on_deployment_type_change
+        # deployment type selection (third - always visible)
+        with st.container(border=True):
+            print_widget_label(
+                "Is this a single camera trap deployment?",
+                help_text="A deployment refers to data from a camera trap placed at a specific location. Select 'No' if this is just a folder of images without location context."
+            )
+            
+            # Define callback to update session state
+            def on_deployment_type_change():
+                if "is_deployment_control" in st.session_state:
+                    set_session_var("analyse_advanced", "is_deployment", st.session_state["is_deployment_control"])
+            
+            # Get current selection or default to True (deployment)
+            is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+            
+            # Create segmented control with callback
+            deployment_options = {True: "Yes", False: "No"}
+            st.segmented_control(
+                "Is this data of a single camera trap deployment?",
+                options=list(deployment_options.keys()),
+                format_func=deployment_options.get,
+                default=is_deployment,
+                label_visibility="collapsed",
+                key="is_deployment_control",
+                on_change=on_deployment_type_change
                 )
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
 
         with col_btn_next:
-            if selected_folder and os.path.isdir(selected_folder):
+            if selected_projectID and selected_folder and os.path.isdir(selected_folder):
                 if st.button(":material/arrow_forward: Next", use_container_width=True):
-                    # Store selected folder temporarily and advance step
-                    set_session_var("analyse_advanced",
-                                    "selected_folder", selected_folder)
-                    set_session_var("analyse_advanced", "step", 1)
+                    # Get current deployment type setting
+                    is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+                    
+                    # Store selected project and folder temporarily
+                    update_session_vars("analyse_advanced", {
+                        "selected_projectID": selected_projectID,
+                        "selected_folder": selected_folder,
+                    })
+                    
+                    # Update persistent general settings with committed projectID
+                    update_vars(section="general_settings",
+                                updates={"selected_projectID": selected_projectID})
+                    
+                    # Skip step 1 for non-deployment data, go directly to step 2 (models)
+                    if is_deployment:
+                        # Go to step 1 (deployment metadata)
+                        set_session_var("analyse_advanced", "step", 1)
+                    else:
+                        # Skip step 1, go directly to step 2 (models)
+                        # Set default values for deployment metadata
+                        update_session_vars("analyse_advanced", {
+                            "selected_locationID": None,
+                            "selected_min_datetime": None,
+                            "step": 2
+                        })
+                    
                     st.rerun()
             else:
                 st.button(":material/arrow_forward: Next",
                           use_container_width=True,
                           disabled=True,
-                          key="project_next_button_dummy")
+                          key="data_next_button_dummy")
 
     elif step == 1:
         
-        # Get deployment type from session state
-        is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+        st.write("Configure deployment metadata for your selected data.")
         
-        # Always show project selection
+        # Get deployment type and project from session state (set in step 0)
+        is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+        selected_projectID = get_session_var("analyse_advanced", "selected_projectID")
+        
+        # # Show current project info
+        # if selected_projectID:
+        #     # Load projects to get the current project name for display
+        #     from utils.analysis_utils import load_known_projects
+        #     projects, _ = load_known_projects()
+        #     current_project_data = projects.get(selected_projectID, {})
+        #     current_project_name = current_project_data.get("name", selected_projectID)
+        #     info_box(f"Data will be added to project: **{current_project_name}**")
+
+        # if selected_projectID:
+            
+        # Check if this is a deployment
+        # if is_deployment:
+        
+        
+        # Show normal metadata collection for deployments
+        
+        # location metadata
         with st.container(border=True):
             print_widget_label(
-                "Project", help_text="help text")
+                "Location", help_text="help text")
+            selected_locationID = location_selector_widget()
+        # st.write("")
 
-            selected_projectID = project_selector_widget()
-
-        if selected_projectID:
-            
-            # Check if this is a deployment
-            if is_deployment:
-                # Show normal metadata collection for deployments
-                
-                # location metadata
-                with st.container(border=True):
-                    print_widget_label(
-                        "Location", help_text="help text")
-                    selected_locationID = location_selector_widget()
-                # st.write("")
-
-                # camera ID metadata
-                if selected_locationID:
-                    with st.container(border=True):
-                        print_widget_label(
-                            "Start", help_text="help text")
-                        selected_min_datetime = datetime_selector_widget()
-            else:
-                # For non-deployments, show info and set defaults
-                info_box(
-                    "This is not a deployment, so location and time metadata are not required. The data will be processed without location context.",
-                    title="Non-deployment Data"
-                )
-                # Set default values for non-deployments
-                selected_locationID = None
-                selected_min_datetime = None
-                # Store these in session state
-                set_session_var("analyse_advanced", "selected_locationID", None)
-                set_session_var("analyse_advanced", "selected_min_datetime", None)
+        # camera ID metadata
+        if selected_locationID:
+            with st.container(border=True):
+                print_widget_label(
+                    "Start", help_text="help text")
+                selected_min_datetime = datetime_selector_widget()
+        # else:
+        #     # For non-deployments, show info and set defaults
+        #     info_box(
+        #         "This is not a deployment, so location and time metadata are not required. The data will be processed without location context.",
+        #         title="Non-deployment Data"
+        #     )
+        #     # Set default values for non-deployments
+        #     selected_locationID = None
+        #     selected_min_datetime = None
+        #     # Store these in session state
+        #     set_session_var("analyse_advanced", "selected_locationID", None)
+        #     set_session_var("analyse_advanced", "selected_min_datetime", None)
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -320,25 +353,21 @@ with st.container(border=True):
 
         # Adjust next button logic based on deployment type
         if is_deployment:
-            # For deployments, require all fields
-            can_proceed = selected_projectID and selected_locationID and selected_min_datetime
+            # For deployments, require location and datetime (project already selected in step 0)
+            can_proceed = selected_locationID and selected_min_datetime
         else:
-            # For non-deployments, only require project
-            can_proceed = selected_projectID is not None
+            # For non-deployments, no additional requirements (project already selected in step 0)
+            can_proceed = True
             
         if can_proceed:
             with col_btn_next:
                 if st.button(":material/arrow_forward: Next", use_container_width=True):
-                    # Store selections temporarily and advance step
+                    # Store deployment metadata and advance step
                     update_session_vars("analyse_advanced", {
                         "step": 2,
-                        "selected_projectID": selected_projectID,
                         "selected_locationID": selected_locationID,
                         "selected_min_datetime": selected_min_datetime
                     })
-                    # Update persistent general settings with committed projectID
-                    update_vars(section="general_settings",
-                                updates={"selected_projectID": selected_projectID})
                     st.rerun()
         else:
             with col_btn_next:

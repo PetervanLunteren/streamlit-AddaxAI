@@ -15,8 +15,8 @@ Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
 TODOs FOR NOW:
-- add location: "Location ID contains invalid characters: . Only letters, numbers, hyphens, and underscores are allowed." spaces are also allowed. 
-- place the project selector widget in the first step of the wizard. The second step should only be deployment info. 
+- ✓ FIXED: Location validation now allows spaces in location names 
+- ✓ FIXED: Project selector moved to step 0, step 1 now focuses only on deployment metadata 
 - CHECK: if NONE cls model is selected, then dont show the cls pbars. 
 - The loader is not blocking... I need to thinik of how to do that. I think I hgad it working with a st_modal() before, but I lost those commits... st_modal is blocking, and you can use streamlit widgets, like the squirell animation and st.loaders
 - make the detections page for images too. 
@@ -302,12 +302,12 @@ st.logo(os.path.join(ADDAXAI_ROOT, "assets", "images", "logo.png"), size="large"
 # Create navigation based on selected mode
 if mode == 0:  # Simple mode - single analysis tool only
     analysis_quick_page = st.Page(
-        os.path.join("pages", "analysis_quick.py"), title=txts["analyse_txt"], icon=":material/rocket_launch:")
+        os.path.join("pages", "analysis_quick.py"), title="Add data", icon=":material/rocket_launch:")
     pg = st.navigation([analysis_quick_page])
     
 elif mode == 1:  # Advanced mode - full toolkit
     analysis_advanced_page = st.Page(
-        os.path.join("pages", "analysis_advanced.py"), title=txts["analyse_txt"], icon=":material/add:")
+        os.path.join("pages", "analysis_advanced.py"), title="Add data", icon=":material/add:")
     remove_duplicates_page = st.Page(
         os.path.join("pages", "remove_duplicates.py"), title="Remove duplicates", icon=":material/reset_image:")
     human_verification_page = st.Page(

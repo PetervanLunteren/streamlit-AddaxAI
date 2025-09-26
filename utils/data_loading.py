@@ -42,12 +42,12 @@ def decode_gps_info(gps_info):
         # Convert GPS coordinates to decimal degrees
         # GPS coordinates are typically stored as [degrees, minutes, seconds]
         if isinstance(gps_lat, list) and len(gps_lat) == 3:
-            lat = gps_lat[0] + gps_lat[1]/60.0 + gps_lat[2]/3600.0
+            lat = float(gps_lat[0]) + float(gps_lat[1])/60.0 + float(gps_lat[2])/3600.0
         else:
             lat = float(gps_lat)
             
         if isinstance(gps_lon, list) and len(gps_lon) == 3:
-            lon = gps_lon[0] + gps_lon[1]/60.0 + gps_lon[2]/3600.0
+            lon = float(gps_lon[0]) + float(gps_lon[1])/60.0 + float(gps_lon[2])/3600.0
         else:
             lon = float(gps_lon)
             
@@ -160,7 +160,7 @@ def load_detection_results_dataframe():
                             # For non-deployments, try to get GPS from image EXIF data
                             if location_id == "NONE":
                                 # Extract GPS from GPSInfo if available
-                                gps_info = image_data.get("GPSInfo")
+                                gps_info = image_data.get("exif_metadata", {}).get("GPSInfo")
                                 if gps_info:
                                     # Decode GPSInfo to lat/lng
                                     image_latitude, image_longitude = decode_gps_info(gps_info)

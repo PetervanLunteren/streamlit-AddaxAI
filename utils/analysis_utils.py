@@ -987,7 +987,7 @@ def add_location_modal():
                 invalid_chars = get_invalid_chars(new_location_id)
                 if invalid_chars:
                     st.error(
-                        f"Location ID contains invalid characters: {', '.join(set(invalid_chars))}. Only letters, numbers, hyphens, and underscores are allowed.")
+                        f"Location ID contains invalid characters: {', '.join(set(invalid_chars))}. Only letters, numbers, spaces, hyphens, and underscores are allowed.")
                 else:
                     st.error(
                         "Location ID format is invalid. It cannot start with '.', '-', or end with '.', and cannot be a reserved system name.")
@@ -1042,7 +1042,7 @@ def is_valid_path_name(name):
     name = name.strip()
 
     # Characters that are generally safe across all systems
-    safe_chars = string.ascii_letters + string.digits + '-_'
+    safe_chars = string.ascii_letters + string.digits + '-_ '
 
     # Check if all characters are safe
     if not all(c in safe_chars for c in name):
@@ -1078,7 +1078,7 @@ def get_invalid_chars(name):
     Returns:
         list: List of invalid characters found
     """
-    safe_chars = string.ascii_letters + string.digits + '-_'
+    safe_chars = string.ascii_letters + string.digits + '-_ '
     return [c for c in name if c not in safe_chars]
 
 
