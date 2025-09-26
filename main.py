@@ -412,10 +412,12 @@ if mode == 1:  # Advanced mode requires project context
                 on_change=on_project_change
             )
             
-            # Ensure the currently selected project is stored in session state
+            # Ensure the currently selected project is stored in session state and persistent storage
             # (handles case where selectbox shows a project but session state is None)
             if selected_projectID and get_session_var("shared", "selected_projectID", None) != selected_projectID:
                 set_session_var("shared", "selected_projectID", selected_projectID)
+                # Also save to persistent storage so it survives restarts
+                update_vars("general_settings", {"selected_projectID": selected_projectID})
         
         with col2:
             if st.button(":material/add_circle:", help="Add new project", width="stretch"):

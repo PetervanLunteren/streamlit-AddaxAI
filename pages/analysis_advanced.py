@@ -25,7 +25,7 @@ from utils.common import (
     check_model_availability)
 from utils.analysis_utils import (browse_directory_widget,
                                   check_folder_metadata,
-                                  project_selector_widget,
+                                #   project_selector_widget,
                                   datetime_selector_widget,
                                   location_selector_widget, 
                                   cls_model_selector_widget,
@@ -68,6 +68,13 @@ mode = st.session_state["shared"]["mode"]
 
 # Load persistent vars (needs fresh data for queue management)
 analyse_advanced_vars = load_vars(section="analyse_advanced")
+general_settings_vars = load_vars(section="general_settings")
+
+# Ensure shared session state has the selected project (important for restarts)
+if "shared" not in st.session_state:
+    st.session_state["shared"] = {}
+if "selected_projectID" not in st.session_state["shared"]:
+    st.session_state["shared"]["selected_projectID"] = general_settings_vars.get("selected_projectID", None)
 
 # Initialize session state for this tool
 init_session_state("analyse_advanced")
@@ -181,15 +188,59 @@ st.write("Fill in the information related to this run. A run refers to all the i
 
 st.write("Current step:", step)
 
-# --- Create stepper
+# --- Create dynamic stepper based on deployment type and classification model selection
+last_deployment_type = general_settings_vars.get("last_deployment_type", True)
+is_deployment = get_session_var("analyse_advanced", "is_deployment", last_deployment_type)
+
+# Check if classification model is selected (affects whether species step is shown)
+selected_cls_modelID = get_session_var("analyse_advanced", "selected_cls_modelID", None)
+has_classification_model = selected_cls_modelID and selected_cls_modelID != "NONE"
+
+# Build stepper steps dynamically
+stepper_steps = ["Data"]
+
+if is_deployment:
+    stepper_steps.append("Deployment")
+
+stepper_steps.append("Model")
+
+if has_classification_model:
+    stepper_steps.append("Species")
+
+# Map internal step numbers to stepper display
+if is_deployment and has_classification_model:
+    # Full 4-step wizard: Data, Deployment, Model, Species
+    current_stepper_step = step
+elif is_deployment and not has_classification_model:
+    # 3-step wizard: Data, Deployment, Model (no species)
+    current_stepper_step = step
+elif not is_deployment and has_classification_model:
+    # 3-step wizard: Data, Model, Species (skip deployment)
+    if step == 0:
+        current_stepper_step = 0  # Data
+    elif step == 2:
+        current_stepper_step = 1  # Model (internal step 2 -> display step 1)
+    elif step == 3:
+        current_stepper_step = 2  # Species (internal step 3 -> display step 2)
+    else:
+        current_stepper_step = 0  # Fallback
+else:
+    # 2-step wizard: Data, Model (skip deployment and species)
+    if step == 0:
+        current_stepper_step = 0  # Data
+    elif step == 2:
+        current_stepper_step = 1  # Model (internal step 2 -> display step 1)
+    else:
+        current_stepper_step = 0  # Fallback
+
 stepper = StepperBar(
-    steps=["Data", "Deployment", "Model", "Species"],
+    steps=stepper_steps,
     orientation="horizontal",
     active_color="#086164", 
     completed_color="#0861647D",
     inactive_color="#dadfeb"
 )
-stepper.set_step(step)
+stepper.set_step(current_stepper_step)
 
 # this is the stepper bar that will be used to navigate through the steps of the run creation process
 with st.container(border=True):
@@ -202,93 +253,114 @@ with st.container(border=True):
     # data selection (folder, project, deployment type)
     if step == 0:
 
-        st.write("Select your data folder, project, and specify the type of data.")
-
-        # folder selection (first)
-        with st.container(border=True):
-            print_widget_label("Where is the data stored?",
-                               help_text="Select the folder where your data is located.")
-            selected_folder = browse_directory_widget()
-
-            if selected_folder and os.path.isdir(selected_folder):
-                check_folder_metadata()
-                # st.write(st.session_state)
-
-            if selected_folder and not os.path.isdir(selected_folder):
-                st.error(
-                    "The selected folder does not exist. Please select a valid folder.")
-                selected_folder = None
-
-        # project selection (second)
-        with st.container(border=True):
-            print_widget_label("Which project does this data belong to?", help_text="Select the project this data belongs to.")
-            selected_projectID = project_selector_widget()
         
-        # deployment type selection (third - always visible)
-        with st.container(border=True):
-            print_widget_label(
-                "Is this a single camera trap deployment?",
-                help_text="A deployment refers to data from a camera trap placed at a specific location. Select 'No' if this is just a folder of images without location context."
-            )
+
+        # Get current project directly from session state (which is updated by sidebar)
+        selected_projectID = get_session_var("shared", "selected_projectID", None)
+        
+        # Store it in analyse_advanced for later use in subsequent steps
+        if selected_projectID:
+            set_session_var("analyse_advanced", "selected_projectID", selected_projectID)
+        
+        if not selected_projectID:
+            # No project selected - show message to create first project
+            info_box("No project selected. Create your first project using the sidebar. Each run needs to fall under a project.")
+        else:
+        
+
+            st.write("Select your data folder, and specify the type of data.")
             
-            # Define callback to update session state
-            def on_deployment_type_change():
-                if "is_deployment_control" in st.session_state:
-                    set_session_var("analyse_advanced", "is_deployment", st.session_state["is_deployment_control"])
+            # folder selection (first)
+            with st.container(border=True):
+                print_widget_label("Where is the data stored?",
+                                help_text="Select the folder where your data is located.")
+                selected_folder = browse_directory_widget()
+
+                if selected_folder and os.path.isdir(selected_folder):
+                    check_folder_metadata()
+                    # st.write(st.session_state)
+
+                if selected_folder and not os.path.isdir(selected_folder):
+                    st.error(
+                        "The selected folder does not exist. Please select a valid folder.")
+                    selected_folder = None
+
+            # # project selection (second)
+            # with st.container(border=True):
+            #     print_widget_label("Which project does this data belong to?", help_text="Select the project this data belongs to.")
+                # selected_projectID = project_selector_widget()
             
-            # Get current selection or default to True (deployment)
-            is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
-            
-            # Create segmented control with callback
-            deployment_options = {True: "Yes", False: "No"}
-            st.segmented_control(
-                "Is this data of a single camera trap deployment?",
-                options=list(deployment_options.keys()),
-                format_func=deployment_options.get,
-                default=is_deployment,
-                label_visibility="collapsed",
-                key="is_deployment_control",
-                on_change=on_deployment_type_change
+            # deployment type selection (third - always visible)
+            with st.container(border=True):
+                print_widget_label(
+                    "Is this a single camera trap deployment?",
+                    help_text="A deployment refers to data from a camera trap placed at a specific location. Select 'No' if this is just a folder of images without location context."
                 )
+                
+                # Define callback to update session state
+                def on_deployment_type_change():
+                    if "is_deployment_control" in st.session_state:
+                        set_session_var("analyse_advanced", "is_deployment", st.session_state["is_deployment_control"])
+                
+                # Get current selection or load last used value from persistent storage
+                last_deployment_type = general_settings_vars.get("last_deployment_type", True)
+                is_deployment = get_session_var("analyse_advanced", "is_deployment", last_deployment_type)
+                
+                # Create segmented control with callback
+                deployment_options = {True: "Yes", False: "No"}
+                segmented_contorl_col1, _ = st.columns([1, 3])
+                with segmented_contorl_col1:
+                    st.segmented_control(
+                        "Is this data of a single camera trap deployment?",
+                        options=list(deployment_options.keys()),
+                        format_func=deployment_options.get,
+                        default=is_deployment,
+                        label_visibility="collapsed",
+                        key="is_deployment_control",
+                        on_change=on_deployment_type_change,
+                        width="stretch"
+                        )
 
-        # place the buttons
-        col_btn_prev, col_btn_next = st.columns([1, 1])
+            # place the buttons
+            col_btn_prev, col_btn_next = st.columns([1, 1])
 
-        with col_btn_next:
-            if selected_projectID and selected_folder and os.path.isdir(selected_folder):
-                if st.button(":material/arrow_forward: Next", use_container_width=True):
-                    # Get current deployment type setting
-                    is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
-                    
-                    # Store selected project and folder temporarily
-                    update_session_vars("analyse_advanced", {
-                        "selected_projectID": selected_projectID,
-                        "selected_folder": selected_folder,
-                    })
-                    
-                    # Update persistent general settings with committed projectID
-                    update_vars(section="general_settings",
-                                updates={"selected_projectID": selected_projectID})
-                    
-                    # Skip step 1 for non-deployment data, go directly to step 2 (models)
-                    if is_deployment:
-                        # Go to step 1 (deployment metadata)
-                        set_session_var("analyse_advanced", "step", 1)
-                    else:
-                        # Skip step 1, go directly to step 2 (models)
-                        # Set default values for deployment metadata
+            with col_btn_next:
+                if selected_folder and os.path.isdir(selected_folder):
+                    if st.button(":material/arrow_forward: Next", use_container_width=True):
+                        # Get current deployment type setting
+                        last_deployment_type = general_settings_vars.get("last_deployment_type", True)
+                        is_deployment = get_session_var("analyse_advanced", "is_deployment", last_deployment_type)
+                        selected_projectID = get_session_var("analyse_advanced", "selected_projectID")
+                        
+                        # Store selected project and folder temporarily
                         update_session_vars("analyse_advanced", {
-                            "selected_locationID": None,
-                            "selected_min_datetime": None,
-                            "step": 2
+                            "selected_projectID": selected_projectID,
+                            "selected_folder": selected_folder,
                         })
-                    
-                    st.rerun()
-            else:
-                st.button(":material/arrow_forward: Next",
-                          use_container_width=True,
-                          disabled=True,
-                          key="data_next_button_dummy")
+                        
+                        # Update persistent general settings with committed projectID
+                        update_vars(section="general_settings",
+                                    updates={"selected_projectID": selected_projectID})
+                        
+                        # Skip step 1 for non-deployment data, go directly to step 2 (models)
+                        if is_deployment:
+                            # Go to step 1 (deployment metadata)
+                            set_session_var("analyse_advanced", "step", 1)
+                        else:
+                            # Skip step 1, go directly to step 2 (models)
+                            # Set default values for deployment metadata
+                            update_session_vars("analyse_advanced", {
+                                "selected_locationID": None,
+                                "selected_min_datetime": None,
+                                "step": 2
+                            })
+                        
+                        st.rerun()
+                else:
+                    st.button(":material/arrow_forward: Next",
+                            use_container_width=True,
+                            disabled=True,
+                            key="data_next_button_dummy")
 
     elif step == 1:
         
@@ -478,18 +550,48 @@ with st.container(border=True):
             if (selected_cls_modelID and selected_det_modelID) or \
                     (selected_cls_modelID == "NONE" and selected_det_modelID):
                 if not needs_installing:
-                    if st.button(":material/arrow_forward: Next", use_container_width=True):
-                        # Check version compatibility before advancing
+                    # Check if we should show "Next" or "Add to queue" button
+                    if selected_cls_modelID == "NONE":
+                        # No classification model - skip species selection, go directly to queue
+                        button_text = ":material/playlist_add: Add to queue"
+                        button_type = "primary"
+                    else:
+                        # Classification model selected - proceed to species selection
+                        button_text = ":material/arrow_forward: Next"
+                        button_type = "secondary"
+                    
+                    if st.button(button_text, use_container_width=True, type=button_type):
+                        # Check version compatibility before proceeding
                         is_compatible, incompatible_models = check_selected_models_version_compatibility(
                             selected_cls_modelID, selected_det_modelID, model_meta)
                         
                         if is_compatible:
-                            # Store model selections temporarily and advance step
+                            # Store model selections temporarily
                             update_session_vars("analyse_advanced", {
-                                "step": 3,
                                 "selected_cls_modelID": selected_cls_modelID,
                                 "selected_det_modelID": selected_det_modelID
                             })
+                            
+                            if selected_cls_modelID == "NONE":
+                                # No classification model - add to queue directly
+                                # Set default values for species selection
+                                set_session_var("analyse_advanced", "selected_species", None)
+                                set_session_var("analyse_advanced", "selected_country", None) 
+                                set_session_var("analyse_advanced", "selected_state", None)
+                                
+                                # Save deployment type preference to general settings
+                                current_is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+                                update_vars("general_settings", {"last_deployment_type": current_is_deployment})
+                                
+                                # Reset step to beginning
+                                set_session_var("analyse_advanced", "step", 0)
+                                
+                                # Add run to persistent queue
+                                add_run_to_queue()
+                            else:
+                                # Classification model selected - proceed to species selection
+                                set_session_var("analyse_advanced", "step", 3)
+                            
                             st.rerun()
                         else:
                             # Show warning without rerunning
@@ -580,6 +682,10 @@ with st.container(border=True):
                 if validation_passed:
                     # store selected species (will be empty for SPECIESNET or NONE, which is fine)
                     set_session_var("analyse_advanced", "selected_species", selected_species)
+
+                    # Save deployment type preference to general settings
+                    current_is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
+                    update_vars("general_settings", {"last_deployment_type": current_is_deployment})
 
                     # reset step to beginning
                     set_session_var("analyse_advanced", "step", 0)

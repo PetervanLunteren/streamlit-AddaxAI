@@ -1691,27 +1691,27 @@ def install_env(env_name: str):
     st.rerun()
 
 
-def project_selector_widget():
-    # Get current project directly from session state (which is updated by sidebar)
-    current_project_id = get_session_var("shared", "selected_projectID", None)
+# def project_selector_widget():
+#     # Get current project directly from session state (which is updated by sidebar)
+#     current_project_id = get_session_var("shared", "selected_projectID", None)
     
-    if not current_project_id:
-        # No project selected - show message to create first project
-        info_box("No project selected. Create your first project using the sidebar.")
-        return None
+#     if not current_project_id:
+#         # No project selected - show message to create first project
+#         info_box("No project selected. Create your first project using the sidebar.")
+#         return None
     
-    # Load projects to get the current project name
-    projects, _ = load_known_projects()
-    current_project_data = projects.get(current_project_id, {})
-    current_project_name = current_project_data.get("name", current_project_id)
+#     # Load projects to get the current project name
+#     projects, _ = load_known_projects()
+#     current_project_data = projects.get(current_project_id, {})
+#     current_project_name = current_project_data.get("name", current_project_id)
     
-    # Show informational message about current project
-    info_box(f"You're currently in project {code_span(current_project_name)}. Data will be listed under this project. You can change projects in the sidebar if desired.")
+#     # Show informational message about current project
+#     info_box(f"You're currently in project {code_span(current_project_name)}. Data will be listed under this project. You can change projects in the sidebar if desired.")
     
-    # Store current project selection in session state for deployment workflow
-    set_session_var("analyse_advanced", "selected_projectID", current_project_id)
+#     # Store current project selection in session state for deployment workflow
+#     set_session_var("analyse_advanced", "selected_projectID", current_project_id)
     
-    return current_project_id
+#     return current_project_id
 
 
 def location_selector_widget():
@@ -2317,6 +2317,22 @@ def cls_model_selector_widget(model_meta):
     def on_cls_change():
         # Update session state from widget value
         st.session_state[ss_key] = st.session_state[widget_key]
+        
+        # Get the new modelID and check if it affects stepper display
+        new_display_name = st.session_state[widget_key]
+        new_modelID = modelID_lookup[new_display_name]
+        
+        # Store the new selection immediately in session state
+        set_session_var("analyse_advanced", "selected_cls_modelID", new_modelID)
+        
+        # Trigger rerun if classification model selection affects stepper
+        # (switching between NONE and actual model changes stepper steps)
+        old_modelID = get_session_var("analyse_advanced", "selected_cls_modelID", previously_selected_modelID)
+        old_has_cls = old_modelID and old_modelID != "NONE"
+        new_has_cls = new_modelID and new_modelID != "NONE"
+        
+        if old_has_cls != new_has_cls:
+            st.rerun()
 
     col1, col2 = st.columns([3, 1])
     with col1:
