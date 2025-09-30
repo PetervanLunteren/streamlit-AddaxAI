@@ -17,6 +17,11 @@ Run with micromamba:
 TODOs FOR NOW:
 - continue with the data brwoser page - fix the modal view for image details
 - make the detections page for images too. 
+- update to the newset MD version and make sure to adjust:
+    - the way you get exif data: --include_exif_tags "datetimeoriginal,gpsinfo" (see https://github.com/agentmorris/MegaDetector/pull/193#issuecomment-3347432732)
+    - make sure to check how I run SpeciesNet now: https://github.com/agentmorris/MegaDetector/pull/193#issuecomment-3347432732
+    - the way the pbars get GPU / CPU / MPS info. (see https://github.com/agentmorris/MegaDetector/pull/187)
+    
 
 TODOs FOR LATER:
 - https://github.com/agentmorris/MegaDetector/blob/main/megadetector/postprocessing/classification_postprocessing.py
