@@ -1,4 +1,67 @@
 import streamlit as st
+import pandas as pd
+from PIL import Image
+import os
+import numpy as np
+from streamlit_image_zoom import image_zoom
+
+
+# load data
+@st.cache_data
+def load():
+    detections = pd.read_csv('./assets/test_images/results_detections.csv')
+    files = pd.read_csv('./assets/test_images/results_files.csv')
+    return detections, files
+
+detections, files = load()
+label_list = detections["label"].unique().tolist()
+
+
+# labels & confidence range to filter data 
+with st.container():
+    selected_labels = st.multiselect(
+        "Select labels", label_list, key="filter_labels"
+    )
+    conf_range = st.slider(
+        "Confidence range", 0.0, 1.0, (0.4, 0.8), key="filter_conf"
+    )
+
+
+# filter data
+filtered_detections = detections[
+    detections["label"].isin(selected_labels) &
+    detections["confidence"].between(conf_range[0], conf_range[1])
+]
+
+
+base_dir = "assets/test_images"
+
+
+# filtered images gallery loop
+for idx, row in filtered_detections.iterrows():
+    img_path = os.path.join(base_dir, row['relative_path'])
+    original_label = row['label']
+
+    with st.container():
+        col_img, col_panel = st.columns([3, 1])
+
+        with col_img:
+            st.header(original_label)
+            #st.write(original_label)
+            image = Image.open(img_path)
+            image_zoom(image)
+
+        with col_panel:
+            default_idx = label_list.index(original_label) if original_label in label_list else 0
+            new_label = st.selectbox(
+                "Change label",
+                options=label_list,
+                index=default_idx,
+                key=f"label_{idx}"
+            )
+            
+        st.divider()
+
 
 
 ## This would be where the users can verify their predictions. It bascially gives the user to select certain labels and confidence ranges to double check the predicitons and adjust if needed
