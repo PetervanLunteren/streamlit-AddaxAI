@@ -259,7 +259,6 @@ def run_process_queue(
         selected_cls_modelID = deployment['selected_cls_modelID']
         selected_country = deployment.get('selected_country', None)
         selected_state = deployment.get('selected_state', None)
-        is_deployment = deployment.get('is_deployment')
 
 
         # Get media counts from deployment queue item (already computed during folder metadata check)
@@ -268,10 +267,16 @@ def run_process_queue(
         
         # Show only relevant progress bars for this deployment
         visible_pbars = []
+        has_classification = selected_cls_modelID and selected_cls_modelID != "NONE"
+        
         if n_videos > 0:
-            visible_pbars.extend(["Video detection", "Video classification"])
+            visible_pbars.append("Video detection")
+            if has_classification:
+                visible_pbars.append("Video classification")
         if n_images > 0:
-            visible_pbars.extend(["Image detection", "Image classification"])
+            visible_pbars.append("Image detection")
+            if has_classification:
+                visible_pbars.append("Image classification")
         
         pbars.set_pbar_visibility(visible_pbars)
         
@@ -379,8 +384,7 @@ def run_process_queue(
                 "det_modelID": selected_det_modelID,
                 "cls_modelID": selected_cls_modelID,
                 "country": selected_country,
-                "state": selected_state,
-                "is_deployment": is_deployment
+                "state": selected_state
             }
 
             # write the updated map to the map file
@@ -1833,8 +1837,12 @@ def match_locations(known_point, locations, max_distance_meters=50):
     candidates = []
 
     for name, data in locations.items():
-        lat = data["lat"]
-        lon = data["lon"]
+        # Skip locations without coordinates
+        lat = data.get("lat")
+        lon = data.get("lon")
+        if lat is None or lon is None:
+            continue
+            
         dist = haversine_distance(lat_known, lon_known, lat, lon)
         if dist <= max_distance_meters:
             candidates.append((name, dist))
@@ -3072,7 +3080,6 @@ def add_run_to_queue():
     selected_cls_modelID = get_session_var(
         "analyse_advanced", "selected_cls_modelID")
     selected_species = get_session_var("analyse_advanced", "selected_species")
-    is_deployment = get_session_var("analyse_advanced", "is_deployment")
     
     # Get EXIF datetime, file paths, filename dict, and file counts from session state (computed by check_folder_metadata)
     exif_min_datetime = get_session_var("analyse_advanced", "exif_min_datetime")
@@ -3112,7 +3119,6 @@ def add_run_to_queue():
         "selected_species": selected_species,
         "selected_country": selected_country,
         "selected_state": selected_state,
-        "is_deployment": is_deployment,
         "exif_min_datetime": exif_min_datetime,
         "exif_max_datetime": exif_max_datetime,
         "file_min_datetime": file_min_datetime,

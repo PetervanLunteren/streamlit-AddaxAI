@@ -19,7 +19,7 @@ MODAL_IMAGE_SIZE = 1000  # High resolution modal images (pixels) - 1000x1000 for
 IMAGE_BACKGROUND_COLOR = (220, 227, 232)
 IMAGE_PADDING_PIXELS = 100  # Padding around bbox in pixels (new padding system)
 IMAGE_BLUR_RADIUS = 15  # Blur radius for background extension
-IMAGE_CORNER_RADIUS = 20  # Corner radius for rounded thumbnails (pixels)
+IMAGE_CORNER_RADIUS = 4  # Corner radius for rounded thumbnails (pixels)
 IMAGE_BBOX_COLOR = 'red'  # Color for bounding box outline
 IMAGE_QUALITY = 85
 
@@ -65,7 +65,7 @@ def format_detection_label(det_label, det_conf, cls_label=None, cls_conf=None):
         else:
             label_parts.append(str(cls_label))
     
-    return " - ".join(label_parts)
+    return "\n".join(label_parts)
 
 
 def save_filter_state(filter_state):
@@ -345,7 +345,8 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
             img.thumbnail(modal_size, Image.Resampling.LANCZOS)
             thumbnail_size = img.size
             
-            # Draw bounding box if requested
+            # Store bbox coordinates for later drawing (after rounding)
+            bbox_coords = None
             if crop_info and show_bbox:
                 scale_x = thumbnail_size[0] / crop_info['crop_size']
                 scale_y = thumbnail_size[1] / crop_info['crop_size']
@@ -355,61 +356,12 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
                 bbox_w_thumb = crop_info['bbox_w'] * scale_x
                 bbox_h_thumb = crop_info['bbox_h'] * scale_y
                 
-                draw = ImageDraw.Draw(img)
                 x1 = int(max(0, bbox_x_thumb))
                 y1 = int(max(0, bbox_y_thumb))
                 x2 = int(min(thumbnail_size[0]-1, bbox_x_thumb + bbox_w_thumb))
                 y2 = int(min(thumbnail_size[1]-1, bbox_y_thumb + bbox_h_thumb))
                 
-                # Draw bounding box
-                draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=2)  # Thicker for modal
-                
-                # Add labels if requested (will be set separately)
-                if show_labels and hasattr(generate_modal_image, '_current_label_text'):
-                    label_text = generate_modal_image._current_label_text
-                    
-                    # Calculate font size for high-res image
-                    font_size = max(12, min(24, thumbnail_size[0] // 35))
-                    
-                    try:
-                        from PIL import ImageFont
-                        font = ImageFont.load_default()
-                    except:
-                        font = None
-                    
-                    # Get text dimensions
-                    if font:
-                        bbox_text = draw.textbbox((0, 0), label_text, font=font)
-                        text_width = bbox_text[2] - bbox_text[0]
-                        text_height = bbox_text[3] - bbox_text[1]
-                    else:
-                        text_width = len(label_text) * (font_size // 2)
-                        text_height = font_size
-                    
-                    # Position text
-                    text_x = max(4, min(x1, thumbnail_size[0] - text_width - 8))
-                    text_y = max(4, y1 - text_height - 6)
-                    
-                    if text_y < 4:
-                        text_y = min(y2 + 6, thumbnail_size[1] - text_height - 4)
-                    
-                    # Draw background
-                    padding = 4
-                    bg_x1 = text_x - padding
-                    bg_y1 = text_y - padding
-                    bg_x2 = text_x + text_width + padding
-                    bg_y2 = text_y + text_height + padding
-                    
-                    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-                    overlay_draw = ImageDraw.Draw(overlay)
-                    overlay_draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(0, 0, 0, 200))
-                    
-                    img_with_overlay = Image.alpha_composite(img.convert('RGBA'), overlay)
-                    img = img_with_overlay.convert('RGB')
-                    draw = ImageDraw.Draw(img)
-                    
-                    # Draw text
-                    draw.text((text_x, text_y), label_text, fill='white', font=font)
+                bbox_coords = (x1, y1, x2, y2)
             
             # Apply rounded corners
             if IMAGE_CORNER_RADIUS > 0:
@@ -431,6 +383,95 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
                 final = Image.new('RGB', img.size, 'white')
                 final.paste(output, (0, 0), output)
                 img = final
+            
+            # Draw bounding box and labels AFTER rounding (fixed sizes for consistency)
+            if bbox_coords and show_bbox:
+                x1, y1, x2, y2 = bbox_coords
+                draw = ImageDraw.Draw(img)
+                
+                # Calculate bbox size in final image
+                bbox_width = x2 - x1
+                bbox_height = y2 - y1
+                bbox_min_dim = min(bbox_width, bbox_height)
+                
+                # Scale line width based on bbox size (1-3 pixels)
+                if bbox_min_dim < 100:  # Very small detection
+                    line_width = 1
+                elif bbox_min_dim < 300:  # Medium detection
+                    line_width = 2
+                else:  # Large detection
+                    line_width = 3
+                
+                # Draw bounding box
+                draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=line_width)
+                
+                # Add labels if requested
+                if show_labels and hasattr(generate_modal_image, '_current_label_text'):
+                    label_text = generate_modal_image._current_label_text
+                    
+                    # Scale font size based on bbox size (8-20px based on bbox dimension)
+                    # Smaller bbox = smaller font
+                    font_size = max(8, min(20, int(bbox_min_dim * 0.08)))
+                    
+                    try:
+                        from PIL import ImageFont
+                        font = ImageFont.load_default()
+                    except:
+                        font = None
+                    
+                    # Split text into lines
+                    lines = label_text.split('\n')
+                    
+                    # Get dimensions for multiline text
+                    max_width = 0
+                    total_height = 0
+                    line_heights = []
+                    
+                    for line in lines:
+                        if font:
+                            bbox_text = draw.textbbox((0, 0), line, font=font)
+                            line_width = bbox_text[2] - bbox_text[0]
+                            line_height = bbox_text[3] - bbox_text[1]
+                        else:
+                            line_width = len(line) * (font_size // 2)
+                            line_height = font_size
+                        
+                        max_width = max(max_width, line_width)
+                        line_heights.append(line_height)
+                        total_height += line_height
+                    
+                    # Add spacing between lines
+                    line_spacing = 2
+                    total_height += (len(lines) - 1) * line_spacing
+                    
+                    # Position text (above bbox if possible, below if not)
+                    text_x = max(4, min(x1, thumbnail_size[0] - max_width - 8))
+                    text_y = max(4, y1 - total_height - 6)
+                    
+                    if text_y < 4:
+                        text_y = min(y2 + 6, thumbnail_size[1] - total_height - 4)
+                    
+                    # Draw background
+                    padding = 4
+                    bg_x1 = text_x - padding
+                    bg_y1 = text_y - padding
+                    bg_x2 = text_x + max_width + padding
+                    bg_y2 = text_y + total_height + padding
+                    
+                    # Draw semi-transparent background
+                    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                    overlay_draw = ImageDraw.Draw(overlay)
+                    overlay_draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(0, 0, 0, 200))
+                    
+                    img_with_overlay = Image.alpha_composite(img.convert('RGBA'), overlay)
+                    img = img_with_overlay.convert('RGB')
+                    draw = ImageDraw.Draw(img)
+                    
+                    # Draw multiline text
+                    y_offset = text_y
+                    for i, line in enumerate(lines):
+                        draw.text((text_x, y_offset), line, fill='white', font=font)
+                        y_offset += line_heights[i] + line_spacing
             
             # Convert to base64
             buffer = io.BytesIO()
@@ -454,13 +495,14 @@ def image_viewer_modal():
     import pandas as pd
     import base64
     from utils.common import get_session_var, set_session_var
+    from components.ui_helpers import code_span
     
     # Get current modal state
     current_index = get_session_var("explore_results", "modal_current_image_index", 0)
-    show_bbox = get_session_var("explore_results", "modal_show_bbox", False)
+    show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
     
     # Get the filtered dataframe from session state
-    df_filtered = st.session_state.get('results_detections_filtered', pd.DataFrame())
+    df_filtered = st.session_state.get('results_modified', pd.DataFrame())
     
     if df_filtered.empty or current_index >= len(df_filtered):
         st.error("No image data available")
@@ -474,29 +516,9 @@ def image_viewer_modal():
     image_path = current_row.get('absolute_path', '')
     
     # Main layout: image on left, metadata on right
-    img_col, meta_col = st.columns([3, 1])
+    img_col, meta_col = st.columns([2, 1])
     
     with img_col:
-        # Segmented control for bbox toggle
-        bbox_options = ["Without Detection Box", "With Detection Box"]
-        
-        # Get user's last choice, defaulting to "With Detection Box"
-        show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
-        default_option = bbox_options[1] if show_bbox else bbox_options[0]
-        
-        selected_option = st.segmented_control(
-            "Display mode",
-            options=bbox_options,
-            default=default_option,
-            key="bbox_toggle"
-        )
-        
-        # Update bbox state if changed and save preference
-        new_show_bbox = (selected_option == "With Detection Box")
-        if new_show_bbox != show_bbox:
-            set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
-            st.rerun()  # Force immediate UI update
-        
         # Generate high-resolution modal image on-demand
         bbox_data = {
             'x': current_row.get('bbox_x'),
@@ -530,62 +552,105 @@ def image_viewer_modal():
             st.error("Could not load image")
     
     with meta_col:
-        st.subheader("Image Details")
+        # Close button
+        if st.button(":material/cancel: Close", type="secondary", width="stretch"):
+            set_session_var("explore_results", "show_modal_image_viewer", False)
+            st.rerun()
         
-        # Detection information
-        st.markdown("**Detection**")
-        det_label = current_row.get('detection_label', 'N/A')
-        det_conf = current_row.get('detection_confidence', 0)
-        if pd.notna(det_conf):
-            st.write(f"• {det_label} ({det_conf:.2f})")
-        else:
-            st.write(f"• {det_label}")
+        # Download button
+        # Convert base64 image to downloadable format
+        if modal_image_url and modal_image_url.startswith('data:image/jpeg;base64,'):
+            # Extract base64 data
+            import base64
+            base64_data = modal_image_url.split(',')[1]
+            image_bytes = base64.b64decode(base64_data)
+            
+            # Create filename with timestamp
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            download_filename = f"addaxai-{timestamp}.jpg"
+            
+            st.download_button(
+                label=":material/download: Export",
+                data=image_bytes,
+                file_name=download_filename,
+                mime="image/jpeg",
+                type="secondary",
+                width="stretch"
+            )
         
-        # Classification information
-        st.markdown("**Classification**")
-        cls_label = current_row.get('classification_label', 'N/A')
-        cls_conf = current_row.get('classification_confidence', 0)
-        if pd.notna(cls_conf):
-            st.write(f"• {cls_label} ({cls_conf:.2f})")
-        else:
-            st.write(f"• {cls_label}")
+        st.divider()
+        
+        # Show box segmented control
+        st.markdown("**Show box**")
+        bbox_options = ["No", "Yes"]
+        
+        # Get user's last choice, defaulting to "Yes"
+        show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
+        default_option = bbox_options[1] if show_bbox else bbox_options[0]
+        
+        selected_option = st.segmented_control(
+            "Show box",
+            options=bbox_options,
+            default=default_option,
+            key="bbox_toggle",
+            label_visibility="collapsed",
+            width="stretch"
+        )
+        
+        # Update bbox state if changed and save preference
+        new_show_bbox = (selected_option == "Yes")
+        if new_show_bbox != show_bbox:
+            set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
+            st.rerun()  # Force immediate UI update
+        
+        st.divider()
         
         # Timestamp
-        st.markdown("**Timestamp**")
         timestamp = current_row.get('timestamp', 'N/A')
-        st.write(f"• {timestamp}")
+        if timestamp != 'N/A':
+            # Parse and format timestamp to human readable
+            try:
+                from datetime import datetime
+                parsed_timestamp = datetime.strptime(timestamp, '%Y:%m:%d %H:%M:%S')
+                human_readable = parsed_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                timestamp_display = human_readable
+            except:
+                timestamp_display = timestamp
+        else:
+            timestamp_display = timestamp
+        st.markdown(f"**Timestamp** {code_span(timestamp_display)}", unsafe_allow_html=True)
         
-        # Location information
-        st.markdown("**Location**")
+        # Location
         location_id = current_row.get('location_id', 'N/A')
-        run_id = current_row.get('run_id', 'N/A')
-        st.write(f"• Location: {location_id}")
-        st.write(f"• Run: {run_id}")
+        st.markdown(f"**Location** {code_span(location_id)}", unsafe_allow_html=True)
         
-        # File paths
-        st.markdown("**File Path**")
+        # File
         rel_path = current_row.get('relative_path', 'N/A')
-        st.write(f"• Relative: {rel_path}")
-        st.code(image_path, language=None)
+        if rel_path != 'N/A':
+            filename = os.path.basename(rel_path)
+            # Shorten to last 20 chars if too long
+            if len(filename) > 20:
+                display_filename = "..." + filename[-20:]
+            else:
+                display_filename = filename
+        else:
+            display_filename = 'N/A'
+        st.markdown(f"**File** {code_span(display_filename)}", unsafe_allow_html=True)
     
-    # Navigation and control buttons
+    # Navigation buttons
     st.divider()
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        if st.button("← Previous", disabled=(current_index <= 0)):
+        if st.button(":material/chevron_left: Previous", disabled=(current_index <= 0), width="stretch"):
             set_session_var("explore_results", "modal_current_image_index", current_index - 1)
             st.rerun()
     
     with col2:
-        if st.button("Next →", disabled=(current_index >= len(df_filtered) - 1)):
-            set_session_var("explore_results", "modal_current_image_index", current_index + 1)
-            st.rerun()
+        st.markdown(f"<div style='display: flex; align-items: center; justify-content: center; height: 38px;'>{code_span(current_index + 1)} &nbsp; of &nbsp; {code_span(len(df_filtered))}</div>", unsafe_allow_html=True)
     
     with col3:
-        st.write(f"Image {current_index + 1} of {len(df_filtered)}")
-    
-    with col4:
-        if st.button("Close", type="primary"):
-            set_session_var("explore_results", "show_modal_image_viewer", False)
+        if st.button("Next :material/chevron_right:", disabled=(current_index >= len(df_filtered) - 1), width="stretch"):
+            set_session_var("explore_results", "modal_current_image_index", current_index + 1)
             st.rerun()

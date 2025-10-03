@@ -18,7 +18,7 @@ from utils.config import *
 
 
 # import local modules
-from components import StepperBar, print_widget_label, warning_box, info_box
+from components import StepperBar, print_widget_label, warning_box, info_box, code_span
 from utils.common import (
     load_vars, update_vars, clear_vars,
     init_session_state, get_session_var, set_session_var, update_session_vars,
@@ -168,25 +168,10 @@ if get_session_var("analyse_advanced", "show_modal_species_selector", False):
             "analyse_advanced", "modal_species_leaf_values", [])
         species_selector_modal(nodes, all_leaf_values)
 
-
-st.markdown("*This is where the AI detection happens. Peter will figure this out as this is mainly a  task of rearrangin the previous code.*")
-
-# header
-st.header(":material/rocket_launch: Add data", divider="grey")
-st.write(
-    "You can analyze one folder at a time using AI models. "
-    "A folder refers to all the images and videos stored on a single SD card retrieved from the field. "
-    "This typically corresponds to one physical camera at one location during a specific period. "
-    "The analysis results are saved to a recognition file, which can then be used by other tools in the platform."
-)
-
-st.write("")
-st.subheader(":material/sd_card: Run information", divider="grey")
-st.write("Fill in the information related to this run. A run refers to all the images and videos stored in a folder.")
+st.subheader(":material/add: Add run to queue", divider="grey")
+st.write("Fill in the information related to this run below and add to the queue for batch processing. It is advised to run the analysis per camera deployment, as many of the subsequent tools depend on deployment metadata. You can add multiple runs to the queue and process them in one go.")
 
 ###### STEPPER BAR ######
-
-st.write("Current step:", step)
 
 # --- Create dynamic stepper based on deployment type and classification model selection
 last_deployment_type = general_settings_vars.get("last_deployment_type", True)
@@ -194,6 +179,22 @@ is_deployment = get_session_var("analyse_advanced", "is_deployment", last_deploy
 
 # Check if classification model is selected (affects whether species step is shown)
 selected_cls_modelID = get_session_var("analyse_advanced", "selected_cls_modelID", None)
+
+# If no model selected in session state yet, check for project's preferred model
+if selected_cls_modelID is None:
+    from utils.analysis_utils import get_cached_map, DEFAULT_CLASSIFICATION_MODEL
+    selected_projectID = st.session_state["shared"].get("selected_projectID")
+    
+    if selected_projectID:
+        # Load project-specific preferred classification model
+        map_data, _ = get_cached_map()
+        project_data = map_data["projects"].get(selected_projectID, {})
+        preferred_models = project_data.get("preferred_models", {})
+        selected_cls_modelID = preferred_models.get("cls_model", DEFAULT_CLASSIFICATION_MODEL)
+    else:
+        # Fallback to global default
+        selected_cls_modelID = general_settings_vars.get("selected_modelID", DEFAULT_CLASSIFICATION_MODEL)
+
 has_classification_model = selected_cls_modelID and selected_cls_modelID != "NONE"
 
 # Build stepper steps dynamically
@@ -266,13 +267,10 @@ with st.container(border=True):
             # No project selected - show message to create first project
             info_box("No project selected. Create your first project using the sidebar. Each run needs to fall under a project.")
         else:
-        
-
-            st.write("Select your data folder, and specify the type of data.")
-            
-            # folder selection (first)
+                    
+            # folder selection
             with st.container(border=True):
-                print_widget_label("Where is the data stored?",
+                print_widget_label("Which data do you want to analyse?",
                                 help_text="Select the folder where your data is located.")
                 selected_folder = browse_directory_widget()
 
@@ -284,13 +282,8 @@ with st.container(border=True):
                     st.error(
                         "The selected folder does not exist. Please select a valid folder.")
                     selected_folder = None
-
-            # # project selection (second)
-            # with st.container(border=True):
-            #     print_widget_label("Which project does this data belong to?", help_text="Select the project this data belongs to.")
-                # selected_projectID = project_selector_widget()
             
-            # deployment type selection (third - always visible)
+            # deployment type selection
             with st.container(border=True):
                 print_widget_label(
                     "Is this a single camera trap deployment?",
@@ -363,34 +356,17 @@ with st.container(border=True):
                             key="data_next_button_dummy")
 
     elif step == 1:
-        
-        st.write("Configure deployment metadata for your selected data.")
-        
+                
         # Get deployment type and project from session state (set in step 0)
         is_deployment = get_session_var("analyse_advanced", "is_deployment", True)
         selected_projectID = get_session_var("analyse_advanced", "selected_projectID")
-        
-        # # Show current project info
-        # if selected_projectID:
-        #     # Load projects to get the current project name for display
-        #     from utils.analysis_utils import load_known_projects
-        #     projects, _ = load_known_projects()
-        #     current_project_data = projects.get(selected_projectID, {})
-        #     current_project_name = current_project_data.get("name", selected_projectID)
-        #     info_box(f"Data will be added to project: **{current_project_name}**")
-
-        # if selected_projectID:
-            
-        # Check if this is a deployment
-        # if is_deployment:
-        
         
         # Show normal metadata collection for deployments
         
         # location metadata
         with st.container(border=True):
             print_widget_label(
-                "Location", help_text="help text")
+                "Where was the camera located?", help_text="help text")
             selected_locationID = location_selector_widget()
         # st.write("")
 
@@ -398,20 +374,8 @@ with st.container(border=True):
         if selected_locationID:
             with st.container(border=True):
                 print_widget_label(
-                    "Start", help_text="help text")
+                    "What was the start of this deployment?", help_text="help text")
                 selected_min_datetime = datetime_selector_widget()
-        # else:
-        #     # For non-deployments, show info and set defaults
-        #     info_box(
-        #         "This is not a deployment, so location and time metadata are not required. The data will be processed without location context.",
-        #         title="Non-deployment Data"
-        #     )
-        #     # Set default values for non-deployments
-        #     selected_locationID = None
-        #     selected_min_datetime = None
-        #     # Store these in session state
-        #     set_session_var("analyse_advanced", "selected_locationID", None)
-        #     set_session_var("analyse_advanced", "selected_min_datetime", None)
 
         # place the buttons
         col_btn_prev, col_btn_next = st.columns([1, 1])
@@ -447,14 +411,10 @@ with st.container(border=True):
                           use_container_width=True, disabled=True)
 
     elif step == 2:
-        st.write("MODEL STUFF!")
 
         needs_installing = False
         selected_cls_modelID = None
         selected_det_modelID = None
-
-        # # load model metadata
-        # model_meta = load_model_metadata()
 
         # select cls model
         with st.container(border=True):
@@ -611,21 +571,15 @@ with st.container(border=True):
 
     elif step == 3:
 
-        st.write("Species Selection!")
-
         selected_cls_modelID = get_session_var(
             "analyse_advanced", "selected_cls_modelID")
-        # ✅ OPTIMIZATION 3: Cached taxon mapping loading
-        # Only loads CSV file when classification model changes
-        # Previous: CSV parsing on every step 3 visit
-        # Now: Cached in session state by model ID
-        # Handle different model types with their specific requirements
+        # cached taxon mapping loading
+
         from components.speciesnet_ui import is_speciesnet_model, render_speciesnet_species_selector
         
         if not selected_cls_modelID == "NONE" and not is_speciesnet_model(selected_cls_modelID):
             # Standard classification models - require species selection
             taxon_mapping = load_taxon_mapping_cached(selected_cls_modelID)
-            # st.write(taxon_mapping)
             with st.container(border=True):
                 print_widget_label("Species presence",
                                    help_text="Here you can select the model of your choosing.")
@@ -635,6 +589,7 @@ with st.container(border=True):
                 selected_country = None
                 selected_state = None
         elif is_speciesnet_model(selected_cls_modelID):
+            
             # SpeciesNet models - require country selection, no species selection
             selected_species, selected_country, selected_state = render_speciesnet_species_selector()
                 
@@ -696,10 +651,6 @@ with st.container(border=True):
                     st.rerun()
 
 
-# TODO: this shouldnt be in the same var as the other step vars etc., but step etc should be in the session state
-# for now its fine, but rename it also that collabroators know that this is not the same as the step vars
-
-
 st.write("")
 st.subheader(":material/traffic_jam: Process queue", divider="grey")
 process_queue = analyse_advanced_vars.get("process_queue", [])
@@ -709,10 +660,8 @@ if len(process_queue) == 0:
               help="You need to add a run to the queue first.")
 else:
 
-    st.write(
-        f"You currently have {len(process_queue)} runs in the queue.")
-    # col1, _ = st.columns([1, 1])
-    # with col1:
+    st.markdown(
+        f"You currently have {code_span(len(process_queue))} runs in the queue.", unsafe_allow_html=True)
 
     with st.expander(":material/visibility: View queue details", expanded=False):
         with st.container(border=True, height=320):
@@ -746,7 +695,6 @@ else:
                             remove_run_from_queue(i)
                             st.rerun()
                     with col3:
-                        # st.popover(f"Process {run['selected_folder']}")
                         with st.popover(":material/visibility:", help="Show details", use_container_width=True):
                             # Format all run details with consistent styling
                             folder_short = "..." + run['selected_folder'][-45:] if len(run['selected_folder']) > 45 else run['selected_folder']

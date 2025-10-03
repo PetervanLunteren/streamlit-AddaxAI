@@ -63,6 +63,10 @@ st.set_page_config(layout="wide")
 filter_config = load_vars("explore_results")
 saved_settings = filter_config.get("aggrid_settings", {})
 
+# Get saved sort settings or set defaults
+saved_sort_column = saved_settings.get('sort_column', 'timestamp')
+saved_sort_direction = saved_settings.get('sort_direction', '↓')  # Descending for newest first
+
 # Check if detection results are available
 if "results_detections" not in st.session_state:
     st.error("No detection results found. Please ensure detection data is loaded.")
@@ -83,7 +87,7 @@ if df.empty:
 if get_session_var("explore_results", "show_modal_image_viewer", False):
     # Only render the modal, skip all heavy grid processing
     modal_image_viewer = Modal(
-        title="#### Image Viewer", 
+        title="", 
         key="image_viewer", 
         show_close_button=False
     )
@@ -104,88 +108,210 @@ image_size_options = {
 # Controls row
 col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(10)
 
+with col7:
+    # Column sorting popover
+    with st.popover(":material/swap_vert:", help="Sort", width="stretch"):
+        with st.form("sort_form", border=False):
+            # Available columns for sorting with friendly names
+            sortable_columns = {
+                'detection_label': 'Detection',
+                'detection_confidence': 'Detection Confidence',
+                'classification_label': 'Classification', 
+                'classification_confidence': 'Classification Confidence',
+                'timestamp': 'Timestamp',
+                'location_id': 'Location'
+            }
+            
+            # All controls in one row
+            sort_col1, sort_col2, sort_col3 = st.columns([3, 1, 1])
+            
+            with sort_col1:
+                # Column to sort dropdown
+                try:
+                    default_index = list(sortable_columns.keys()).index(saved_sort_column)
+                except ValueError:
+                    default_index = 0  # fallback to first option if saved column not found
+                
+                sort_column = st.selectbox(
+                    "Column to sort",
+                    options=list(sortable_columns.keys()),
+                    format_func=lambda x: sortable_columns[x],
+                    index=default_index,
+                    label_visibility="collapsed"
+                )
+            
+            with sort_col2:
+                # Sorting method (up or down)
+                sort_direction = st.segmented_control(
+                    "Sorting method",
+                    options=["↑", "↓"],
+                    default=saved_sort_direction,
+                    label_visibility="collapsed",
+                    width="stretch"
+                )
+            
+            with sort_col3:
+                # Apply sorting button
+                if st.form_submit_button("Apply", width="stretch", type="primary"):
+                    # Save sort settings
+                    new_settings = saved_settings.copy()
+                    new_settings.update({
+                        'sort_column': sort_column,
+                        'sort_direction': sort_direction
+                    })
+                    update_vars("explore_results", {"aggrid_settings": new_settings})
+                    
+                    # Clear modified results to force re-processing with new sort
+                    if 'results_modified' in st.session_state:
+                        del st.session_state['results_modified']
+                    
+                    # Clear thumbnail cache since sort order changed
+                    if 'aggrid_thumbnail_cache' in st.session_state:
+                        del st.session_state['aggrid_thumbnail_cache']
+                    
+                    # Reset to page 1
+                    st.session_state.aggrid_current_page = 1
+                    
+                    st.rerun()
+
 with col8:
     # Simple date filter popover
-    with st.popover(":material/filter_alt:", help="Date Filter", width="stretch"):
-        with st.form("date_filter_form"):
+    with st.popover(":material/tune:", help="Filter", width="stretch"):
+        with st.form("date_filter_form", border=False):
             
-            # Get min and max dates from the full data
-            if 'timestamp' in df.columns and df['timestamp'].notna().any():
-                df_timestamps = parse_timestamps(df['timestamp'])
-                min_date = df_timestamps.min()
-                max_date = df_timestamps.max()
+            # Get unique detection types from current dataframe
+            if 'detection_label' in df.columns:
+                unique_detection_types = sorted([
+                    det_type for det_type in df['detection_label'].dropna().unique() 
+                    if det_type.strip() != ''
+                ])
+            else:
+                unique_detection_types = []  # No fallback - show only what exists
+            
+            # DETECTIONS SECTION
+            st.subheader("Detections", divider="grey")
+            with st.container(border=True):
                 
-                # If we can't parse dates, use defaults
-                if pd.isna(min_date) or pd.isna(max_date):
+                # Detection types multiselect
+                saved_detection_types = saved_settings.get('selected_detection_types', unique_detection_types)
+                if unique_detection_types:
+                    selected_detection_types = st.multiselect(
+                        "Classes",
+                        options=unique_detection_types,
+                        default=saved_detection_types
+                    )
+                else:
+                    selected_detection_types = []
+                    st.info("No detection types available in the data")
+                
+                # Detection confidence range
+                saved_det_conf_min = saved_settings.get('det_conf_min', 0.2)
+                saved_det_conf_max = saved_settings.get('det_conf_max', 1.0)
+                det_conf_range = st.slider(
+                    "Confidence range",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=(saved_det_conf_min, saved_det_conf_max),
+                    step=0.01,
+                    format="%.2f",
+                    key="detection_confidence_slider"
+                )
+            
+            # CLASSIFICATIONS SECTION
+            st.subheader("Classifications", divider="grey")
+            with st.container(border=True):
+                # Get unique classifications from current dataframe
+                if 'classification_label' in df.columns:
+                    unique_classifications = sorted([
+                        cls for cls in df['classification_label'].dropna().unique() 
+                        if cls != 'N/A' and cls.strip() != ''
+                    ])
+                else:
+                    unique_classifications = []
+                
+                # Classification selectbox
+                saved_selected_classifications = saved_settings.get('selected_classifications', unique_classifications)
+                if unique_classifications:
+                    selected_classifications = st.multiselect(
+                        "Classes",
+                        options=unique_classifications,
+                        default=saved_selected_classifications,
+                        help="Select specific species to include"
+                    )
+                else:
+                    selected_classifications = []
+                    st.info("No classifications available in the data")
+                
+                # Classification confidence range  
+                saved_cls_conf_min = saved_settings.get('cls_conf_min', 0.3)
+                saved_cls_conf_max = saved_settings.get('cls_conf_max', 1.0)
+                cls_conf_range = st.slider(
+                    "Confidence range",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=(saved_cls_conf_min, saved_cls_conf_max),
+                    step=0.01,
+                    format="%.2f",
+                    key="classification_confidence_slider"
+                )
+                
+                # Checkbox for including unclassified detections
+                saved_include_unclassified = saved_settings.get('include_unclassified', True)
+                include_unclassified = st.checkbox(
+                    "Include detections without classification",
+                    value=saved_include_unclassified,
+                    help="When checked, shows detections that haven't been classified for species"
+                )
+            
+            # DATES SECTION
+            st.subheader("Dates", divider="grey")
+            with st.container(border=True):
+                # Get min and max dates from the full data
+                if 'timestamp' in df.columns and df['timestamp'].notna().any():
+                    df_timestamps = parse_timestamps(df['timestamp'])
+                    min_date = df_timestamps.min()
+                    max_date = df_timestamps.max()
+                    
+                    # If we can't parse dates, use defaults
+                    if pd.isna(min_date) or pd.isna(max_date):
+                        min_date = datetime.now() - timedelta(days=365)
+                        max_date = datetime.now()
+                else:
+                    # Default to last year if no timestamp data
                     min_date = datetime.now() - timedelta(days=365)
                     max_date = datetime.now()
-            else:
-                # Default to last year if no timestamp data
-                min_date = datetime.now() - timedelta(days=365)
-                max_date = datetime.now()
-            
-            # Get saved date range or use full range as default
-            saved_start = saved_settings.get('date_start')
-            saved_end = saved_settings.get('date_end')
-            
-            # Handle None values by using full range
-            if saved_start is None:
-                saved_start = min_date.date()
-            elif isinstance(saved_start, str):
-                saved_start = pd.to_datetime(saved_start).date()
                 
-            if saved_end is None:
-                saved_end = max_date.date()
-            elif isinstance(saved_end, str):
-                saved_end = pd.to_datetime(saved_end).date()
-            
-            # Date range slider
-            date_range = st.slider(
-                "Date range",
-                min_value=min_date.date(),
-                max_value=max_date.date(),
-                value=(saved_start, saved_end),
-                format="YYYY-MM-DD"
-            )
-            
-            # Detection confidence range
-            saved_det_conf_min = saved_settings.get('det_conf_min', 0.0)
-            saved_det_conf_max = saved_settings.get('det_conf_max', 1.0)
-            det_conf_range = st.slider(
-                "Detection confidence range",
-                min_value=0.0,
-                max_value=1.0,
-                value=(saved_det_conf_min, saved_det_conf_max),
-                step=0.01,
-                format="%.2f"
-            )
-            
-            # Classification confidence range  
-            saved_cls_conf_min = saved_settings.get('cls_conf_min', 0.0)
-            saved_cls_conf_max = saved_settings.get('cls_conf_max', 1.0)
-            cls_conf_range = st.slider(
-                "Classification confidence range",
-                min_value=0.0,
-                max_value=1.0,
-                value=(saved_cls_conf_min, saved_cls_conf_max),
-                step=0.01,
-                format="%.2f"
-            )
-            
-            # Checkbox for including unclassified detections
-            saved_include_unclassified = saved_settings.get('include_unclassified', True)
-            include_unclassified = st.checkbox(
-                "Include detections without classification",
-                value=saved_include_unclassified,
-                help="When checked, shows detections that haven't been classified for species"
-            )
+                # Get saved date range or use full range as default
+                saved_start = saved_settings.get('date_start')
+                saved_end = saved_settings.get('date_end')
+                
+                # Handle None values by using full range
+                if saved_start is None:
+                    saved_start = min_date.date()
+                elif isinstance(saved_start, str):
+                    saved_start = pd.to_datetime(saved_start).date()
+                    
+                if saved_end is None:
+                    saved_end = max_date.date()
+                elif isinstance(saved_end, str):
+                    saved_end = pd.to_datetime(saved_end).date()
+                
+                # Date range slider
+                date_range = st.slider(
+                    "Date range",
+                    min_value=min_date.date(),
+                    max_value=max_date.date(),
+                    value=(saved_start, saved_end),
+                    format="YYYY-MM-DD",
+                    label_visibility="collapsed"
+                )
             
             # Buttons
             col1, col2 = st.columns([1, 1])
             with col1:
-                apply_filter = st.form_submit_button("Apply", width="stretch", type="primary")
+                clear_all = st.form_submit_button("Clear all", width="stretch")
             with col2:
-                clear_all = st.form_submit_button("Clear All", width="stretch")
+                apply_filter = st.form_submit_button("Apply", width="stretch", type="primary")
             
             if apply_filter:
                 # Save filter settings to config
@@ -198,6 +324,8 @@ with col8:
                         "cls_conf_min": cls_conf_range[0],
                         "cls_conf_max": cls_conf_range[1],
                         "include_unclassified": include_unclassified,
+                        "selected_detection_types": selected_detection_types,
+                        "selected_classifications": selected_classifications,
                         "image_size": saved_settings.get('image_size', 'medium')
                     }
                 }
@@ -208,8 +336,8 @@ with col8:
                     del st.session_state['aggrid_thumbnail_cache']
                 if 'aggrid_last_cache_key' in st.session_state:
                     del st.session_state['aggrid_last_cache_key']
-                if 'results_detections_filtered' in st.session_state:
-                    del st.session_state['results_detections_filtered']
+                if 'results_modified' in st.session_state:
+                    del st.session_state['results_modified']
                 
                 # Reset to first page
                 st.session_state.aggrid_current_page = 1
@@ -222,11 +350,13 @@ with col8:
                     "aggrid_settings": {
                         "date_start": min_date.date().isoformat(),
                         "date_end": max_date.date().isoformat(), 
-                        "det_conf_min": 0.0,
+                        "det_conf_min": 0.2,
                         "det_conf_max": 1.0,
-                        "cls_conf_min": 0.0,
+                        "cls_conf_min": 0.3,
                         "cls_conf_max": 1.0,
                         "include_unclassified": True,
+                        "selected_detection_types": unique_detection_types,
+                        "selected_classifications": unique_classifications,
                         "image_size": saved_settings.get('image_size', 'medium')
                     }
                 }
@@ -237,8 +367,8 @@ with col8:
                     del st.session_state['aggrid_thumbnail_cache']
                 if 'aggrid_last_cache_key' in st.session_state:
                     del st.session_state['aggrid_last_cache_key']
-                if 'results_detections_filtered' in st.session_state:
-                    del st.session_state['results_detections_filtered']
+                if 'results_modified' in st.session_state:
+                    del st.session_state['results_modified']
                 
                 # Reset to first page
                 st.session_state.aggrid_current_page = 1
@@ -246,18 +376,18 @@ with col8:
                 st.rerun()
 
 with col9:
-    # Download popover with material icon
-    with st.popover(":material/download:", help="Download Data", width="stretch"):
+    # Export popover with material icon
+    with st.popover(":material/download:", help="Export", width="stretch"):
         # Get the filtered dataframe from session state
-        df_to_download = st.session_state.get('results_detections_filtered', df)
+        df_to_download = st.session_state.get('results_modified', df)
         
         # Generate timestamp for filename
         from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         
-        # Download formats label and container
-        st.markdown('<p style="font-size: 14px; margin-bottom: 4px;">Download formats</p>', unsafe_allow_html=True)
-        with st.container(border=True):
+        # Export formats label and container
+        st.markdown('<p style="font-size: 14px; margin-bottom: 4px;">Export formats</p>', unsafe_allow_html=True)
+        with st.container(border=False):
             # Four download buttons in one row
             download_col1, download_col2, download_col3, download_col4 = st.columns(4)
         
@@ -272,7 +402,7 @@ with col9:
             st.download_button(
                 label="XLSX",
                 data=xlsx_data,
-                file_name=f"addaxai-export-{timestamp}.xlsx",
+                file_name=f"addaxai-{timestamp}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 width="stretch"
             )
@@ -284,7 +414,7 @@ with col9:
             st.download_button(
                 label="CSV",
                 data=csv_data,
-                file_name=f"addaxai-export-{timestamp}.csv",
+                file_name=f"addaxai-{timestamp}.csv",
                 mime="text/csv",
                 width="stretch"
             )
@@ -296,7 +426,7 @@ with col9:
             st.download_button(
                 label="TSV",
                 data=tsv_data,
-                file_name=f"addaxai-export-{timestamp}.tsv",
+                file_name=f"addaxai-{timestamp}.tsv",
                 mime="text/tab-separated-values",
                 width="stretch"
             )
@@ -308,14 +438,14 @@ with col9:
             st.download_button(
                 label="JSON",
                 data=json_data,
-                file_name=f"addaxai-export-{timestamp}.json",
+                file_name=f"addaxai-{timestamp}.json",
                 mime="application/json",
                 width="stretch"
             )
 
 with col10:
     # Settings popover with material icon
-    with st.popover(":material/settings:", help="Image Size Settings", width="stretch"):        
+    with st.popover(":material/settings:", help="Settings", width="stretch"):        
         # Get the saved or default value for the segmented control
         default_image_size = saved_settings.get('image_size', DEFAULT_SIZE_OPTION)
         
@@ -356,10 +486,14 @@ size_config = image_size_options.get(selected_size, image_size_options[DEFAULT_S
 current_row_height = size_config["height"]
 current_image_width = size_config["width"]
 
-# Create or get filtered dataframe
-if 'results_detections_filtered' not in st.session_state:
+# Store raw data (never changes)
+if 'results_raw' not in st.session_state:
+    st.session_state['results_raw'] = df.copy()
+
+# Create or get modified dataframe
+if 'results_modified' not in st.session_state:
     # Start with full dataframe
-    filtered_df = df.copy()
+    filtered_df = st.session_state['results_raw'].copy()
     
     # Apply date filter if set
     if ('date_start' in saved_settings and 'date_end' in saved_settings and 
@@ -402,11 +536,96 @@ if 'results_detections_filtered' not in st.session_state:
             
             filtered_df = filtered_df[mask].copy()
     
-    # Store filtered dataframe in session state
-    st.session_state['results_detections_filtered'] = filtered_df
+    # Apply detection types filter if set
+    if 'selected_detection_types' in saved_settings:
+        if 'detection_label' in filtered_df.columns:
+            selected_det_types = saved_settings['selected_detection_types']
+            if selected_det_types and len(selected_det_types) > 0:
+                filtered_df = filtered_df[
+                    filtered_df['detection_label'].isin(selected_det_types)
+                ].copy()
+    
+    # Apply classification species filter if set
+    if 'selected_classifications' in saved_settings:
+        if 'classification_label' in filtered_df.columns:
+            selected_classifications = saved_settings['selected_classifications']
+            if selected_classifications and len(selected_classifications) > 0:
+                # Include unclassified if include_unclassified is True
+                include_unclass = saved_settings.get('include_unclassified', True)
+                
+                if include_unclass:
+                    # Include both selected classifications and unclassified (NaN or empty)
+                    mask = (filtered_df['classification_label'].isna()) | \
+                           (filtered_df['classification_label'] == '') | \
+                           (filtered_df['classification_label'] == 'N/A') | \
+                           (filtered_df['classification_label'].isin(selected_classifications))
+                else:
+                    # Only selected classifications
+                    mask = filtered_df['classification_label'].isin(selected_classifications)
+                
+                filtered_df = filtered_df[mask].copy()
+    
+    # Apply sorting
+    if saved_sort_column in filtered_df.columns:
+        ascending = (saved_sort_direction == '↑')
+        
+        try:
+            # Handle different data types appropriately
+            if saved_sort_column in ['detection_confidence', 'classification_confidence']:
+                # For confidence columns, handle NaN values by putting them at the end
+                filtered_df = filtered_df.sort_values(
+                    by=saved_sort_column, 
+                    ascending=ascending, 
+                    na_position='last'
+                )
+            elif saved_sort_column == 'timestamp':
+                # For timestamp, convert to datetime for proper sorting
+                if 'timestamp' in filtered_df.columns:
+                    # Parse timestamps for sorting
+                    df_timestamps = parse_timestamps(filtered_df['timestamp'])
+                    filtered_df = filtered_df.copy()
+                    filtered_df['_temp_timestamp'] = df_timestamps
+                    filtered_df = filtered_df.sort_values(
+                        by='_temp_timestamp', 
+                        ascending=ascending, 
+                        na_position='last'
+                    )
+                    filtered_df = filtered_df.drop(columns=['_temp_timestamp'])
+            else:
+                # For other columns (text), sort normally
+                filtered_df = filtered_df.sort_values(
+                    by=saved_sort_column, 
+                    ascending=ascending, 
+                    na_position='last'
+                )
+        except Exception as e:
+            # If sorting fails, continue without sorting and log the issue
+            st.warning(f"Could not sort by {saved_sort_column}: {str(e)}")
+    elif saved_sort_column != 'timestamp':
+        # If the saved sort column doesn't exist, fall back to timestamp if available
+        if 'timestamp' in filtered_df.columns:
+            try:
+                df_timestamps = parse_timestamps(filtered_df['timestamp'])
+                filtered_df = filtered_df.copy()
+                filtered_df['_temp_timestamp'] = df_timestamps
+                filtered_df = filtered_df.sort_values(
+                    by='_temp_timestamp', 
+                    ascending=False,  # Default to newest first
+                    na_position='last'
+                )
+                filtered_df = filtered_df.drop(columns=['_temp_timestamp'])
+            except Exception:
+                pass  # If timestamp sorting fails, continue without sorting
+    
+    # Store filtered and sorted dataframe in session state
+    st.session_state['results_modified'] = filtered_df
+    
+    # Clear thumbnail cache when results_modified changes
+    if 'aggrid_thumbnail_cache' in st.session_state:
+        del st.session_state['aggrid_thumbnail_cache']
 
 # Use filtered dataframe for all operations
-df_filtered = st.session_state['results_detections_filtered']
+df_filtered = st.session_state['results_modified']
 
 if df_filtered.empty:
     st.warning("No results match the current filters.")
@@ -484,6 +703,7 @@ with st.spinner("Processing images for current page..."):
         # Add all columns in the same order as explore_results.py
         # Use None for missing numeric values (AgGrid will display as empty)
         display_data.append({
+            '_df_index': idx,  # Store original dataframe index for modal navigation
             'image': image_url,  # Image column (was image_url in explore_results)
             'relative_path': row.get('relative_path') if pd.notna(row.get('relative_path')) else '',
             'detection_label': row.get('detection_label') if pd.notna(row.get('detection_label')) else '',
@@ -510,6 +730,9 @@ with st.spinner("Processing images for current page..."):
 
 # Configure AgGrid
 gb = GridOptionsBuilder.from_dataframe(display_df)
+
+# Hide the internal index column
+gb.configure_column("_df_index", hide=True)
 
 # Configure image column - use DOM element creation with click handling
 image_jscode = JsCode(f"""
@@ -680,25 +903,24 @@ if (grid_response['selected_rows'] is not None and len(grid_response['selected_r
     # grid_response['selected_rows'] is a DataFrame, get the first row as a Series
     selected_row = grid_response['selected_rows'].iloc[0]
     
-    # Find the index of the selected row in the filtered dataframe
-    # We need to match by a unique identifier since display_df is just the current page
-    selected_path = selected_row.get('relative_path')
+    # Get the original dataframe index we stored
+    original_df_index = selected_row.get('_df_index')
     
-    # Find the actual index in the full filtered dataframe
-    if selected_path and 'results_detections_filtered' in st.session_state:
-        df_filtered = st.session_state['results_detections_filtered']
-        matching_rows = df_filtered[df_filtered['relative_path'] == selected_path]
+    # Find the position in the full filtered dataframe
+    if original_df_index is not None and 'results_modified' in st.session_state:
+        df_filtered = st.session_state['results_modified']
         
-        if not matching_rows.empty:
-            # Get the index of the first match in the filtered dataframe
-            selected_index = matching_rows.index[0]
-            # Convert to position in the filtered dataframe
-            modal_index = df_filtered.index.get_loc(selected_index)
-            
-            # Set modal state and open
-            set_session_var("explore_results", "modal_current_image_index", modal_index)
-            set_session_var("explore_results", "show_modal_image_viewer", True)
-            st.rerun()
+        # Convert the original index to position in the filtered dataframe
+        try:
+            modal_index = df_filtered.index.get_loc(original_df_index)
+        except KeyError:
+            # Fallback: if index not found, use direct position
+            modal_index = list(df_filtered.index).index(original_df_index)
+        
+        # Set modal state and open
+        set_session_var("explore_results", "modal_current_image_index", modal_index)
+        set_session_var("explore_results", "show_modal_image_viewer", True)
+        st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGINATION CONTROLS (BOTTOM) - Same as explore_results.py

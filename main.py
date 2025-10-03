@@ -19,8 +19,8 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit_image_zoom
 
 TODOs FOR NOW:
-- continue with the data brwoser page - fix the modal view for image details
-- make the detections page for images too. 
+- continue with the data brwoser page - WAARWASIK: ik was bezig met de filtering popover. Still to add: Location, and model selectboxes, then make the cls slecetbox a hiearchical taxon tree.
+- make the detections page for full images too. 
 - update to the newset MD version and make sure to adjust:
     - the way you get exif data: --include_exif_tags "datetimeoriginal,gpsinfo" (see https://github.com/agentmorris/MegaDetector/pull/193#issuecomment-3347432732)
     - make sure to check how I run SpeciesNet now: https://github.com/agentmorris/MegaDetector/pull/193#issuecomment-3347432732
@@ -308,12 +308,12 @@ st.logo(os.path.join(ADDAXAI_ROOT, "assets", "images", "logo.png"), size="large"
 # Create navigation based on selected mode
 if mode == 0:  # Simple mode - single analysis tool only
     analysis_quick_page = st.Page(
-        os.path.join("pages", "analysis_quick.py"), title="Add data", icon=":material/rocket_launch:")
+        os.path.join("pages", "analysis_quick.py"), title="Analyse data", icon=":material/rocket_launch:")
     pg = st.navigation([analysis_quick_page])
     
 elif mode == 1:  # Advanced mode - full toolkit
     analysis_advanced_page = st.Page(
-        os.path.join("pages", "analysis_advanced.py"), title="Add data", icon=":material/add:")
+        os.path.join("pages", "analysis_advanced.py"), title="Analyse new data", icon=":material/add:")
     remove_duplicates_page = st.Page(
         os.path.join("pages", "remove_duplicates.py"), title="Remove duplicates", icon=":material/reset_image:")
     human_verification_page = st.Page(
