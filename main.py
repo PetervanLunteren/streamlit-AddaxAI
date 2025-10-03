@@ -14,6 +14,10 @@ Architecture:
 Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 
+How to pip install into an environment:
+./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install [package-name]
+./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit_image_zoom
+
 TODOs FOR NOW:
 - continue with the data brwoser page - fix the modal view for image details
 - make the detections page for images too. 
