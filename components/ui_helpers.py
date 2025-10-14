@@ -189,3 +189,33 @@ class BlockingLoader:
             """,
             unsafe_allow_html=True,
         )
+
+
+def header_large(text):
+    """
+    Display a large custom header.
+
+    Args:
+        text: The header text to display
+    """
+    st.markdown(f"<h1 style='font-size: 2.5rem; font-weight: 600; margin-bottom: 0.15rem;'>{text}</h1><hr style='margin-top: 0; margin-bottom: 1rem; border: none; border-top: 2px solid #0f6064;'>", unsafe_allow_html=True)
+
+
+def header_medium(text):
+    """
+    Display a medium custom header.
+
+    Args:
+        text: The header text to display
+    """
+    st.markdown(f"<h2 style='font-size: 1.75rem; font-weight: 600; margin-bottom: 0.05rem; margin-top: 0;'>{text}</h2><hr style='margin-top: 0; margin-bottom: 0.75rem; border: none; border-top: 2px solid #0f6064;'>", unsafe_allow_html=True)
+
+
+def header_small(text):
+    """
+    Display a small custom header.
+
+    Args:
+        text: The header text to display
+    """
+    st.markdown(f"<h3 style='font-size: 1.25rem; font-weight: 600; margin-bottom: 0.05rem;'>{text}</h3><hr style='margin-top: 0; margin-bottom: 0.5rem; border: none; border-top: 2px solid #0f6064;'>", unsafe_allow_html=True)
