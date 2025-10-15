@@ -19,7 +19,8 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit_image_zoom
 
 TODOs FOR NOW:
-- continue with the data brwoser page - WAARWASIK: ls slecetbox a hiearchical taxon tree.
+- WAARWASIK: "I am still seeing no checkboxes in the tree select expandable in the filter popover of data-browser." I was busy debugging this issue. Use claude --continue to debug further. Logs in the terminal on startup. 
+- continue with the data brwoser page
 - make the detections page for full images too. 
 - try out my new PyPi package: https://pypi.org/project/st-segmented-buttons/
 - update to the newset MD version and make sure to adjust:

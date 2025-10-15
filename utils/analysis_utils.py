@@ -704,6 +704,7 @@ def merge_deployment_jsons(json_files, output_file, deployment_data=None):
             'images': [],
             'detection_categories': {},
             'classification_categories': {},
+            'classification_category_descriptions': {},
             'info': {}
         }
         
@@ -729,6 +730,8 @@ def merge_deployment_jsons(json_files, output_file, deployment_data=None):
                 merged_data['detection_categories'] = data.get('detection_categories', {})
             if not merged_data['classification_categories']:
                 merged_data['classification_categories'] = data.get('classification_categories', {})
+            if not merged_data['classification_category_descriptions']:
+                merged_data['classification_category_descriptions'] = data.get('classification_category_descriptions', {})
             if not merged_data['info']:
                 merged_data['info'] = data.get('info', {})
         

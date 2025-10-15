@@ -88,8 +88,8 @@ if df.empty:
 if get_session_var("explore_results", "show_modal_image_viewer", False):
     # Only render the modal, skip all heavy grid processing
     modal_image_viewer = Modal(
-        title="", 
-        key="image_viewer", 
+        title="",
+        key="image_viewer",
         show_close_button=False
     )
     with modal_image_viewer.container():
@@ -407,7 +407,7 @@ with col8:
             with st.container(border=True):
                 print_widget_label("Classifications")
 
-                # Get unique classifications from current dataframe
+                # Get unique classifications from current dataframe (fallback if no taxonomy)
                 if 'classification_label' in df.columns:
                     unique_classifications = sorted([
                         cls for cls in df['classification_label'].dropna().unique()
@@ -416,17 +416,89 @@ with col8:
                 else:
                     unique_classifications = []
 
-                # Classification selectbox
-                saved_selected_classifications = saved_settings.get('selected_classifications', unique_classifications)
-                if unique_classifications:
+                # Check if merged taxonomy is available
+                taxonomy_cache = st.session_state.get("taxonomy_cache")
+
+                if taxonomy_cache and taxonomy_cache.get("merged_tree"):
+                    # Use tree selector in expander
+                    from st_checkbox_tree import checkbox_tree
+
+                    merged_tree = taxonomy_cache["merged_tree"]
+                    all_leaf_values = taxonomy_cache["all_leaf_values"]
+
+                    # Get current selections
+                    saved_selected_classifications = saved_settings.get('selected_classifications', all_leaf_values)
+                    saved_expanded_nodes = saved_settings.get('expanded_cls_nodes', [])
+
+                    selected_count = len(saved_selected_classifications)
+                    total_count = len(all_leaf_values)
+
+                    # Tree selector in expander
+                    with st.expander(f":material/pets: Select species ({selected_count} of {total_count} selected)", expanded=False):
+                        # Select all / none buttons
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            select_all_cls = st.checkbox("Select all", value=(selected_count == total_count), key="cls_select_all_checkbox")
+                        with col2:
+                            select_none_cls = st.checkbox("Select none", value=(selected_count == 0), key="cls_select_none_checkbox")
+
+                        # Handle select all/none
+                        if select_all_cls and not select_none_cls:
+                            saved_selected_classifications = all_leaf_values
+                        elif select_none_cls and not select_all_cls:
+                            saved_selected_classifications = []
+                        elif select_all_cls and select_none_cls:
+                            # Both checked - maintain current state
+                            pass
+
+                        # Tree widget
+                        with st.container(border=True, height=400):
+                            # DEBUG: Print tree structure
+                            from utils.config import log
+                            log(f"DEBUG merged_tree type: {type(merged_tree)}")
+                            log(f"DEBUG merged_tree length: {len(merged_tree) if merged_tree else 0}")
+                            if merged_tree and len(merged_tree) > 0:
+                                log(f"DEBUG first tree node: {merged_tree[0]}")
+                                log(f"DEBUG first tree node keys: {merged_tree[0].keys() if isinstance(merged_tree[0], dict) else 'NOT A DICT'}")
+                            log(f"DEBUG all_leaf_values: {all_leaf_values[:5] if len(all_leaf_values) > 5 else all_leaf_values}")
+                            log(f"DEBUG saved_selected_classifications: {saved_selected_classifications[:5] if len(saved_selected_classifications) > 5 else saved_selected_classifications}")
+
+                            tree_result = checkbox_tree(
+                                merged_tree,
+                                check_model="leaf",
+                                checked=saved_selected_classifications,
+                                expanded=saved_expanded_nodes,
+                                show_expand_all=True,
+                                half_check_color="#086164",
+                                check_color="#086164",
+                                key="cls_tree_select_form",
+                                show_tree_lines=True,
+                                tree_line_color="#e9e9eb"
+                            )
+
+                        # Update selections from tree
+                        if tree_result:
+                            selected_classifications = tree_result.get("checked", saved_selected_classifications)
+                            # Store expanded state for next time
+                            expanded_nodes = tree_result.get("expanded", saved_expanded_nodes)
+                        else:
+                            selected_classifications = saved_selected_classifications
+                            expanded_nodes = saved_expanded_nodes
+
+                elif unique_classifications:
+                    # Fallback to flat multiselect if no taxonomy
+                    saved_selected_classifications = saved_settings.get('selected_classifications', unique_classifications)
                     selected_classifications = st.multiselect(
                         "Classes",
                         options=unique_classifications,
                         default=saved_selected_classifications,
                         help="Select specific species to include"
                     )
+                    expanded_nodes = []
                 else:
+                    # No data available
                     selected_classifications = []
+                    expanded_nodes = []
                     st.info("No classifications available in the data")
 
                 # Classification confidence range
@@ -616,6 +688,7 @@ with col8:
                         "include_unclassified": include_unclassified,
                         "selected_detection_types": selected_detection_types,
                         "selected_classifications": selected_classifications,
+                        "expanded_cls_nodes": expanded_nodes if 'expanded_nodes' in locals() else [],
                         "selected_locations": selected_locations,
                         "selected_runs": selected_runs,
                         "selected_detection_models": selected_detection_models,
@@ -639,6 +712,13 @@ with col8:
                 st.rerun()
             
             if clear_all:
+                # Get default classification list
+                taxonomy_cache = st.session_state.get("taxonomy_cache")
+                if taxonomy_cache and taxonomy_cache.get("all_leaf_values"):
+                    default_classifications = taxonomy_cache["all_leaf_values"]
+                else:
+                    default_classifications = unique_classifications
+
                 # Clear all filters to default ranges
                 filter_settings = {
                     "aggrid_settings": {
@@ -650,7 +730,8 @@ with col8:
                         "cls_conf_max": 1.0,
                         "include_unclassified": True,
                         "selected_detection_types": unique_detection_types,
-                        "selected_classifications": unique_classifications,
+                        "selected_classifications": default_classifications,
+                        "expanded_cls_nodes": [],
                         "selected_locations": unique_locations,
                         "selected_runs": unique_runs,
                         "selected_detection_models": unique_detection_models,

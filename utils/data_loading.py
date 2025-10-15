@@ -63,6 +63,198 @@ def decode_gps_info(gps_info):
         return None, None
 
 
+def load_model_taxonomy(model_id, classification_category_descriptions=None):
+    """
+    Load taxonomy information for a classification model.
+
+    Tries to load from classification_category_descriptions first (from SpeciesNet),
+    then falls back to taxon-mapping.csv for other models.
+
+    Args:
+        model_id (str): Classification model ID
+        classification_category_descriptions (dict, optional): Taxonomy mapping from JSON
+            Format: {"0": "mammalia;carnivora;felidae;panthera;leo", ...}
+
+    Returns:
+        dict: {
+            "tree": [...],           # Hierarchical tree structure
+            "leaf_values": [...],    # All species (model_class values)
+            "taxon_mapping": [...]   # Raw CSV data as list of dicts
+        } or None if loading fails
+    """
+    from utils.config import ADDAXAI_ROOT
+    from utils.analysis_utils import build_taxon_tree, get_all_leaf_values
+
+    try:
+        # Check if model is NONE or unknown
+        if not model_id or model_id in ["NONE", "unknown"]:
+            return None
+
+        # Try to use classification_category_descriptions from JSON first (SpeciesNet)
+        if classification_category_descriptions:
+            log(f"Using taxonomy from classification_category_descriptions for {model_id}")
+
+            # Convert SpeciesNet format to taxon_mapping format
+            # SpeciesNet format: {"0": "mammalia;carnivora;felidae;panthera;leo"}
+            # Need to convert to: [{"model_class": "leo", "level_class": "class mammalia", ...}]
+            taxon_mapping = []
+            for category_id, taxonomy_string in classification_category_descriptions.items():
+                # Skip empty or whitespace-only strings
+                if not taxonomy_string or not taxonomy_string.strip():
+                    continue
+
+                # Split taxonomy string: "mammalia;carnivora;felidae;panthera;leo"
+                parts = [p.strip() for p in taxonomy_string.split(';')]
+
+                # Skip entries that don't have at least class and species (parts[0] and parts[4])
+                if len(parts) < 5 or not parts[0] or not parts[4]:
+                    log(f"Skipping malformed taxonomy entry: {taxonomy_string}")
+                    continue
+
+                # Assume format is: class;order;family;genus;species
+                # build_taxon_tree expects level_* fields with "class ", "order ", etc. prefixes
+                entry = {
+                    "model_class": parts[4],  # species
+                    "level_class": f"class {parts[0]}",
+                    "level_order": f"order {parts[1]}" if parts[1] else "",
+                    "level_family": f"family {parts[2]}" if parts[2] else "",
+                    "level_genus": f"genus {parts[3]}" if parts[3] else "",
+                    "level_species": f"species {parts[4]}"
+                }
+                taxon_mapping.append(entry)
+
+            if taxon_mapping:
+                # DEBUG: Print first few entries
+                log(f"DEBUG SpeciesNet taxon_mapping first 3 entries:")
+                for i, entry in enumerate(taxon_mapping[:3]):
+                    log(f"  Entry {i}: {entry}")
+
+                tree = build_taxon_tree(taxon_mapping)
+
+                # DEBUG: Print tree structure
+                log(f"DEBUG SpeciesNet tree structure (first 2 nodes):")
+                for i, node in enumerate(tree[:2]):
+                    log(f"  Node {i}: {node}")
+
+                leaf_values = get_all_leaf_values(tree)
+
+                return {
+                    "tree": tree,
+                    "leaf_values": leaf_values,
+                    "taxon_mapping": taxon_mapping
+                }
+
+        # Fallback: Load from taxon-mapping.csv
+        mapping_path = os.path.join(
+            ADDAXAI_ROOT, "models", "cls", model_id, "taxon-mapping.csv"
+        )
+
+        if not os.path.exists(mapping_path):
+            log(f"No taxon-mapping.csv found for model: {model_id}")
+            return None
+
+        log(f"Using taxonomy from taxon-mapping.csv for {model_id}")
+
+        # Load and parse taxonomy
+        taxon_df = pd.read_csv(mapping_path)
+        taxon_mapping = taxon_df.to_dict('records')
+
+        # Build tree structure
+        tree = build_taxon_tree(taxon_mapping)
+        leaf_values = get_all_leaf_values(tree)
+
+        return {
+            "tree": tree,
+            "leaf_values": leaf_values,
+            "taxon_mapping": taxon_mapping
+        }
+
+    except Exception as e:
+        log(f"Error loading taxonomy for model {model_id}: {str(e)}")
+        return None
+
+
+def merge_taxonomies(taxonomy_dict):
+    """
+    Merge multiple model taxonomies into a unified tree.
+
+    Args:
+        taxonomy_dict (dict): {
+            "model_africa": {"tree": [...], "leaf_values": [...], "taxon_mapping": [...]},
+            "model_asia": {...}
+        }
+
+    Returns:
+        dict: {
+            "merged_tree": [...],           # Unified tree structure
+            "all_leaf_values": [...],       # All unique species
+        }
+    """
+    from utils.analysis_utils import build_taxon_tree, get_all_leaf_values
+
+    try:
+        if not taxonomy_dict:
+            return {
+                "merged_tree": [],
+                "all_leaf_values": []
+            }
+
+        # Collect all taxon_mapping entries from all models
+        all_taxon_entries = []
+        seen_model_classes = set()
+
+        for model_id, taxonomy_data in taxonomy_dict.items():
+            taxon_mapping = taxonomy_data.get("taxon_mapping", [])
+
+            for entry in taxon_mapping:
+                model_class = entry.get("model_class", "").strip()
+
+                # Deduplicate by model_class
+                if model_class and model_class not in seen_model_classes:
+                    seen_model_classes.add(model_class)
+
+                    # Normalize taxonomic levels to lowercase for consistent merging
+                    # This ensures "class Mammalia" and "class mammalia" are treated as the same node
+                    normalized_entry = entry.copy()
+                    for level_key in ["level_class", "level_order", "level_family", "level_genus", "level_species"]:
+                        if level_key in normalized_entry and normalized_entry[level_key]:
+                            normalized_entry[level_key] = normalized_entry[level_key].lower()
+
+                    all_taxon_entries.append(normalized_entry)
+
+        # Build unified tree from merged entries
+        if all_taxon_entries:
+            # DEBUG: Print first few merged entries
+            log(f"DEBUG merge_taxonomies: Processing {len(all_taxon_entries)} total entries")
+            log(f"DEBUG merge_taxonomies: First 3 entries:")
+            for i, entry in enumerate(all_taxon_entries[:3]):
+                log(f"  Entry {i}: {entry}")
+
+            merged_tree = build_taxon_tree(all_taxon_entries)
+
+            # DEBUG: Print merged tree structure
+            log(f"DEBUG merge_taxonomies: Tree has {len(merged_tree)} root nodes")
+            for i, node in enumerate(merged_tree[:3]):
+                log(f"DEBUG merge_taxonomies: Root node {i}: {node}")
+
+            all_leaf_values = get_all_leaf_values(merged_tree)
+        else:
+            merged_tree = []
+            all_leaf_values = []
+
+        return {
+            "merged_tree": merged_tree,
+            "all_leaf_values": all_leaf_values
+        }
+
+    except Exception as e:
+        log(f"Error merging taxonomies: {str(e)}")
+        return {
+            "merged_tree": [],
+            "all_leaf_values": []
+        }
+
+
 def load_detection_results_dataframe():
     """
     Load all detection results from completed runs into a pandas DataFrame.
@@ -96,15 +288,17 @@ def load_detection_results_dataframe():
     
     results_list = []
     error_count = 0
-    
+    classification_models_seen = set()
+    speciesnet_taxonomy_descriptions = {}  # Track classification_category_descriptions for SpeciesNet only
+
     try:
         # Load MAP_JSON from session state
         map_file_path = st.session_state["shared"]["MAP_FILE_PATH"]
-        
+
         if not os.path.exists(map_file_path):
             log(f"MAP_JSON file not found: {map_file_path}")
             return pd.DataFrame()
-            
+
         with open(map_file_path, 'r') as f:
             map_data = json.load(f)
             
@@ -133,7 +327,17 @@ def load_detection_results_dataframe():
                         metadata = run_json.get("addaxai_metadata", {})
                         detection_model_id = metadata.get("selected_det_modelID", "unknown")
                         classification_model_id = metadata.get("selected_cls_modelID", "unknown")
-                        
+
+                        # Track classification models encountered
+                        if classification_model_id and classification_model_id not in ["NONE", "unknown"]:
+                            classification_models_seen.add(classification_model_id)
+
+                            # For SpeciesNet models, capture taxonomy descriptions from JSON
+                            if "SPECIESNET" in classification_model_id.upper():
+                                category_descriptions = run_json.get("classification_category_descriptions", {})
+                                if category_descriptions and classification_model_id not in speciesnet_taxonomy_descriptions:
+                                    speciesnet_taxonomy_descriptions[classification_model_id] = category_descriptions
+
                         # Get category mapping dictionaries
                         detection_categories = run_json.get("detection_categories", {})
                         classification_categories = run_json.get("classification_categories", {})
@@ -234,16 +438,41 @@ def load_detection_results_dataframe():
                         
         # Create DataFrame
         df = pd.DataFrame(results_list)
-        
+
+        # Load taxonomy for each classification model encountered
+        taxonomy_dict = {}
+        if classification_models_seen:
+            log(f"Loading taxonomy for {len(classification_models_seen)} classification model(s)...")
+
+            for model_id in classification_models_seen:
+                # For SpeciesNet, pass taxonomy descriptions from JSON
+                category_descriptions = speciesnet_taxonomy_descriptions.get(model_id)
+                taxonomy_data = load_model_taxonomy(model_id, classification_category_descriptions=category_descriptions)
+                if taxonomy_data:
+                    taxonomy_dict[model_id] = taxonomy_data
+                    log(f"  ✓ Loaded taxonomy for {model_id}: {len(taxonomy_data['leaf_values'])} species")
+                else:
+                    log(f"  ✗ Failed to load taxonomy for {model_id}")
+
+        # Merge all taxonomies into unified tree
+        if taxonomy_dict:
+            merged_taxonomy = merge_taxonomies(taxonomy_dict)
+            st.session_state["taxonomy_cache"] = merged_taxonomy
+            log(f"Merged taxonomy: {len(merged_taxonomy['all_leaf_values'])} unique species total")
+        else:
+            st.session_state["taxonomy_cache"] = None
+            if classification_models_seen:
+                log("No taxonomies loaded - tree selector will not be available")
+
         # Log summary
         if len(df) > 0:
             log(f"Successfully loaded {len(df)} detections from {len(df['run_id'].unique())} runs")
         else:
             log("No detection results found in any runs")
-            
+
         if error_count > 0:
             log(f"Encountered {error_count} errors while loading detection results")
-            
+
         return df
         
     except Exception as e:

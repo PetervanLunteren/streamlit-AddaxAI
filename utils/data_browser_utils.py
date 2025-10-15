@@ -654,3 +654,67 @@ def image_viewer_modal():
         if st.button("Next :material/chevron_right:", disabled=(current_index >= len(df_filtered) - 1), width="stretch"):
             set_session_var("explore_results", "modal_current_image_index", current_index + 1)
             st.rerun()
+
+
+def classification_selector_modal(nodes, all_leaf_values):
+    """
+    Hierarchical species selector modal for data browser filtering.
+
+    Args:
+        nodes (list): Merged tree structure
+        all_leaf_values (list): All unique species across all models
+    """
+    import streamlit as st
+    from st_checkbox_tree import checkbox_tree
+    from utils.common import get_session_var, set_session_var
+
+    # Select all / none buttons
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button(":material/select_check_box: Select all", use_container_width=True, key="cls_select_all"):
+            set_session_var("explore_results", "selected_classifications", all_leaf_values)
+            st.rerun()
+    with col2:
+        if st.button(":material/check_box_outline_blank: Select none", use_container_width=True, key="cls_select_none"):
+            set_session_var("explore_results", "selected_classifications", [])
+            set_session_var("explore_results", "expanded_cls_nodes", [])
+            st.rerun()
+
+    # Get current state
+    selected_nodes = get_session_var("explore_results", "selected_classifications", [])
+    expanded_nodes = get_session_var("explore_results", "expanded_cls_nodes", [])
+
+    # Tree widget
+    with st.container(border=True, height=400):
+        selected = checkbox_tree(
+            nodes,
+            check_model="leaf",
+            checked=selected_nodes,
+            expanded=expanded_nodes,
+            show_expand_all=True,
+            half_check_color="#086164",
+            check_color="#086164",
+            key="cls_tree_select",
+            show_tree_lines=True,
+            tree_line_color="#e9e9eb"
+        )
+
+    # Update state on change
+    if selected:
+        new_checked = selected.get("checked", [])
+        new_expanded = selected.get("expanded", [])
+        if new_checked != selected_nodes or new_expanded != expanded_nodes:
+            set_session_var("explore_results", "selected_classifications", new_checked)
+            set_session_var("explore_results", "expanded_cls_nodes", new_expanded)
+            st.rerun()
+
+    # Cancel / Apply buttons
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button(":material/cancel: Cancel", use_container_width=True, key="cls_cancel"):
+            set_session_var("explore_results", "show_modal_cls_selector", False)
+            st.rerun()
+    with col2:
+        if st.button(":material/check: Apply", use_container_width=True, type="primary", key="cls_apply"):
+            set_session_var("explore_results", "show_modal_cls_selector", False)
+            st.rerun()
