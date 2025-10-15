@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit_image_zoom
 
 TODOs FOR NOW:
-- WAARWASIK: "I am still seeing no checkboxes in the tree select expandable in the filter popover of data-browser." I was busy debugging this issue. Use claude --continue to debug further. Logs in the terminal on startup. 
+- WAARWASIK: I was making a shared tree selector. there are still some bugs. Check the tree select in the filter of data-browser and the analyse-advanced-wizard. Use claude --continue to debug further. Logs in the terminal on startup. 
 - continue with the data brwoser page
 - make the detections page for full images too. 
 - try out my new PyPi package: https://pypi.org/project/st-segmented-buttons/
@@ -236,19 +236,37 @@ if st.session_state == {}:
         from utils.data_loading import load_detection_results_dataframe
         results_df = load_detection_results_dataframe()
         st.session_state["results_detections"] = results_df
-        
+
         if len(results_df) > 0:
             log(f"Loaded {len(results_df)} detections from {len(results_df['run_id'].unique())} runs")
         else:
             log("No detection results found in completed runs")
-            
+
     except Exception as e:
         error_msg = f"Failed to load detection results: {str(e)}"
         log(error_msg)
         st.warning(error_msg)
         # Create empty dataframe as fallback
         st.session_state["results_detections"] = pd.DataFrame()
-    
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Load global taxonomy data (for taxonomic tree selector)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    loader.update_text("Loading global taxonomy...")
+
+    time.sleep(0.5)  # Simulate loading time
+
+    try:
+        from utils.taxonomy_loader import load_global_taxonomy
+        load_global_taxonomy()
+        log("Global taxonomy loaded successfully")
+    except Exception as e:
+        error_msg = f"Failed to load global taxonomy: {str(e)}"
+        log(error_msg)
+        # Non-critical - tree selector will show fallback
+        st.session_state["taxonomy"] = {}
+
     # Archive previous session log and create fresh log (only on startup)
     log_fpath = os.path.join(ADDAXAI_ROOT, "assets", "logs", "log.txt")
     previous_sessions_dir = os.path.join(ADDAXAI_ROOT, "assets", "logs", "previous_sessions")

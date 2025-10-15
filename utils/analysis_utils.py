@@ -38,7 +38,7 @@ Cache keys stored in st.session_state:
 """
 
 
-from st_checkbox_tree import checkbox_tree  # pip install st-checkbox-tree
+# Removed: from st_checkbox_tree import checkbox_tree  # Now using components.taxonomic_tree_selector instead
 import os
 import json
 import streamlit as st
@@ -1121,81 +1121,34 @@ def show_none_model_info_modal():
             st.rerun()
 
 
-def species_selector_modal(nodes, all_leaf_values):
-    butn_col1, butn_col2 = st.columns([1, 1])
-    with butn_col1:
-        select_all_clicked = st.button(
-            ":material/select_check_box: Select all", key="modal_expand_all_button", use_container_width=True)
-    with butn_col2:
-        select_none_clicked = st.button(
-            ":material/check_box_outline_blank: Select none", key="modal_collapse_all_button", use_container_width=True)
+def species_selector_modal(all_species, selected_species):
+    """
+    Species selector modal using the new tree_selector_modal component.
 
-    # Get current state
-    selected_nodes = get_session_var("analyse_advanced", "selected_nodes", [])
-    expanded_nodes = get_session_var("analyse_advanced", "expanded_nodes", [])
-    last_selected = get_session_var("analyse_advanced", "last_selected", {})
+    Args:
+        all_species: List of all available species (model_class values)
+        selected_species: List of currently selected species
 
-    # Handle button clicks after the buttons are rendered
-    if select_all_clicked:
-        # Use cached leaf values for faster performance
-        set_session_var("analyse_advanced", "selected_nodes", all_leaf_values)
-        set_session_var("analyse_advanced", "last_selected", {
-                        "checked": all_leaf_values, "expanded": expanded_nodes})
-        selected_nodes = all_leaf_values  # Update local variable
+    Returns:
+        None - Updates session state directly
+    """
+    from components.taxonomic_tree_selector import tree_selector_modal
 
-    if select_none_clicked:
-        # Clear selection and update structured session state
-        set_session_var("analyse_advanced", "selected_nodes", [])
-        set_session_var("analyse_advanced", "expanded_nodes", [])
-        set_session_var("analyse_advanced", "last_selected", {})
-        selected_nodes = []  # Update local variable
-        expanded_nodes = []
+    # Render tree selector modal
+    result = tree_selector_modal(
+        available=all_species,
+        selected=selected_species,
+        key="analyse_advanced_tree"
+    )
 
-    with st.container(border=True, height=400):
-        # pip install st-checkbox-tree
-        selected = checkbox_tree(
-            nodes,
-            check_model="leaf",
-            checked=selected_nodes,
-            expanded=expanded_nodes,
-            show_expand_all=True,
-            half_check_color="#086164",
-            check_color="#086164",
-            key="modal_tree_select",
-            show_tree_lines=True,
-            tree_line_color="#e9e9eb"
-        )
+    # Handle result
+    if result is not None:  # Apply was clicked
+        # Save selection to session state
+        set_session_var("analyse_advanced", "selected_nodes", result)
 
-    # Handle selection update
-    if selected is not None:
-        new_checked = selected.get("checked", [])
-        new_expanded = selected.get("expanded", [])
-        last_checked = last_selected.get("checked", [])
-        last_expanded = last_selected.get("expanded", [])
-
-        if new_checked != last_checked or new_expanded != last_expanded:
-            # Update structured session state
-            update_session_vars("analyse_advanced", {
-                "selected_nodes": new_checked,
-                "expanded_nodes": new_expanded,
-                "last_selected": selected
-            })
-            st.rerun()  # Force rerun
-
-    col2, col1 = st.columns([1, 1])
-    with col1:
-        if st.button(":material/check: Apply Selection", use_container_width=True, type="primary"):
-            # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced",
-                            "show_modal_species_selector", False)
-            st.rerun()
-
-    with col2:
-        if st.button(":material/cancel: Cancel", use_container_width=True):
-            # Close modal by setting session state flag to False
-            set_session_var("analyse_advanced",
-                            "show_modal_species_selector", False)
-            st.rerun()
+        # Close modal
+        set_session_var("analyse_advanced", "show_modal_species_selector", False)
+        st.rerun()
 
 
 def show_cls_model_info_modal(model_info):
@@ -3235,13 +3188,13 @@ def write_selected_species(selected_species, cls_model_ID):
 
 
 def species_selector_widget(taxon_mapping, cls_model_ID):
-    nodes = build_taxon_tree(taxon_mapping)
-
-    # Cache leaf values to avoid expensive tree traversal on every "Select all"
-    cache_key = "all_leaf_values"
-    if cache_key not in st.session_state:
-        st.session_state[cache_key] = get_all_leaf_values(nodes)
-    all_leaf_values = st.session_state[cache_key]
+    # Extract all species names (model_class values) from taxon_mapping
+    # taxon_mapping is a list of dicts with 'model_class' keys
+    all_species = sorted(list(set([
+        entry.get("model_class", "").strip()
+        for entry in taxon_mapping
+        if entry.get("model_class", "").strip()
+    ])))
 
     # Initialize state in structured session state
     # First check if we need to initialize from model's variables.json
@@ -3259,38 +3212,24 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
                             "selected_nodes", selected_nodes)
         # Mark as initialized regardless of whether we found classes
         set_session_var("analyse_advanced", "species_initialized", True)
-    expanded_nodes = get_session_var("analyse_advanced", "expanded_nodes", [])
-    last_selected = get_session_var("analyse_advanced", "last_selected", {})
 
     col1, col2 = st.columns([1, 3])
     with col1:
-        # OLD POPOVER CONVERTED TO MODAL - species_selector_popover() replaced with modal_species_selector
+        # Button to open tree selector modal
         if st.button(":material/pets: Select", use_container_width=True):
-            # Store modal data in session state
-            set_session_var("analyse_advanced", "modal_species_nodes", nodes)
-            set_session_var("analyse_advanced",
-                            "modal_species_leaf_values", all_leaf_values)
+            # Store all species list in session state for modal
+            set_session_var("analyse_advanced", "modal_all_species", all_species)
             # Set session state flag to show modal on next rerun
             set_session_var("analyse_advanced",
                             "show_modal_species_selector", True)
             st.rerun()
 
-    # Count leaf nodes
-    def count_leaf_nodes(nodes):
-        count = 0
-        for node in nodes:
-            if "children" in node and node["children"]:
-                count += count_leaf_nodes(node["children"])
-            else:
-                count += 1
-        return count
-
     with col2:
-        leaf_count = count_leaf_nodes(nodes)
         # Get current selected nodes from session state
         current_selected = get_session_var(
             "analyse_advanced", "selected_nodes", [])
-        text = f"You have selected <code style='color:#086164; font-family:monospace;'>{len(current_selected)}</code> of <code style='color:#086164; font-family:monospace;'>{leaf_count}</code> classes. "
+        total_count = len(all_species)
+        text = f"You have selected <code style='color:#086164; font-family:monospace;'>{len(current_selected)}</code> of <code style='color:#086164; font-family:monospace;'>{total_count}</code> classes. "
         st.markdown(
             f"""
                 <div style="background-color: #f0f2f6; padding: 7px; border-radius: 8px;">

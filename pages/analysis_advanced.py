@@ -162,11 +162,10 @@ if get_session_var("analyse_advanced", "show_modal_species_selector", False):
     modal_species_selector = Modal(
         f"#### Select species", key="species_selector", show_close_button=False)
     with modal_species_selector.container():
-        # Get cached data from session state
-        nodes = get_session_var("analyse_advanced", "modal_species_nodes", [])
-        all_leaf_values = get_session_var( 
-            "analyse_advanced", "modal_species_leaf_values", [])
-        species_selector_modal(nodes, all_leaf_values)
+        # Get all available species and current selection
+        all_species = get_session_var("analyse_advanced", "modal_all_species", [])
+        selected_species = get_session_var("analyse_advanced", "selected_nodes", [])
+        species_selector_modal(all_species, selected_species)
 
 st.subheader(":material/add: Add run to queue", divider="grey")
 st.write("Fill in the information related to this run below and add to the queue for batch processing. It is advised to run the analysis per camera deployment, as many of the subsequent tools depend on deployment metadata. You can add multiple runs to the queue and process them in one go.")

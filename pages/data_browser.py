@@ -84,7 +84,7 @@ if df.empty:
 # CHECK IF MODAL SHOULD BE SHOWN - GUARD HEAVY CODE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Check if modal should be displayed
+# Check if image viewer modal should be displayed
 if get_session_var("explore_results", "show_modal_image_viewer", False):
     # Only render the modal, skip all heavy grid processing
     modal_image_viewer = Modal(
@@ -94,6 +94,57 @@ if get_session_var("explore_results", "show_modal_image_viewer", False):
     )
     with modal_image_viewer.container():
         image_viewer_modal()
+    st.stop()  # Don't render anything else
+
+# Check if tree selector modal should be displayed
+if get_session_var("explore_results", "show_tree_modal", False):
+    from components.taxonomic_tree_selector import tree_selector_modal
+
+    # Get unique classifications from current dataframe
+    if 'classification_label' in df.columns:
+        unique_classifications = sorted([
+            cls for cls in df['classification_label'].dropna().unique()
+            if cls != 'N/A' and cls.strip() != ''
+        ])
+    else:
+        unique_classifications = []
+
+    # Get current selections from saved settings
+    saved_selected_classifications = saved_settings.get('selected_classifications', unique_classifications)
+
+    # Open modal using st-modal library
+    tree_modal = Modal(
+        title="Select Species",
+        key="tree_selector_modal",
+        show_close_button=False
+    )
+
+    with tree_modal.container():
+        # Render tree selector modal
+        result = tree_selector_modal(
+            available=unique_classifications,
+            selected=saved_selected_classifications,
+            key="explore_results_tree"
+        )
+
+        # Handle result
+        if result is not None:  # Apply was clicked
+            # Save selection
+            new_settings = saved_settings.copy()
+            new_settings['selected_classifications'] = result
+            update_vars("explore_results", {"aggrid_settings": new_settings})
+
+            # Close modal
+            set_session_var("explore_results", "show_tree_modal", False)
+
+            # Clear caches and rerun
+            if 'aggrid_thumbnail_cache' in st.session_state:
+                del st.session_state['aggrid_thumbnail_cache']
+            if 'results_modified' in st.session_state:
+                del st.session_state['results_modified']
+            st.session_state.aggrid_current_page = 1
+            st.rerun()
+
     st.stop()  # Don't render anything else
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -364,114 +415,7 @@ with col8:
     # Simple date filter popover
     with st.popover(":material/tune:", help="Filter", width="stretch"):
         # ═══════════════════════════════════════════════════════════════════════
-        # TREE SELECTOR (OUTSIDE FORM) - Must be first, before form starts
-        # ═══════════════════════════════════════════════════════════════════════
-
-        # Get unique classifications from current dataframe (fallback if no taxonomy)
-        if 'classification_label' in df.columns:
-            unique_classifications = sorted([
-                cls for cls in df['classification_label'].dropna().unique()
-                if cls != 'N/A' and cls.strip() != ''
-            ])
-        else:
-            unique_classifications = []
-
-        # Check if merged taxonomy is available
-        taxonomy_cache = st.session_state.get("taxonomy_cache")
-
-        # Initialize variables that will be used in the form
-        selected_classifications = None
-        expanded_nodes = []
-
-        if taxonomy_cache and taxonomy_cache.get("merged_tree"):
-            # Use tree selector (OUTSIDE form, so it works properly)
-            from st_checkbox_tree import checkbox_tree
-
-            merged_tree = taxonomy_cache["merged_tree"]
-            all_leaf_values = taxonomy_cache["all_leaf_values"]
-
-            # Get current selections from saved settings
-            saved_selected_classifications = saved_settings.get('selected_classifications', all_leaf_values)
-            saved_expanded_nodes = saved_settings.get('expanded_cls_nodes', [])
-
-            selected_count = len(saved_selected_classifications)
-            total_count = len(all_leaf_values)
-
-            # CLASSIFICATIONS SECTION (with tree selector)
-            with st.container(border=True):
-                print_widget_label("Classifications")
-
-                # Select all / none buttons
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    select_all_cls = st.button("Select all", key="cls_select_all_button", use_container_width=True)
-                with col2:
-                    select_none_cls = st.button("Select none", key="cls_select_none_button", use_container_width=True)
-
-                # Handle select all/none button clicks
-                if select_all_cls:
-                    saved_selected_classifications = all_leaf_values
-                    # Update settings immediately
-                    new_settings = saved_settings.copy()
-                    new_settings['selected_classifications'] = all_leaf_values
-                    update_vars("explore_results", {"aggrid_settings": new_settings})
-                    st.rerun()
-
-                if select_none_cls:
-                    saved_selected_classifications = []
-                    # Update settings immediately
-                    new_settings = saved_settings.copy()
-                    new_settings['selected_classifications'] = []
-                    update_vars("explore_results", {"aggrid_settings": new_settings})
-                    st.rerun()
-
-                # Tree widget
-                with st.container(border=True, height=400):
-                    tree_result = checkbox_tree(
-                        merged_tree,
-                        check_model="leaf",
-                        checked=saved_selected_classifications,
-                        expanded=saved_expanded_nodes,
-                        show_expand_all=True,
-                        half_check_color="#086164",
-                        check_color="#086164",
-                        key="cls_tree_select_outside_form",
-                        show_tree_lines=True,
-                        tree_line_color="#e9e9eb"
-                    )
-
-                # Handle tree selection changes
-                if tree_result:
-                    new_checked = tree_result.get("checked", saved_selected_classifications)
-                    new_expanded = tree_result.get("expanded", saved_expanded_nodes)
-
-                    # Check if selection changed
-                    if new_checked != saved_selected_classifications or new_expanded != saved_expanded_nodes:
-                        selected_classifications = new_checked
-                        expanded_nodes = new_expanded
-
-                        # Update settings immediately when tree changes
-                        new_settings = saved_settings.copy()
-                        new_settings['selected_classifications'] = selected_classifications
-                        new_settings['expanded_cls_nodes'] = expanded_nodes
-                        update_vars("explore_results", {"aggrid_settings": new_settings})
-
-                        # Clear caches and rerun
-                        if 'aggrid_thumbnail_cache' in st.session_state:
-                            del st.session_state['aggrid_thumbnail_cache']
-                        if 'results_modified' in st.session_state:
-                            del st.session_state['results_modified']
-                        st.session_state.aggrid_current_page = 1
-                        st.rerun()
-                    else:
-                        selected_classifications = saved_selected_classifications
-                        expanded_nodes = saved_expanded_nodes
-                else:
-                    selected_classifications = saved_selected_classifications
-                    expanded_nodes = saved_expanded_nodes
-
-        # ═══════════════════════════════════════════════════════════════════════
-        # FORM STARTS HERE (all other filters)
+        # FORM STARTS HERE
         # ═══════════════════════════════════════════════════════════════════════
 
         with st.form("date_filter_form", border=False):
@@ -514,8 +458,35 @@ with col8:
                     key="detection_confidence_slider"
                 )
 
+            # CLASSIFICATIONS SECTION (with modal tree selector)
+            with st.container(border=True):
+                print_widget_label("Classifications")
+
+                # Get unique classifications from current dataframe
+                if 'classification_label' in df.columns:
+                    unique_classifications = sorted([
+                        cls for cls in df['classification_label'].dropna().unique()
+                        if cls != 'N/A' and cls.strip() != ''
+                    ])
+                else:
+                    unique_classifications = []
+
+                # Get current selections from saved settings
+                saved_selected_classifications = saved_settings.get('selected_classifications', unique_classifications)
+
+                selected_count = len(saved_selected_classifications)
+                total_count = len(unique_classifications)
+
+                # Display selection count
+                st.markdown(f"**{selected_count}** of **{total_count}** species selected")
+
+                # Button to open modal
+                if st.form_submit_button("Select species", use_container_width=True):
+                    set_session_var("explore_results", "show_tree_modal", True)
+                    # Trigger rerun to show modal
+                    st.rerun()
+
             # CLASSIFICATION CONFIDENCE SECTION (in form)
-            # Note: Species selection is handled by tree selector above, outside the form
             with st.container(border=True):
                 print_widget_label("Classification confidence")
 
@@ -694,10 +665,9 @@ with col8:
                 apply_filter = st.form_submit_button("Apply", width="stretch", type="primary")
             
             if apply_filter:
-                # Use current tree selections if available, otherwise fall back to saved settings
-                # (Tree selector is outside the form, so its state is already saved)
+                # Use current selections from saved settings
+                # (Modal selections are saved when Apply is clicked in the modal)
                 current_cls_selections = saved_settings.get('selected_classifications', [])
-                current_expanded_nodes = saved_settings.get('expanded_cls_nodes', [])
 
                 # Save filter settings to config
                 filter_settings = {
@@ -711,7 +681,6 @@ with col8:
                         "include_unclassified": include_unclassified,
                         "selected_detection_types": selected_detection_types,
                         "selected_classifications": current_cls_selections,
-                        "expanded_cls_nodes": current_expanded_nodes,
                         "selected_locations": selected_locations,
                         "selected_runs": selected_runs,
                         "selected_detection_models": selected_detection_models,
@@ -735,12 +704,8 @@ with col8:
                 st.rerun()
             
             if clear_all:
-                # Get default classification list
-                taxonomy_cache = st.session_state.get("taxonomy_cache")
-                if taxonomy_cache and taxonomy_cache.get("all_leaf_values"):
-                    default_classifications = taxonomy_cache["all_leaf_values"]
-                else:
-                    default_classifications = unique_classifications
+                # Get default classification list (all species)
+                default_classifications = unique_classifications
 
                 # Clear all filters to default ranges
                 filter_settings = {
@@ -754,7 +719,6 @@ with col8:
                         "include_unclassified": True,
                         "selected_detection_types": unique_detection_types,
                         "selected_classifications": default_classifications,
-                        "expanded_cls_nodes": [],
                         "selected_locations": unique_locations,
                         "selected_runs": unique_runs,
                         "selected_detection_models": unique_detection_models,
