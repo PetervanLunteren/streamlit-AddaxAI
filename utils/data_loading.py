@@ -124,18 +124,7 @@ def load_model_taxonomy(model_id, classification_category_descriptions=None):
                 taxon_mapping.append(entry)
 
             if taxon_mapping:
-                # DEBUG: Print first few entries
-                log(f"DEBUG SpeciesNet taxon_mapping first 3 entries:")
-                for i, entry in enumerate(taxon_mapping[:3]):
-                    log(f"  Entry {i}: {entry}")
-
                 tree = build_taxon_tree(taxon_mapping)
-
-                # DEBUG: Print tree structure
-                log(f"DEBUG SpeciesNet tree structure (first 2 nodes):")
-                for i, node in enumerate(tree[:2]):
-                    log(f"  Node {i}: {node}")
-
                 leaf_values = get_all_leaf_values(tree)
 
                 return {
@@ -224,19 +213,7 @@ def merge_taxonomies(taxonomy_dict):
 
         # Build unified tree from merged entries
         if all_taxon_entries:
-            # DEBUG: Print first few merged entries
-            log(f"DEBUG merge_taxonomies: Processing {len(all_taxon_entries)} total entries")
-            log(f"DEBUG merge_taxonomies: First 3 entries:")
-            for i, entry in enumerate(all_taxon_entries[:3]):
-                log(f"  Entry {i}: {entry}")
-
             merged_tree = build_taxon_tree(all_taxon_entries)
-
-            # DEBUG: Print merged tree structure
-            log(f"DEBUG merge_taxonomies: Tree has {len(merged_tree)} root nodes")
-            for i, node in enumerate(merged_tree[:3]):
-                log(f"DEBUG merge_taxonomies: Root node {i}: {node}")
-
             all_leaf_values = get_all_leaf_values(merged_tree)
         else:
             merged_tree = []

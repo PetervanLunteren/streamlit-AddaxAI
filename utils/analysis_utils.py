@@ -2974,17 +2974,18 @@ def build_taxon_tree(taxon_mapping):
         current_level = root
         last_taxon_name = None
         last_valid_taxonomic_level = None
-        
+        path_components = []  # Track full path for unique values
+
         for i, level in enumerate(levels):
             taxon_name = entry.get(level)
             if not taxon_name or taxon_name == "":
                 continue
 
             is_last_level = (i == len(levels) - 1)
-            has_taxonomic_prefix = (taxon_name.startswith("class ") or 
-                                  taxon_name.startswith("order ") or 
-                                  taxon_name.startswith("family ") or 
-                                  taxon_name.startswith("genus ") or 
+            has_taxonomic_prefix = (taxon_name.startswith("class ") or
+                                  taxon_name.startswith("order ") or
+                                  taxon_name.startswith("family ") or
+                                  taxon_name.startswith("genus ") or
                                   taxon_name.startswith("species "))
 
             if not is_last_level:
@@ -2993,7 +2994,11 @@ def build_taxon_tree(taxon_mapping):
                     if taxon_name == last_taxon_name:
                         continue
                     label = taxon_name
-                    value = taxon_name
+
+                    # Build unique value using full path to this node
+                    path_components.append(taxon_name)
+                    value = "|".join(path_components)  # Use path as unique value
+
                     last_valid_taxonomic_level = taxon_name
 
                     if value not in current_level:
