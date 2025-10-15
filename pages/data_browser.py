@@ -189,6 +189,42 @@ if 'results_modified' not in st.session_state:
 
                 filtered_df = filtered_df[mask].copy()
 
+    # Apply location filter if set
+    if 'selected_locations' in saved_settings_early:
+        if 'location_id' in filtered_df.columns:
+            selected_locations = saved_settings_early['selected_locations']
+            if selected_locations and len(selected_locations) > 0:
+                filtered_df = filtered_df[
+                    filtered_df['location_id'].isin(selected_locations)
+                ].copy()
+
+    # Apply run filter if set
+    if 'selected_runs' in saved_settings_early:
+        if 'run_id' in filtered_df.columns:
+            selected_runs = saved_settings_early['selected_runs']
+            if selected_runs and len(selected_runs) > 0:
+                filtered_df = filtered_df[
+                    filtered_df['run_id'].isin(selected_runs)
+                ].copy()
+
+    # Apply detection model filter if set
+    if 'selected_detection_models' in saved_settings_early:
+        if 'detection_model_id' in filtered_df.columns:
+            selected_det_models = saved_settings_early['selected_detection_models']
+            if selected_det_models and len(selected_det_models) > 0:
+                filtered_df = filtered_df[
+                    filtered_df['detection_model_id'].isin(selected_det_models)
+                ].copy()
+
+    # Apply classification model filter if set
+    if 'selected_classification_models' in saved_settings_early:
+        if 'classification_model_id' in filtered_df.columns:
+            selected_cls_models = saved_settings_early['selected_classification_models']
+            if selected_cls_models and len(selected_cls_models) > 0:
+                filtered_df = filtered_df[
+                    filtered_df['classification_model_id'].isin(selected_cls_models)
+                ].copy()
+
     # Apply sorting
     if saved_sort_column in filtered_df.columns:
         ascending = (saved_sort_direction == '↑')
@@ -457,7 +493,109 @@ with col8:
                     format="YYYY-MM-DD",
                     label_visibility="collapsed"
                 )
-            
+
+            # LOCATIONS SECTION
+            with st.container(border=True):
+                print_widget_label("Locations")
+
+                # Get unique locations from current dataframe
+                if 'location_id' in df.columns:
+                    unique_locations = sorted([
+                        loc for loc in df['location_id'].dropna().unique()
+                        if loc.strip() != '' and loc != 'NONE'
+                    ])
+                else:
+                    unique_locations = []
+
+                # Location multiselect
+                saved_selected_locations = saved_settings.get('selected_locations', unique_locations)
+                if unique_locations:
+                    selected_locations = st.multiselect(
+                        "Locations",
+                        options=unique_locations,
+                        default=saved_selected_locations,
+                        help="Select specific locations to include",
+                        label_visibility="collapsed"
+                    )
+                else:
+                    selected_locations = []
+                    st.info("No locations available in the data")
+
+            # RUNS SECTION
+            with st.container(border=True):
+                print_widget_label("Runs")
+
+                # Get unique runs from current dataframe
+                if 'run_id' in df.columns:
+                    unique_runs = sorted([
+                        run for run in df['run_id'].dropna().unique()
+                        if run.strip() != ''
+                    ])
+                else:
+                    unique_runs = []
+
+                # Run multiselect
+                saved_selected_runs = saved_settings.get('selected_runs', unique_runs)
+                if unique_runs:
+                    selected_runs = st.multiselect(
+                        "Runs",
+                        options=unique_runs,
+                        default=saved_selected_runs,
+                        help="Select specific runs to include",
+                        label_visibility="collapsed"
+                    )
+                else:
+                    selected_runs = []
+                    st.info("No runs available in the data")
+
+            # MODELS SECTION
+            with st.container(border=True):
+                print_widget_label("Models")
+
+                # Get unique detection models from current dataframe
+                if 'detection_model_id' in df.columns:
+                    unique_detection_models = sorted([
+                        model for model in df['detection_model_id'].dropna().unique()
+                        if model.strip() != '' and model != 'unknown'
+                    ])
+                else:
+                    unique_detection_models = []
+
+                # Detection model multiselect
+                saved_selected_det_models = saved_settings.get('selected_detection_models', unique_detection_models)
+                if unique_detection_models:
+                    selected_detection_models = st.multiselect(
+                        "Detection models",
+                        options=unique_detection_models,
+                        default=saved_selected_det_models,
+                        help="Select specific detection models to include"
+                    )
+                else:
+                    selected_detection_models = []
+                    st.info("No detection models available in the data")
+
+                # Get unique classification models from current dataframe
+                if 'classification_model_id' in df.columns:
+                    unique_classification_models = sorted([
+                        model for model in df['classification_model_id'].dropna().unique()
+                        if model.strip() != '' and model != 'unknown'
+                    ])
+                else:
+                    unique_classification_models = []
+
+                # Classification model multiselect
+                saved_selected_cls_models = saved_settings.get('selected_classification_models', unique_classification_models)
+                if unique_classification_models:
+                    selected_classification_models = st.multiselect(
+                        "Classification models",
+                        options=unique_classification_models,
+                        default=saved_selected_cls_models,
+                        help="Select specific classification models to include"
+                    )
+                else:
+                    selected_classification_models = []
+                    st.info("No classification models available in the data")
+
             # Buttons
             col1, col2 = st.columns([1, 1])
             with col1:
@@ -478,6 +616,10 @@ with col8:
                         "include_unclassified": include_unclassified,
                         "selected_detection_types": selected_detection_types,
                         "selected_classifications": selected_classifications,
+                        "selected_locations": selected_locations,
+                        "selected_runs": selected_runs,
+                        "selected_detection_models": selected_detection_models,
+                        "selected_classification_models": selected_classification_models,
                         "image_size": saved_settings.get('image_size', 'medium')
                     }
                 }
@@ -509,6 +651,10 @@ with col8:
                         "include_unclassified": True,
                         "selected_detection_types": unique_detection_types,
                         "selected_classifications": unique_classifications,
+                        "selected_locations": unique_locations,
+                        "selected_runs": unique_runs,
+                        "selected_detection_models": unique_detection_models,
+                        "selected_classification_models": unique_classification_models,
                         "image_size": saved_settings.get('image_size', 'medium')
                     }
                 }
@@ -626,6 +772,12 @@ with col10:
                         "cls_conf_min": saved_settings.get('cls_conf_min', 0.0),
                         "cls_conf_max": saved_settings.get('cls_conf_max', 1.0),
                         "include_unclassified": saved_settings.get('include_unclassified', True),
+                        "selected_detection_types": saved_settings.get('selected_detection_types', []),
+                        "selected_classifications": saved_settings.get('selected_classifications', []),
+                        "selected_locations": saved_settings.get('selected_locations', []),
+                        "selected_runs": saved_settings.get('selected_runs', []),
+                        "selected_detection_models": saved_settings.get('selected_detection_models', []),
+                        "selected_classification_models": saved_settings.get('selected_classification_models', []),
                         "image_size": selected_size
                     }
                 }

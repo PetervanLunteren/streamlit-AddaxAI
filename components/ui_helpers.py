@@ -106,12 +106,15 @@ class BlockingLoader:
     Prevents any user interaction while active.
     Transparent background, solid fixed-size loader box.
     Shows a random animal emoji on each update.
+
+    Uses st.empty() to ensure complete DOM cleanup when closed.
     """
 
     def __init__(self, overlay_color="rgba(255, 255, 255, 0.6)"):
         self.overlay_color = overlay_color
         self.current_text = "Loading..."
         self.current_emoji = "🐿️"
+        self.placeholder = None  # Will hold st.empty() placeholder
         self.animals = [
             "🦌", "🐗", "🦊", "🐺", "🐻", "🐼", "🐨", "🦘",
             "🦡", "🦦", "🦥", "🐘", "🦏", "🦬", "🐒", "🦍",
@@ -167,9 +170,13 @@ class BlockingLoader:
             </div>
         </div>
         """
-        st.markdown(overlay_html, unsafe_allow_html=True)
+        # Render into the placeholder instead of directly to the page
+        if self.placeholder is not None:
+            self.placeholder.markdown(overlay_html, unsafe_allow_html=True)
 
     def open(self, initial_text="Loading..."):
+        # Create the st.empty() placeholder for the loader
+        self.placeholder = st.empty()
         self.current_text = initial_text
         self.current_emoji = random.choice(self.animals)
         self._render_overlay(self.current_text, self.current_emoji)
@@ -180,15 +187,21 @@ class BlockingLoader:
         self._render_overlay(self.current_text, self.current_emoji)
 
     def close(self):
-        st.markdown(
-            """
-            <style>
-            body { pointer-events: auto !important; }
-            .blocking-overlay { display: none !important; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+        # Re-enable pointer events and remove the overlay from DOM
+        if self.placeholder is not None:
+            # First restore pointer events with a cleanup style
+            self.placeholder.markdown(
+                """
+                <style>
+                body { pointer-events: auto !important; }
+                .blocking-overlay { display: none !important; }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
+            # Then completely empty the placeholder to remove it from DOM
+            self.placeholder.empty()
+            self.placeholder = None
 
 
 def header_large(text):

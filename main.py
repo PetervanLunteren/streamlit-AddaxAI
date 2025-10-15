@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit_image_zoom
 
 TODOs FOR NOW:
-- continue with the data brwoser page - WAARWASIK: ik was bezig met de filtering popover. Still to add: Location, and model selectboxes, then make the cls slecetbox a hiearchical taxon tree.
+- continue with the data brwoser page - WAARWASIK: ls slecetbox a hiearchical taxon tree.
 - make the detections page for full images too. 
 - try out my new PyPi package: https://pypi.org/project/st-segmented-buttons/
 - update to the newset MD version and make sure to adjust:
