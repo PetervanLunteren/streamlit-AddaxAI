@@ -15,6 +15,7 @@
 #############################################
 # Parse command line arguments
 import argparse
+import os
 
 parser = argparse.ArgumentParser(description='Classification inference script for AddaxAI models')
 parser.add_argument('--model-path', required=True, help='Path to the classification model file')
@@ -359,7 +360,10 @@ model = get_model(classes=species_list,
 # run main function
 import classification.cls_inference as ea
 
+model_id = os.path.basename(os.path.dirname(cls_model_fpath))
+
 ea.create_raw_classifications(json_path= json_path,
                                GPU_availability= GPU_availability,
                                crop_function=get_crop,
-                               inference_function=predict_one_image,)
+                               inference_function=predict_one_image,
+                               model_id=model_id)

@@ -118,7 +118,10 @@ def get_crop(image, bbox):
 # run main function
 import classification.cls_inference as ea
 
+model_id = os.path.basename(os.path.dirname(cls_model_fpath))
+
 ea.create_raw_classifications(json_path= json_path,
                                GPU_availability= GPU_availability,
                                crop_function=get_crop,
-                               inference_function=get_classification,)
+                               inference_function=get_classification,
+                               model_id=model_id)

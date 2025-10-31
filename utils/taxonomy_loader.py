@@ -7,9 +7,8 @@ This provides a single source of truth for species taxonomy across all tools.
 
 import os
 import json
-import pandas as pd
 import streamlit as st
-from utils.config import log, ADDAXAI_ROOT
+from utils.config import log
 
 
 def load_global_taxonomy():
@@ -18,9 +17,8 @@ def load_global_taxonomy():
 
     This function:
     1. Reads all classification models from completed runs
-    2. For SpeciesNet: uses classification_category_descriptions from JSON
-    3. For other models: loads from taxon-mapping.csv
-    4. Builds a flat dictionary of all unique species with their taxonomy
+    2. Uses classification_category_descriptions embedded in run JSON
+    3. Builds a flat dictionary of all unique species with their taxonomy
 
     Stores result in st.session_state["taxonomy"] as:
     {
@@ -46,7 +44,8 @@ def load_global_taxonomy():
 
     taxonomy = {}
     classification_models_seen = set()
-    speciesnet_taxonomy_descriptions = {}
+    model_taxonomy_descriptions = {}
+    model_category_labels = {}
 
     try:
         # Load MAP_JSON from session state
@@ -87,11 +86,15 @@ def load_global_taxonomy():
                         if classification_model_id and classification_model_id not in ["NONE", "unknown"]:
                             classification_models_seen.add(classification_model_id)
 
-                            # For SpeciesNet models, capture taxonomy descriptions from JSON
-                            if "SPECIESNET" in classification_model_id.upper():
-                                category_descriptions = run_json.get("classification_category_descriptions", {})
-                                if category_descriptions and classification_model_id not in speciesnet_taxonomy_descriptions:
-                                    speciesnet_taxonomy_descriptions[classification_model_id] = category_descriptions
+                            category_descriptions = run_json.get("classification_category_descriptions", {})
+                            if category_descriptions:
+                                existing_descriptions = model_taxonomy_descriptions.setdefault(classification_model_id, {})
+                                existing_descriptions.update(category_descriptions)
+
+                            category_labels = run_json.get("classification_categories", {})
+                            if category_labels:
+                                existing_labels = model_category_labels.setdefault(classification_model_id, {})
+                                existing_labels.update(category_labels)
 
                     except Exception as e:
                         log(f"Error processing {run_json_path}: {str(e)}")
@@ -101,102 +104,34 @@ def load_global_taxonomy():
         for model_id in classification_models_seen:
             log(f"Loading taxonomy for model: {model_id}")
 
-            # Check if this is a SpeciesNet model
-            if "SPECIESNET" in model_id.upper() and model_id in speciesnet_taxonomy_descriptions:
-                # Use SpeciesNet taxonomy from JSON
-                category_descriptions = speciesnet_taxonomy_descriptions[model_id]
+            category_descriptions = model_taxonomy_descriptions.get(model_id)
+            category_labels = model_category_labels.get(model_id, {})
 
-                for category_id, taxonomy_string in category_descriptions.items():
-                    # Skip empty or whitespace-only strings
-                    if not taxonomy_string or not taxonomy_string.strip():
-                        continue
+            if not category_descriptions:
+                log(f"  ✗ No classification taxonomy metadata found for model: {model_id}")
+                continue
 
-                    # Split taxonomy string: "mammalia;carnivora;felidae;panthera;leo"
-                    parts = [p.strip() for p in taxonomy_string.split(';')]
+            for category_id, taxonomy_string in category_descriptions.items():
+                taxonomy_string = taxonomy_string or ""
+                parts = [p.strip() for p in taxonomy_string.split(';')]
+                if len(parts) < 5:
+                    parts.extend([""] * (5 - len(parts)))
 
-                    # Skip entries that don't have at least class and species
-                    if len(parts) < 5 or not parts[0] or not parts[4]:
-                        continue
+                class_name, order_name, family_name, genus_name, species_name = parts[:5]
+                label = category_labels.get(str(category_id), "").strip()
+                fallback = next((name for name in [species_name, genus_name, family_name, order_name, class_name] if name), None)
+                model_class = label or fallback or f"{model_id}_{category_id}"
 
-                    model_class = parts[4]  # Species name is the model class
+                if model_class not in taxonomy:
+                    taxonomy[model_class] = {
+                        "class": class_name.lower() if class_name else "",
+                        "order": order_name.lower() if order_name else "",
+                        "family": family_name.lower() if family_name else "",
+                        "genus": genus_name.lower() if genus_name else "",
+                        "species": species_name.lower() if species_name else ""
+                    }
 
-                    # Add to taxonomy dict if not already present
-                    if model_class not in taxonomy:
-                        taxonomy[model_class] = {
-                            "class": parts[0].lower(),
-                            "order": parts[1].lower() if parts[1] else "",
-                            "family": parts[2].lower() if parts[2] else "",
-                            "genus": parts[3].lower() if parts[3] else "",
-                            "species": parts[4].lower()
-                        }
-
-                log(f"  ✓ Loaded {len([k for k in taxonomy if k])} species from SpeciesNet")
-
-            else:
-                # Load from taxon-mapping.csv
-                mapping_path = os.path.join(ADDAXAI_ROOT, "models", "cls", model_id, "taxon-mapping.csv")
-
-                if not os.path.exists(mapping_path):
-                    log(f"  ✗ No taxon-mapping.csv found for model: {model_id}")
-                    continue
-
-                try:
-                    taxon_df = pd.read_csv(mapping_path)
-
-                    for _, row in taxon_df.iterrows():
-                        model_class = row.get("model_class", "").strip()
-
-                        if not model_class or model_class in taxonomy:
-                            continue
-
-                        # Extract taxonomy fields
-                        # CSV format has fields like "level_class", "level_order", etc.
-                        # with values like "class Mammalia", "order Carnivora"
-                        level_class = row.get("level_class", "")
-                        level_order = row.get("level_order", "")
-                        level_family = row.get("level_family", "")
-                        level_genus = row.get("level_genus", "")
-                        level_species = row.get("level_species", "")
-
-                        # Extract just the taxonomic name (remove prefix like "class ", "order ")
-                        # Only extract if the value has the proper prefix for that level
-                        def extract_name(level_value, expected_prefix):
-                            if not level_value or pd.isna(level_value):
-                                return ""
-                            level_value = str(level_value).strip()
-                            if not level_value:
-                                return ""
-                            # Check if it has the expected prefix
-                            if not level_value.lower().startswith(expected_prefix.lower() + " "):
-                                return ""
-                            parts = level_value.split(" ", 1)
-                            return parts[1].lower() if len(parts) > 1 else ""
-
-                        # Extract all taxonomic levels with validation
-                        extracted_class = extract_name(level_class, "class")
-                        extracted_order = extract_name(level_order, "order")
-                        extracted_family = extract_name(level_family, "family")
-                        extracted_genus = extract_name(level_genus, "genus")
-                        extracted_species = extract_name(level_species, "species")
-
-                        # If species name equals genus name, it means there's no real species differentiation
-                        # Set species to empty string in this case
-                        if extracted_species == extracted_genus:
-                            extracted_species = ""
-
-                        taxonomy[model_class] = {
-                            "class": extracted_class,
-                            "order": extracted_order,
-                            "family": extracted_family,
-                            "genus": extracted_genus,
-                            "species": extracted_species
-                        }
-
-                    log(f"  ✓ Loaded taxonomy from CSV for {model_id}")
-
-                except Exception as e:
-                    log(f"  ✗ Error loading taxonomy for {model_id}: {str(e)}")
-                    continue
+            log(f"  ✓ Loaded taxonomy metadata for {model_id}")
 
         # Store in session state
         st.session_state["taxonomy"] = taxonomy

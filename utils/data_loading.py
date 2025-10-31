@@ -63,17 +63,21 @@ def decode_gps_info(gps_info):
         return None, None
 
 
-def load_model_taxonomy(model_id, classification_category_descriptions=None):
+def load_model_taxonomy(model_id, classification_category_descriptions=None, classification_categories=None):
     """
     Load taxonomy information for a classification model.
 
-    Tries to load from classification_category_descriptions first (from SpeciesNet),
-    then falls back to taxon-mapping.csv for other models.
+    Relies on the taxonomy metadata embedded in run JSON files:
+    classification_categories maps category IDs to labels, and
+    classification_category_descriptions maps category IDs to semi-colon separated
+    taxonomy strings (class;order;family;genus;species).
 
     Args:
         model_id (str): Classification model ID
         classification_category_descriptions (dict, optional): Taxonomy mapping from JSON
             Format: {"0": "mammalia;carnivora;felidae;panthera;leo", ...}
+        classification_categories (dict, optional): Category labels from JSON
+            Format: {"0": "blank", "1": "domestic cattle", ...}
 
     Returns:
         dict: {
@@ -82,7 +86,6 @@ def load_model_taxonomy(model_id, classification_category_descriptions=None):
             "taxon_mapping": [...]   # Raw CSV data as list of dicts
         } or None if loading fails
     """
-    from utils.config import ADDAXAI_ROOT
     from utils.analysis_utils import build_taxon_tree, get_all_leaf_values
 
     try:
@@ -90,65 +93,44 @@ def load_model_taxonomy(model_id, classification_category_descriptions=None):
         if not model_id or model_id in ["NONE", "unknown"]:
             return None
 
-        # Try to use classification_category_descriptions from JSON first (SpeciesNet)
-        if classification_category_descriptions:
-            log(f"Using taxonomy from classification_category_descriptions for {model_id}")
-
-            # Convert SpeciesNet format to taxon_mapping format
-            # SpeciesNet format: {"0": "mammalia;carnivora;felidae;panthera;leo"}
-            # Need to convert to: [{"model_class": "leo", "level_class": "class mammalia", ...}]
-            taxon_mapping = []
-            for category_id, taxonomy_string in classification_category_descriptions.items():
-                # Skip empty or whitespace-only strings
-                if not taxonomy_string or not taxonomy_string.strip():
-                    continue
-
-                # Split taxonomy string: "mammalia;carnivora;felidae;panthera;leo"
-                parts = [p.strip() for p in taxonomy_string.split(';')]
-
-                # Skip entries that don't have at least class and species (parts[0] and parts[4])
-                if len(parts) < 5 or not parts[0] or not parts[4]:
-                    log(f"Skipping malformed taxonomy entry: {taxonomy_string}")
-                    continue
-
-                # Assume format is: class;order;family;genus;species
-                # build_taxon_tree expects level_* fields with "class ", "order ", etc. prefixes
-                entry = {
-                    "model_class": parts[4],  # species
-                    "level_class": f"class {parts[0]}",
-                    "level_order": f"order {parts[1]}" if parts[1] else "",
-                    "level_family": f"family {parts[2]}" if parts[2] else "",
-                    "level_genus": f"genus {parts[3]}" if parts[3] else "",
-                    "level_species": f"species {parts[4]}"
-                }
-                taxon_mapping.append(entry)
-
-            if taxon_mapping:
-                tree = build_taxon_tree(taxon_mapping)
-                leaf_values = get_all_leaf_values(tree)
-
-                return {
-                    "tree": tree,
-                    "leaf_values": leaf_values,
-                    "taxon_mapping": taxon_mapping
-                }
-
-        # Fallback: Load from taxon-mapping.csv
-        mapping_path = os.path.join(
-            ADDAXAI_ROOT, "models", "cls", model_id, "taxon-mapping.csv"
-        )
-
-        if not os.path.exists(mapping_path):
-            log(f"No taxon-mapping.csv found for model: {model_id}")
+        if not classification_category_descriptions:
+            log(f"No classification_category_descriptions found for model {model_id}")
             return None
 
-        log(f"Using taxonomy from taxon-mapping.csv for {model_id}")
+        log(f"Using taxonomy metadata embedded in run JSON for {model_id}")
 
-        # Load and parse taxonomy
-        taxon_df = pd.read_csv(mapping_path)
-        taxon_mapping = taxon_df.to_dict('records')
+        taxon_mapping = []
+        label_lookup = classification_categories or {}
 
-        # Build tree structure
+        for category_id, taxonomy_string in classification_category_descriptions.items():
+            cat_key = str(category_id)
+            label = label_lookup.get(cat_key, "").strip() if label_lookup else ""
+
+            taxonomy_string = taxonomy_string or ""
+            parts = [p.strip() for p in taxonomy_string.split(';')]
+            if len(parts) < 5:
+                parts.extend([""] * (5 - len(parts)))
+
+            class_name, order_name, family_name, genus_name, species_name = parts[:5]
+
+            # Determine model_class value for tree leaves
+            fallback = next((name for name in [species_name, genus_name, family_name, order_name, class_name] if name), None)
+            model_class = label or fallback or f"{model_id}_{cat_key}"
+
+            entry = {
+                "model_class": model_class,
+                "level_class": f"class {class_name.lower()}" if class_name else "",
+                "level_order": f"order {order_name.lower()}" if order_name else "",
+                "level_family": f"family {family_name.lower()}" if family_name else "",
+                "level_genus": f"genus {genus_name.lower()}" if genus_name else "",
+                "level_species": f"species {species_name.lower()}" if species_name else ""
+            }
+            taxon_mapping.append(entry)
+
+        if not taxon_mapping:
+            log(f"No usable taxonomy entries found for {model_id}")
+            return None
+
         tree = build_taxon_tree(taxon_mapping)
         leaf_values = get_all_leaf_values(tree)
 
@@ -266,7 +248,8 @@ def load_detection_results_dataframe():
     results_list = []
     error_count = 0
     classification_models_seen = set()
-    speciesnet_taxonomy_descriptions = {}  # Track classification_category_descriptions for SpeciesNet only
+    model_taxonomy_descriptions = {}  # Track classification_category_descriptions per model
+    model_category_labels = {}  # Track classification_categories per model
 
     try:
         # Load MAP_JSON from session state
@@ -309,11 +292,15 @@ def load_detection_results_dataframe():
                         if classification_model_id and classification_model_id not in ["NONE", "unknown"]:
                             classification_models_seen.add(classification_model_id)
 
-                            # For SpeciesNet models, capture taxonomy descriptions from JSON
-                            if "SPECIESNET" in classification_model_id.upper():
-                                category_descriptions = run_json.get("classification_category_descriptions", {})
-                                if category_descriptions and classification_model_id not in speciesnet_taxonomy_descriptions:
-                                    speciesnet_taxonomy_descriptions[classification_model_id] = category_descriptions
+                            category_descriptions = run_json.get("classification_category_descriptions", {})
+                            if category_descriptions:
+                                existing_descriptions = model_taxonomy_descriptions.setdefault(classification_model_id, {})
+                                existing_descriptions.update(category_descriptions)
+
+                            category_labels = run_json.get("classification_categories", {})
+                            if category_labels:
+                                existing_labels = model_category_labels.setdefault(classification_model_id, {})
+                                existing_labels.update(category_labels)
 
                         # Get category mapping dictionaries
                         detection_categories = run_json.get("detection_categories", {})
@@ -422,9 +409,13 @@ def load_detection_results_dataframe():
             log(f"Loading taxonomy for {len(classification_models_seen)} classification model(s)...")
 
             for model_id in classification_models_seen:
-                # For SpeciesNet, pass taxonomy descriptions from JSON
-                category_descriptions = speciesnet_taxonomy_descriptions.get(model_id)
-                taxonomy_data = load_model_taxonomy(model_id, classification_category_descriptions=category_descriptions)
+                category_descriptions = model_taxonomy_descriptions.get(model_id)
+                category_labels = model_category_labels.get(model_id)
+                taxonomy_data = load_model_taxonomy(
+                    model_id,
+                    classification_category_descriptions=category_descriptions,
+                    classification_categories=category_labels
+                )
                 if taxonomy_data:
                     taxonomy_dict[model_id] = taxonomy_data
                     log(f"  ✓ Loaded taxonomy for {model_id}: {len(taxonomy_data['leaf_values'])} species")
