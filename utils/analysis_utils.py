@@ -1148,6 +1148,12 @@ def species_selector_modal(all_species, selected_species):
 
         # Close modal
         set_session_var("analyse_advanced", "show_modal_species_selector", False)
+        st.session_state.pop("analyse_advanced_tree_dismissed", None)
+        st.rerun()
+
+    dismissed = st.session_state.pop("analyse_advanced_tree_dismissed", None)
+    if dismissed == "cancel":
+        set_session_var("analyse_advanced", "show_modal_species_selector", False)
         st.rerun()
 
 
@@ -2930,97 +2936,136 @@ def merge_single_redundant_nodes(nodes):
 
 def build_taxon_tree(taxon_mapping):
     root = {}
-    levels = ["level_class", "level_order",
-              "level_family", "level_genus", "level_species"]
+    other_key = "__other__"
+    other_label = "other"
+
+    def ensure_other_group():
+        if other_key not in root:
+            root[other_key] = {
+                "label": f"{other_label}",
+                "value": other_label,
+                "children": {},
+                "level": "other"
+            }
+        return root[other_key]["children"]
+
+    def format_prefix(level_name, taxon_name):
+        display_name = taxon_name if level_name == "species" else taxon_name.title()
+        return f"{level_name} {display_name}"
 
     for entry in taxon_mapping:
         model_class = entry["model_class"].strip()
-        
-        # If no proper class level, place at root level with unknown taxonomy format
-        if not entry.get("level_class", "").startswith("class "):
-            taxonomic_value = entry.get("level_class", "").strip()
-            if not taxonomic_value:
-                taxonomic_value = model_class
+
+        class_name = (entry.get("class") or "").strip()
+        order_name = (entry.get("order") or "").strip()
+        family_name = (entry.get("family") or "").strip()
+        genus_name = (entry.get("genus") or "").strip()
+        species_name = (entry.get("species") or "").strip()
+
+        if not any([class_name, order_name, family_name, genus_name, species_name]):
+            # No taxonomy information at all -> group under "other"
+            other_children = ensure_other_group()
+            if model_class not in other_children:
+                other_children[model_class] = {
+                    "label": f"<b>{model_class}</b> (<i>unknown taxonomy</i>)",
+                    "value": model_class,
+                    "children": {},
+                    "level": "other"
+                }
+            continue
+
+        if not class_name:
+            # No class information - place at root level with unknown taxonomy
+            taxonomic_value = species_name or model_class
             label = f"{taxonomic_value} (<b>{model_class}</b>, <i>unknown taxonomy</i>)"
             value = model_class
             if value not in root:
                 root[value] = {
                     "label": label,
                     "value": value,
-                    "children": {}
+                    "children": {},
+                    "level": "unknown"
                 }
             continue
 
-        current_level = root
-        last_taxon_name = None
-        last_valid_taxonomic_level = None
-        path_components = []  # Track full path for unique values
+        levels = [
+            ("class", class_name),
+            ("order", order_name),
+            ("family", family_name),
+            ("genus", genus_name),
+            ("species", species_name),
+        ]
 
-        for i, level in enumerate(levels):
-            taxon_name = entry.get(level)
-            if not taxon_name or taxon_name == "":
+        current_level = root
+        path_components = []
+
+        species_available = bool(species_name)
+
+        for idx, (level_name, taxon_name) in enumerate(levels):
+            if not taxon_name:
                 continue
 
-            is_last_level = (i == len(levels) - 1)
-            has_taxonomic_prefix = (taxon_name.startswith("class ") or
-                                  taxon_name.startswith("order ") or
-                                  taxon_name.startswith("family ") or
-                                  taxon_name.startswith("genus ") or
-                                  taxon_name.startswith("species "))
+            remaining_names = [name for _, name in levels[idx:] if name]
+            unspecified_branch = len(set(remaining_names)) == 1 if remaining_names else False
 
-            if not is_last_level:
-                # Check if this level has proper taxonomic information
-                if has_taxonomic_prefix:
-                    if taxon_name == last_taxon_name:
-                        continue
-                    label = taxon_name
+            label_with_prefix = format_prefix(level_name, taxon_name)
 
-                    # Build unique value using full path to this node
-                    path_components.append(taxon_name)
-                    value = "|".join(path_components)  # Use path as unique value
+            if unspecified_branch and level_name != "species" and not species_available:
+                path_components.append(f"{level_name}:{taxon_name}")
+                node_value = "|".join(path_components)
 
-                    last_valid_taxonomic_level = taxon_name
-
-                    if value not in current_level:
-                        current_level[value] = {
-                            "label": label,
-                            "value": value,
-                            "children": {}
-                        }
-                    current_level = current_level[value]["children"]
-                    last_taxon_name = taxon_name
-                else:
-                    # This level lacks taxonomic prefix - create entry with unknown taxonomy
-                    label = f"{taxon_name} (<b>{model_class}</b>, <i>unknown taxonomy</i>)"
-                    value = model_class
-                    if value not in current_level:
-                        current_level[value] = {
-                            "label": label,
-                            "value": value,
-                            "children": {}
-                        }
-                    break  # Stop processing further levels
-
-            else:  # is_last_level
-                if taxon_name.startswith("species "):
-                    label = f"{taxon_name} (<b>{model_class}</b>)"
-                elif has_taxonomic_prefix:
-                    label = f"{taxon_name} (<b>{model_class}</b>, <i>unspecified</i>)"
-                else:
-                    label = f"{taxon_name} (<b>{model_class}</b>)"
-                value = model_class
-                if value not in current_level:
-                    current_level[value] = {
-                        "label": label,
-                        "value": value,
-                        "children": {}
+                if node_value not in current_level:
+                    current_level[node_value] = {
+                        "label": label_with_prefix,
+                        "value": node_value,
+                        "children": {},
+                        "level": level_name
                     }
+
+                current_level = current_level[node_value]["children"]
+
+                if model_class not in current_level:
+                    current_level[model_class] = {
+                        "label": f"<b>{model_class}</b> (<i>unspecified</i>)",
+                        "value": model_class,
+                        "children": {},
+                        "level": "unspecified"
+                    }
+                break
+
+            is_last_level = idx == len(levels) - 1 or not any(levels[j][1] for j in range(idx + 1, len(levels)))
+
+            if is_last_level:
+                if level_name == "species":
+                    label = f"{label_with_prefix} (<b>{model_class}</b>)"
+                else:
+                    label = f"{label_with_prefix} (<b>{model_class}</b>, <i>unspecified</i>)"
+
+                if model_class not in current_level:
+                    current_level[model_class] = {
+                        "label": label,
+                        "value": model_class,
+                        "children": {},
+                        "level": level_name
+                    }
+            else:
+                path_components.append(f"{level_name}:{taxon_name}")
+                node_value = "|".join(path_components)
+
+                if node_value not in current_level:
+                    current_level[node_value] = {
+                        "label": label_with_prefix,
+                        "value": node_value,
+                        "children": {},
+                        "level": level_name
+                    }
+
+                current_level = current_level[node_value]["children"]
 
     def dict_to_list(d):
         result = []
-        for _, node_val in d.items():  # node_key unused - Vulture detected unused variable
-            children_list = dict_to_list(
-                node_val["children"]) if node_val["children"] else []
+        for node_val in d.values():
+            children_list = dict_to_list(node_val["children"]) if node_val["children"] else []
             node = {
                 "label": node_val["label"],
                 "value": node_val["value"]
@@ -3030,9 +3075,21 @@ def build_taxon_tree(taxon_mapping):
             result.append(node)
         return result
 
+    def annotate_counts(nodes):
+        total = 0
+        for node in nodes:
+            if "children" in node and node["children"]:
+                child_total = annotate_counts(node["children"])
+                node["label"] = f"{node['label']} {code_span(f'({child_total})')}"
+                total += child_total
+            else:
+                total += 1
+        return total
+
     raw_tree = dict_to_list(root)
     merged_tree = merge_single_redundant_nodes(raw_tree)
     sorted_tree = sort_leaf_first(merged_tree)
+    annotate_counts(sorted_tree)
     return sorted_tree
 
 
@@ -3239,10 +3296,9 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
             "species": (entry.get("species") or "").strip().lower(),
         }
 
-        if any(taxonomy_entry.values()):
-            if taxonomy_dict.get(model_class) != taxonomy_entry:
-                taxonomy_dict[model_class] = taxonomy_entry
-                taxonomy_updated = True
+        if taxonomy_dict.get(model_class) != taxonomy_entry:
+            taxonomy_dict[model_class] = taxonomy_entry
+            taxonomy_updated = True
 
     if taxonomy_updated:
         st.session_state["taxonomy"] = taxonomy_dict

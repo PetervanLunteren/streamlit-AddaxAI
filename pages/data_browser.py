@@ -136,6 +136,7 @@ if get_session_var("explore_results", "show_tree_modal", False):
 
             # Close modal
             set_session_var("explore_results", "show_tree_modal", False)
+            st.session_state.pop("explore_results_tree_dismissed", None)
 
             # Clear caches and rerun
             if 'aggrid_thumbnail_cache' in st.session_state:
@@ -144,6 +145,8 @@ if get_session_var("explore_results", "show_tree_modal", False):
                 del st.session_state['results_modified']
             st.session_state.aggrid_current_page = 1
             st.rerun()
+        elif st.session_state.pop("explore_results_tree_dismissed", None) == "cancel":
+            set_session_var("explore_results", "show_tree_modal", False)
 
     st.stop()  # Don't render anything else
 

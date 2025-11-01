@@ -99,7 +99,6 @@ def code_span(text):
     """
     return f"<code style='color:#086164; font-family:monospace;'>{text}</code>"
 
-
 class BlockingLoader:
     """
     Full-page blocking loader for Streamlit.

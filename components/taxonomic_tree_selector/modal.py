@@ -46,6 +46,7 @@ def tree_selector_modal(available, selected, key="tree_selector"):
     session_key_selected = f"{key}_selected"
     session_key_expanded = f"{key}_expanded"
     session_key_last = f"{key}_last"
+    session_key_dismissed = f"{key}_dismissed"
 
     # Initialize session state for this modal
     if session_key_selected not in st.session_state:
@@ -75,9 +76,12 @@ def tree_selector_modal(available, selected, key="tree_selector"):
     selected_count = len(current_selected)
     total_count = len(all_species_in_tree)
 
-    # Header with selection count
-    st.markdown(f"### Select Species")
-    st.markdown(f"**{selected_count}** of **{total_count}** species selected")
+    from components.ui_helpers import code_span
+    st.markdown(
+        f"<div style='text-align:center;'>Selected {code_span(str(selected_count))} of {code_span(str(total_count))}</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
     # Select All / Select None buttons
     col1, col2 = st.columns([1, 1])
@@ -121,6 +125,7 @@ def tree_selector_modal(available, selected, key="tree_selector"):
             st.session_state[session_key_last] = tree_result
             st.rerun()
 
+    # Selection summary
     # Apply / Cancel buttons
     col1, col2 = st.columns([1, 1])
 
@@ -128,6 +133,7 @@ def tree_selector_modal(available, selected, key="tree_selector"):
         if st.button("Cancel", key=f"{key}_cancel", use_container_width=True):
             # Clear modal state
             _clear_modal_state(key)
+            st.session_state[session_key_dismissed] = "cancel"
             return None
 
     with col2:
@@ -137,6 +143,7 @@ def tree_selector_modal(available, selected, key="tree_selector"):
 
             # Clear modal state
             _clear_modal_state(key)
+            st.session_state[session_key_dismissed] = "apply"
 
             # Return selection
             return final_selection
@@ -155,7 +162,8 @@ def _clear_modal_state(key):
     session_keys = [
         f"{key}_selected",
         f"{key}_expanded",
-        f"{key}_last"
+        f"{key}_last",
+        f"{key}_dismissed"
     ]
 
     for session_key in session_keys:
