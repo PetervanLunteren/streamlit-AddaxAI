@@ -169,8 +169,7 @@ exit()
 
 
 # Load model and taxonomy
-taxonomy_path = os.path.join(os.path.dirname(cls_model_fpath), "taxon-mapping.csv")
-# model = load_model(cls_model_fpath)
+taxonomy_path = os.path.join(os.path.dirname(cls_model_fpath), "taxonomy.csv")
 taxonomy_df = pd.read_csv(taxonomy_path)
 class_names = taxonomy_df['model_class'].tolist()
 

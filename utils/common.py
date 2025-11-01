@@ -384,18 +384,18 @@ def fetch_latest_model_info():
                         with open(variables_file, 'w') as f:
                             json.dump(model_info, f, indent=4)
                         
-                        # Download taxon-mapping.csv for classification models
+                        # Download taxonomy.csv for classification models
                         if model_type == "cls":
                             try:
-                                taxon_mapping_url = f"https://huggingface.co/Addax-Data-Science/{model_id}/resolve/main/taxon-mapping.csv?download=true"
-                                taxon_mapping_file = os.path.join(model_dir, "taxon-mapping.csv")
+                                taxonomy_url = f"https://huggingface.co/Addax-Data-Science/{model_id}/resolve/main/taxonomy.csv?download=true"
+                                taxonomy_file = os.path.join(model_dir, "taxonomy.csv")
                                 
-                                log(f"Downloading taxon-mapping.csv for {model_id} from: {taxon_mapping_url}")
+                                log(f"Downloading taxonomy.csv for {model_id} from: {taxonomy_url}")
                                 # Don't use gzip encoding in headers to avoid compression issues
                                 taxon_headers = headers.copy()
                                 taxon_headers["Accept-Encoding"] = "identity"  # Request uncompressed content
                                 
-                                taxon_response = requests.get(taxon_mapping_url, timeout=15, headers=taxon_headers)
+                                taxon_response = requests.get(taxonomy_url, timeout=15, headers=taxon_headers)
                                 
                                 if taxon_response.status_code == 200:
                                     # Check if content might be compressed by looking at the raw bytes
@@ -410,13 +410,13 @@ def fetch_latest_model_info():
                                     # Decode to text with UTF-8
                                     text_content = content.decode('utf-8')
                                     
-                                    with open(taxon_mapping_file, 'w', encoding='utf-8', newline='') as f:
+                                    with open(taxonomy_file, 'w', encoding='utf-8', newline='') as f:
                                         f.write(text_content)
-                                    log(f"Downloaded taxon-mapping.csv for {model_id}")
+                                    log(f"Downloaded taxonomy.csv for {model_id}")
                                 else:
-                                    log(f"Failed to download taxon-mapping.csv for {model_id}. Status: {taxon_response.status_code}")
+                                    log(f"Failed to download taxonomy.csv for {model_id}. Status: {taxon_response.status_code}")
                             except Exception as e:
-                                log(f"Error downloading taxon-mapping.csv for {model_id}: {e}")
+                                log(f"Error downloading taxonomy.csv for {model_id}: {e}")
                         
                         log(f"Created directory and variables.json for new {model_type} model: {model_id}")
                         
@@ -512,4 +512,3 @@ def check_model_availability(model_type, model_id, model_meta):
         'model_fname': model_fname,
         'friendly_name': friendly_name
     }
-

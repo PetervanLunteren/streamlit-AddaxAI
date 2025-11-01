@@ -93,7 +93,7 @@ def _extract_taxon_component(value, prefix):
 
 def _load_taxonomy_lookup_from_csv(model_id):
     """
-    Load taxonomy metadata for a classification model from its taxon-mapping.csv.
+    Load taxonomy metadata for a classification model.
 
     Returns:
         dict: {model_class_label: "class;order;family;genus;species"}
@@ -101,9 +101,11 @@ def _load_taxonomy_lookup_from_csv(model_id):
     if not model_id:
         return {}
 
-    mapping_path = os.path.join(ADDAXAI_ROOT, "models", "cls", model_id, "taxon-mapping.csv")
+    model_dir = os.path.join(ADDAXAI_ROOT, "models", "cls", model_id)
+    mapping_path = os.path.join(model_dir, "taxonomy.csv")
+
     if not os.path.exists(mapping_path):
-        print(f"Warning: taxon-mapping.csv not found for model {model_id} at {mapping_path}")
+        print(f"Warning: taxonomy file not found for model {model_id} at {mapping_path}")
         return {}
 
     taxonomy_lookup = {}
@@ -115,11 +117,17 @@ def _load_taxonomy_lookup_from_csv(model_id):
                 if not label:
                     continue
 
-                class_name = _extract_taxon_component(row.get("level_class"), "class")
-                order_name = _extract_taxon_component(row.get("level_order"), "order")
-                family_name = _extract_taxon_component(row.get("level_family"), "family")
-                genus_name = _extract_taxon_component(row.get("level_genus"), "genus")
-                species_name = _extract_taxon_component(row.get("level_species"), "species")
+                class_name = (row.get("class") or "").strip().lower()
+                order_name = (row.get("order") or "").strip().lower()
+                family_name = (row.get("family") or "").strip().lower()
+                genus_name = (row.get("genus") or "").strip().lower()
+                species_name = (row.get("species") or "").strip().lower()
+
+                if genus_name and species_name:
+                    if species_name == genus_name:
+                        species_name = ""
+                    elif species_name.startswith(f"{genus_name} "):
+                        species_name = species_name[len(genus_name) + 1 :]
 
                 taxonomy_lookup[label] = ";".join([
                     class_name,
@@ -129,7 +137,7 @@ def _load_taxonomy_lookup_from_csv(model_id):
                     species_name
                 ])
     except Exception as exc:
-        print(f"Warning: failed to parse taxonomy CSV for model {model_id}: {exc}")
+        print(f"Warning: failed to parse taxonomy file for model {model_id}: {exc}")
 
     return taxonomy_lookup
 

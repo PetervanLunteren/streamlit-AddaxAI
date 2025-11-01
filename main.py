@@ -20,19 +20,6 @@ How to pip install into an environment:
 
 TODOs FOR NOW:
 - WAARWASIK: Ik ben bezig met de SPeciesNet en de andere JSONS gelijk te maken met de taxon informatie in the JSON in dezelfde format. Doe `codex resume` en vraag hem om een update. Ga dan door. Je wilt dat de JSONS van SpeciesNet en andere modellen de zelfde taxon_categories_dict format hebben. 
-Edit: it seems to work now, but I believe there is a slight difference
-
-non-speciesnet
-
-    "322": "aves;passeriformes;muscicapidae;melaenornis;melaenornis ardesiacus",
-    "323": "aves;galliformes;phasianidae;pternistis;pternistis leucoscepus",
-    "324": "mammalia;hyracoidea;procaviidae;heterohyrax;heterohyrax brucei",
-    "325": "aves;passeriformes;pycnonotidae;eurillas;eurillas latirostris",
-    "326": "mammalia;carnivora;mustelidae;ictonyx;ictonyx striatus"
-    
-speciesnet: doesn't duplicate the genus in the species name??
-
-
 
 
 - Continue later with: I was making a shared tree selector. there are still some bugs. Check the tree select in the filter of data-browser and the analyse-advanced-wizard. Use claude --continue to debug further. Logs in the terminal on startup. 

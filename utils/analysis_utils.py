@@ -2787,15 +2787,42 @@ def format_class_name(s):
 
 
 def load_taxon_mapping(cls_model_ID):
-    """Load taxon mapping CSV file for classification model (original function)"""
-    taxon_mapping_csv = os.path.join(
-        ADDAXAI_ROOT, "models", "cls", cls_model_ID, "taxon-mapping.csv")
+    """
+    Load taxonomy metadata for a classification model from taxonomy.csv and
+    normalise it into the legacy level_* schema expected by downstream code.
+    """
+    model_dir = os.path.join(ADDAXAI_ROOT, "models", "cls", cls_model_ID)
+    taxonomy_csv = os.path.join(model_dir, "taxonomy.csv")
+
+    if not os.path.exists(taxonomy_csv):
+        raise FileNotFoundError(f"No taxonomy.csv found for model {cls_model_ID}")
 
     taxon_mapping = []
-    with open(taxon_mapping_csv, newline='', encoding='utf-8') as f:
+    with open(taxonomy_csv, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
+
         for row in reader:
-            taxon_mapping.append(row)
+            model_class = (row.get("model_class") or "").strip()
+            cls = (row.get("class") or "").strip().lower()
+            order = (row.get("order") or "").strip().lower()
+            family = (row.get("family") or "").strip().lower()
+            genus = (row.get("genus") or "").strip().lower()
+            species = (row.get("species") or "").strip().lower()
+
+            normalised = {
+                "model_class": model_class,
+                "level_class": f"class {cls}" if cls else "",
+                "level_order": f"order {order}" if order else "",
+                "level_family": f"family {family}" if family else "",
+                "level_genus": f"genus {genus}" if genus else "",
+                "level_species": f"species {species}" if species else "",
+                "class": cls,
+                "order": order,
+                "family": family,
+                "genus": genus,
+                "species": species,
+            }
+            taxon_mapping.append(normalised)
  
     return taxon_mapping
 
@@ -2828,7 +2855,7 @@ def get_all_classes_from_taxon_mapping(cls_model_ID):
         cls_model_ID: The classification model ID
         
     Returns:
-        list: Unique sorted list of all classes from taxon-mapping.csv
+        list: Unique sorted list of all classes from taxonomy.csv
     """
     # First try to get from cached session state
     cache_key = f"taxon_mapping_{cls_model_ID}"
@@ -3139,14 +3166,14 @@ def get_model_friendly_name(model_id, model_type, model_meta):
 def read_selected_species(cls_model_ID):
     """
     Read the selected_classes from the model's variables.json file.
-    If selected_classes is not present, returns all classes from taxon-mapping.csv.
+    If selected_classes is not present, returns all classes from taxonomy.csv.
 
     Args:
         cls_model_ID: The classification model ID
 
     Returns:
-        list: The selected_classes list from the model's variables.json, 
-              or all classes from taxon-mapping.csv if selected_classes not present
+        list: The selected_classes list from the model's variables.json,
+              or all classes from taxonomy.csv if selected_classes not present
     """
     try:
         json_path = os.path.join(
@@ -3195,6 +3222,30 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
         for entry in taxon_mapping
         if entry.get("model_class", "").strip()
     ])))
+
+    # Ensure global taxonomy cache includes entries for this model's species.
+    taxonomy_dict = st.session_state.get("taxonomy", {})
+    taxonomy_updated = False
+    for entry in taxon_mapping:
+        model_class = (entry.get("model_class") or "").strip()
+        if not model_class:
+            continue
+
+        taxonomy_entry = {
+            "class": (entry.get("class") or "").strip().lower(),
+            "order": (entry.get("order") or "").strip().lower(),
+            "family": (entry.get("family") or "").strip().lower(),
+            "genus": (entry.get("genus") or "").strip().lower(),
+            "species": (entry.get("species") or "").strip().lower(),
+        }
+
+        if any(taxonomy_entry.values()):
+            if taxonomy_dict.get(model_class) != taxonomy_entry:
+                taxonomy_dict[model_class] = taxonomy_entry
+                taxonomy_updated = True
+
+    if taxonomy_updated:
+        st.session_state["taxonomy"] = taxonomy_dict
 
     # Initialize state in structured session state
     # First check if we need to initialize from model's variables.json

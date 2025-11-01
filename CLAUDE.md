@@ -44,7 +44,7 @@ AddaxAI is a Streamlit-based wildlife camera trap analysis platform that automat
 ```
 models/cls/[MODEL-ID]/
 ├── variables.json      # Model configuration
-├── taxon-mapping.csv   # Species taxonomies  
+├── taxonomy.csv        # Species taxonomies
 └── [model weights]     # Actual model files
 ```
 
