@@ -9,6 +9,7 @@ import os
 import json
 import streamlit as st
 from utils.config import log
+from utils.data_loading import load_model_taxonomy
 
 
 def load_global_taxonomy():
@@ -16,8 +17,8 @@ def load_global_taxonomy():
     Load all taxonomy data once and store in st.session_state["taxonomy"].
 
     This function:
-    1. Reads all classification models from completed runs
-    2. Uses classification_category_descriptions embedded in run JSON
+    1. Reads all classification models referenced by completed runs
+    2. Loads taxonomy data from each model's taxonomy.csv (SpeciesNet models fall back to embedded run metadata)
     3. Builds a flat dictionary of all unique species with their taxonomy
 
     Stores result in st.session_state["taxonomy"] as:
@@ -86,15 +87,16 @@ def load_global_taxonomy():
                         if classification_model_id and classification_model_id not in ["NONE", "unknown"]:
                             classification_models_seen.add(classification_model_id)
 
-                            category_descriptions = run_json.get("classification_category_descriptions", {})
-                            if category_descriptions:
-                                existing_descriptions = model_taxonomy_descriptions.setdefault(classification_model_id, {})
-                                existing_descriptions.update(category_descriptions)
+                            if "SPECIESNET" in classification_model_id.upper():
+                                category_descriptions = run_json.get("classification_category_descriptions", {})
+                                if category_descriptions:
+                                    existing_descriptions = model_taxonomy_descriptions.setdefault(classification_model_id, {})
+                                    existing_descriptions.update(category_descriptions)
 
-                            category_labels = run_json.get("classification_categories", {})
-                            if category_labels:
-                                existing_labels = model_category_labels.setdefault(classification_model_id, {})
-                                existing_labels.update(category_labels)
+                                category_labels = run_json.get("classification_categories", {})
+                                if category_labels:
+                                    existing_labels = model_category_labels.setdefault(classification_model_id, {})
+                                    existing_labels.update(category_labels)
 
                     except Exception as e:
                         log(f"Error processing {run_json_path}: {str(e)}")
@@ -104,31 +106,28 @@ def load_global_taxonomy():
         for model_id in classification_models_seen:
             log(f"Loading taxonomy for model: {model_id}")
 
-            category_descriptions = model_taxonomy_descriptions.get(model_id)
-            category_labels = model_category_labels.get(model_id, {})
+            taxonomy_data = load_model_taxonomy(
+                model_id,
+                classification_category_descriptions=model_taxonomy_descriptions.get(model_id),
+                classification_categories=model_category_labels.get(model_id)
+            )
 
-            if not category_descriptions:
-                log(f"  ✗ No classification taxonomy metadata found for model: {model_id}")
+            if not taxonomy_data:
+                log(f"  ✗ Unable to load taxonomy for model: {model_id}")
                 continue
 
-            for category_id, taxonomy_string in category_descriptions.items():
-                taxonomy_string = taxonomy_string or ""
-                parts = [p.strip() for p in taxonomy_string.split(';')]
-                if len(parts) < 5:
-                    parts.extend([""] * (5 - len(parts)))
-
-                class_name, order_name, family_name, genus_name, species_name = parts[:5]
-                label = category_labels.get(str(category_id), "").strip()
-                fallback = next((name for name in [species_name, genus_name, family_name, order_name, class_name] if name), None)
-                model_class = label or fallback or f"{model_id}_{category_id}"
+            for entry in taxonomy_data.get("taxon_mapping", []):
+                model_class = (entry.get("model_class") or "").strip()
+                if not model_class:
+                    continue
 
                 if model_class not in taxonomy:
                     taxonomy[model_class] = {
-                        "class": class_name.lower() if class_name else "",
-                        "order": order_name.lower() if order_name else "",
-                        "family": family_name.lower() if family_name else "",
-                        "genus": genus_name.lower() if genus_name else "",
-                        "species": species_name.lower() if species_name else ""
+                        "class": (entry.get("class") or "").strip().lower(),
+                        "order": (entry.get("order") or "").strip().lower(),
+                        "family": (entry.get("family") or "").strip().lower(),
+                        "genus": (entry.get("genus") or "").strip().lower(),
+                        "species": (entry.get("species") or "").strip().lower()
                     }
 
             log(f"  ✓ Loaded taxonomy metadata for {model_id}")

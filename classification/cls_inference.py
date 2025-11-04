@@ -16,7 +16,6 @@ Latest edit by Peter van Lunteren on 19 May 2025
 # import io
 import os
 import json
-import csv
 # import datetime
 # import contextlib
 # import pandas as pd
@@ -91,56 +90,6 @@ def _extract_taxon_component(value, prefix):
     return value_lower.strip()
 
 
-def _load_taxonomy_lookup_from_csv(model_id):
-    """
-    Load taxonomy metadata for a classification model.
-
-    Returns:
-        dict: {model_class_label: "class;order;family;genus;species"}
-    """
-    if not model_id:
-        return {}
-
-    model_dir = os.path.join(ADDAXAI_ROOT, "models", "cls", model_id)
-    mapping_path = os.path.join(model_dir, "taxonomy.csv")
-
-    if not os.path.exists(mapping_path):
-        print(f"Warning: taxonomy file not found for model {model_id} at {mapping_path}")
-        return {}
-
-    taxonomy_lookup = {}
-    try:
-        with open(mapping_path, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                label = (row.get("model_class") or "").strip()
-                if not label:
-                    continue
-
-                class_name = (row.get("class") or "").strip().lower()
-                order_name = (row.get("order") or "").strip().lower()
-                family_name = (row.get("family") or "").strip().lower()
-                genus_name = (row.get("genus") or "").strip().lower()
-                species_name = (row.get("species") or "").strip().lower()
-
-                if genus_name and species_name:
-                    if species_name == genus_name:
-                        species_name = ""
-                    elif species_name.startswith(f"{genus_name} "):
-                        species_name = species_name[len(genus_name) + 1 :]
-
-                taxonomy_lookup[label] = ";".join([
-                    class_name,
-                    order_name,
-                    family_name,
-                    genus_name,
-                    species_name
-                ])
-    except Exception as exc:
-        print(f"Warning: failed to parse taxonomy file for model {model_id}: {exc}")
-
-    return taxonomy_lookup
-
 def fetch_label_map_from_json(path_to_json):
     """
     Extract detection category labels from MegaDetector JSON output.
@@ -178,7 +127,6 @@ def create_raw_classifications(json_path,
     with open(json_path) as image_recognition_file_content:
         data = json.load(image_recognition_file_content)
         label_map = fetch_label_map_from_json(json_path)
-        existing_taxonomy_descriptions = data.get('classification_category_descriptions', {})
     
     # First pass: count animal crops and group by video files
     # Note: No filtering applied - all detections in JSON are processed
@@ -363,37 +311,6 @@ def create_raw_classifications(json_path,
     # Update classification categories mapping in data structure
     data['classification_categories'] = {v: k for k, v in inverted_cls_label_map.items()}
 
-    # Attach taxonomy descriptions derived from model metadata
-    metadata = data.get("addaxai_metadata", {}) if data else {}
-    if not model_id:
-        model_id = metadata.get("selected_cls_modelID")
-    if not model_id or model_id in ["NONE", "unknown"]:
-        model_id = metadata.get("classification_model_id")
-
-    taxonomy_lookup = _load_taxonomy_lookup_from_csv(model_id)
-    classification_categories = data.get("classification_categories", {})
-    taxonomy_descriptions = {}
-    default_empty = ";".join([""] * 5)
-
-    for category_id, label in classification_categories.items():
-        if not isinstance(category_id, str):
-            category_key = str(category_id)
-        else:
-            category_key = category_id
-
-        label = label.strip() if isinstance(label, str) else label
-        taxonomy_string = ""
-        if label and taxonomy_lookup:
-            taxonomy_string = taxonomy_lookup.get(label, "")
-
-        if not taxonomy_string and existing_taxonomy_descriptions:
-            taxonomy_string = existing_taxonomy_descriptions.get(category_id) or \
-                              existing_taxonomy_descriptions.get(category_key, "")
-
-        taxonomy_descriptions[category_key] = taxonomy_string if taxonomy_string else default_empty
-
-    data['classification_category_descriptions'] = taxonomy_descriptions
-    
     # Write updated data back to JSON file with formatting
     with open(json_path, "w") as json_file:
         json.dump(data, json_file, indent=1)

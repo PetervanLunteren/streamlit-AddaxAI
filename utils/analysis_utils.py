@@ -730,11 +730,14 @@ def merge_deployment_jsons(json_files, output_file, deployment_data=None):
                 merged_data['detection_categories'] = data.get('detection_categories', {})
             if not merged_data['classification_categories']:
                 merged_data['classification_categories'] = data.get('classification_categories', {})
-            if not merged_data['classification_category_descriptions']:
-                merged_data['classification_category_descriptions'] = data.get('classification_category_descriptions', {})
+            if data.get('classification_category_descriptions'):
+                merged_data['classification_category_descriptions'].update(data.get('classification_category_descriptions', {}))
             if not merged_data['info']:
                 merged_data['info'] = data.get('info', {})
         
+        if not merged_data['classification_category_descriptions']:
+            merged_data.pop('classification_category_descriptions', None)
+
         # Write merged results
         with open(output_file, 'w') as f:
             json.dump(merged_data, f, indent=2)
@@ -2795,7 +2798,7 @@ def format_class_name(s):
 def load_taxon_mapping(cls_model_ID):
     """
     Load taxonomy metadata for a classification model from taxonomy.csv and
-    normalise it into the legacy level_* schema expected by downstream code.
+    normalise it into lowercase taxonomic levels.
     """
     model_dir = os.path.join(ADDAXAI_ROOT, "models", "cls", cls_model_ID)
     taxonomy_csv = os.path.join(model_dir, "taxonomy.csv")
@@ -2817,11 +2820,6 @@ def load_taxon_mapping(cls_model_ID):
 
             normalised = {
                 "model_class": model_class,
-                "level_class": f"class {cls}" if cls else "",
-                "level_order": f"order {order}" if order else "",
-                "level_family": f"family {family}" if family else "",
-                "level_genus": f"genus {genus}" if genus else "",
-                "level_species": f"species {species}" if species else "",
                 "class": cls,
                 "order": order,
                 "family": family,

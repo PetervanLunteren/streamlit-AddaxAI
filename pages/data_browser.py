@@ -100,10 +100,11 @@ if get_session_var("explore_results", "show_modal_image_viewer", False):
 if get_session_var("explore_results", "show_tree_modal", False):
     from components.taxonomic_tree_selector import tree_selector_modal
 
-    # Get unique classifications from current dataframe
-    if 'classification_label' in df.columns:
+    # Build classification universe from full dataset only
+    raw_df = st.session_state.get("results_raw", df)
+    if 'classification_label' in raw_df.columns:
         unique_classifications = sorted([
-            cls for cls in df['classification_label'].dropna().unique()
+            cls for cls in raw_df['classification_label'].dropna().unique()
             if cls != 'N/A' and cls.strip() != ''
         ])
     else:
@@ -231,15 +232,22 @@ if 'results_modified' not in st.session_state:
                 # Include unclassified if include_unclassified is True
                 include_unclass = saved_settings_early.get('include_unclassified', True)
 
+                raw_classification_series = filtered_df['classification_label']
+                classification_series = raw_classification_series.fillna("").astype(str)
+                classification_series_norm = classification_series.str.strip()
+                selected_norm = {cls.strip().lower() for cls in selected_classifications}
+
                 if include_unclass:
                     # Include both selected classifications and unclassified (NaN or empty)
-                    mask = (filtered_df['classification_label'].isna()) | \
-                           (filtered_df['classification_label'] == '') | \
-                           (filtered_df['classification_label'] == 'N/A') | \
-                           (filtered_df['classification_label'].isin(selected_classifications))
+                    mask = (
+                        raw_classification_series.isna() |
+                        (classification_series_norm == '') |
+                        (classification_series_norm.str.lower() == 'n/a') |
+                        (classification_series_norm.str.lower().isin(selected_norm))
+                    )
                 else:
                     # Only selected classifications
-                    mask = filtered_df['classification_label'].isin(selected_classifications)
+                    mask = classification_series_norm.str.lower().isin(selected_norm)
 
                 filtered_df = filtered_df[mask].copy()
 

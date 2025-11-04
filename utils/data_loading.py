@@ -67,17 +67,10 @@ def load_model_taxonomy(model_id, classification_category_descriptions=None, cla
     """
     Load taxonomy information for a classification model.
 
-    Relies on the taxonomy metadata embedded in run JSON files:
-    classification_categories maps category IDs to labels, and
-    classification_category_descriptions maps category IDs to semi-colon separated
-    taxonomy strings (class;order;family;genus;species).
-
     Args:
         model_id (str): Classification model ID
-        classification_category_descriptions (dict, optional): Taxonomy mapping from JSON
-            Format: {"0": "mammalia;carnivora;felidae;panthera;leo", ...}
-        classification_categories (dict, optional): Category labels from JSON
-            Format: {"0": "blank", "1": "domestic cattle", ...}
+        classification_category_descriptions (dict, optional): Run-level taxonomy mapping (used for SpeciesNet models)
+        classification_categories (dict, optional): Category labels from run JSON (used for SpeciesNet models)
 
     Returns:
         dict: {
@@ -86,50 +79,60 @@ def load_model_taxonomy(model_id, classification_category_descriptions=None, cla
             "taxon_mapping": [...]   # Raw CSV data as list of dicts
         } or None if loading fails
     """
-    from utils.analysis_utils import build_taxon_tree, get_all_leaf_values
+    from utils.analysis_utils import build_taxon_tree, get_all_leaf_values, load_taxon_mapping
 
     try:
         # Check if model is NONE or unknown
         if not model_id or model_id in ["NONE", "unknown"]:
             return None
 
-        if not classification_category_descriptions:
-            log(f"No classification_category_descriptions found for model {model_id}")
-            return None
+        is_speciesnet = "SPECIESNET" in model_id.upper()
 
-        log(f"Using taxonomy metadata embedded in run JSON for {model_id}")
+        if is_speciesnet:
+            if not classification_category_descriptions:
+                log(f"SpeciesNet model {model_id} is missing classification_category_descriptions; skipping taxonomy load")
+                return None
 
-        taxon_mapping = []
-        label_lookup = classification_categories or {}
+            label_lookup = {str(k): v for k, v in (classification_categories or {}).items()}
+            deduped_entries = {}
 
-        for category_id, taxonomy_string in classification_category_descriptions.items():
-            cat_key = str(category_id)
-            label = label_lookup.get(cat_key, "").strip() if label_lookup else ""
+            for category_id, taxonomy_string in classification_category_descriptions.items():
+                taxonomy_string = (taxonomy_string or "").strip()
+                if not taxonomy_string:
+                    continue
 
-            taxonomy_string = taxonomy_string or ""
-            parts = [p.strip() for p in taxonomy_string.split(';')]
-            if len(parts) < 5:
-                parts.extend([""] * (5 - len(parts)))
+                parts = [p.strip() for p in taxonomy_string.split(';')]
+                if len(parts) < 5:
+                    parts.extend([""] * (5 - len(parts)))
 
-            class_name, order_name, family_name, genus_name, species_name = parts[:5]
+                class_name, order_name, family_name, genus_name, species_name = parts[:5]
+                label = (label_lookup.get(str(category_id)) or "").strip()
+                fallback = next((name for name in [label, species_name, genus_name, family_name, order_name, class_name] if name), None)
+                model_class = fallback or f"{model_id}_{category_id}"
 
-            # Determine model_class value for tree leaves
-            fallback = next((name for name in [species_name, genus_name, family_name, order_name, class_name] if name), None)
-            model_class = label or fallback or f"{model_id}_{cat_key}"
+                deduped_entries[model_class] = {
+                    "model_class": model_class,
+                    "class": class_name.lower(),
+                    "order": order_name.lower(),
+                    "family": family_name.lower(),
+                    "genus": genus_name.lower(),
+                    "species": species_name.lower()
+                }
 
-            entry = {
-                "model_class": model_class,
-                "level_class": f"class {class_name.lower()}" if class_name else "",
-                "level_order": f"order {order_name.lower()}" if order_name else "",
-                "level_family": f"family {family_name.lower()}" if family_name else "",
-                "level_genus": f"genus {genus_name.lower()}" if genus_name else "",
-                "level_species": f"species {species_name.lower()}" if species_name else ""
-            }
-            taxon_mapping.append(entry)
+            taxon_mapping = list(deduped_entries.values())
+            if not taxon_mapping:
+                log(f"No embedded taxonomy entries found for SpeciesNet model {model_id}")
+                return None
 
-        if not taxon_mapping:
-            log(f"No usable taxonomy entries found for {model_id}")
-            return None
+            log(f"Using embedded taxonomy for SpeciesNet model {model_id}: {len(taxon_mapping)} entries")
+
+        else:
+            try:
+                taxon_mapping = load_taxon_mapping(model_id)
+                log(f"Using taxonomy.csv for model {model_id}")
+            except FileNotFoundError:
+                log(f"taxonomy.csv not found for {model_id}")
+                return None
 
         tree = build_taxon_tree(taxon_mapping)
         leaf_values = get_all_leaf_values(tree)
@@ -184,12 +187,14 @@ def merge_taxonomies(taxonomy_dict):
                 if model_class and model_class not in seen_model_classes:
                     seen_model_classes.add(model_class)
 
-                    # Normalize taxonomic levels to lowercase for consistent merging
-                    # This ensures "class Mammalia" and "class mammalia" are treated as the same node
-                    normalized_entry = entry.copy()
-                    for level_key in ["level_class", "level_order", "level_family", "level_genus", "level_species"]:
-                        if level_key in normalized_entry and normalized_entry[level_key]:
-                            normalized_entry[level_key] = normalized_entry[level_key].lower()
+                    normalized_entry = {
+                        "model_class": model_class,
+                        "class": (entry.get("class") or "").strip().lower(),
+                        "order": (entry.get("order") or "").strip().lower(),
+                        "family": (entry.get("family") or "").strip().lower(),
+                        "genus": (entry.get("genus") or "").strip().lower(),
+                        "species": (entry.get("species") or "").strip().lower(),
+                    }
 
                     all_taxon_entries.append(normalized_entry)
 
@@ -248,8 +253,8 @@ def load_detection_results_dataframe():
     results_list = []
     error_count = 0
     classification_models_seen = set()
-    model_taxonomy_descriptions = {}  # Track classification_category_descriptions per model
-    model_category_labels = {}  # Track classification_categories per model
+    model_taxonomy_descriptions = {}
+    model_category_labels = {}
 
     try:
         # Load MAP_JSON from session state
@@ -292,15 +297,16 @@ def load_detection_results_dataframe():
                         if classification_model_id and classification_model_id not in ["NONE", "unknown"]:
                             classification_models_seen.add(classification_model_id)
 
-                            category_descriptions = run_json.get("classification_category_descriptions", {})
-                            if category_descriptions:
-                                existing_descriptions = model_taxonomy_descriptions.setdefault(classification_model_id, {})
-                                existing_descriptions.update(category_descriptions)
+                            if "SPECIESNET" in classification_model_id.upper():
+                                category_descriptions = run_json.get("classification_category_descriptions", {})
+                                if category_descriptions:
+                                    existing_descriptions = model_taxonomy_descriptions.setdefault(classification_model_id, {})
+                                    existing_descriptions.update(category_descriptions)
 
-                            category_labels = run_json.get("classification_categories", {})
-                            if category_labels:
-                                existing_labels = model_category_labels.setdefault(classification_model_id, {})
-                                existing_labels.update(category_labels)
+                                category_labels = run_json.get("classification_categories", {})
+                                if category_labels:
+                                    existing_labels = model_category_labels.setdefault(classification_model_id, {})
+                                    existing_labels.update(category_labels)
 
                         # Get category mapping dictionaries
                         detection_categories = run_json.get("detection_categories", {})
@@ -409,12 +415,10 @@ def load_detection_results_dataframe():
             log(f"Loading taxonomy for {len(classification_models_seen)} classification model(s)...")
 
             for model_id in classification_models_seen:
-                category_descriptions = model_taxonomy_descriptions.get(model_id)
-                category_labels = model_category_labels.get(model_id)
                 taxonomy_data = load_model_taxonomy(
                     model_id,
-                    classification_category_descriptions=category_descriptions,
-                    classification_categories=category_labels
+                    classification_category_descriptions=model_taxonomy_descriptions.get(model_id),
+                    classification_categories=model_category_labels.get(model_id)
                 )
                 if taxonomy_data:
                     taxonomy_dict[model_id] = taxonomy_data
