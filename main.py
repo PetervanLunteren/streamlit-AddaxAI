@@ -19,11 +19,9 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit_image_zoom
 
 TODOs FOR NOW:
-- WAARWASIK: Ik ben bezig met de SPeciesNet en de andere JSONS gelijk te maken met de taxon informatie in the JSON in dezelfde format. Doe `codex resume` en vraag hem om een update. Ga dan door. Je wilt dat de JSONS van SpeciesNet en andere modellen de zelfde taxon_categories_dict format hebben. 
+- WAARWASIK: Ik ben bezig met de met de taxonomy.csv nieuwe format. Als je door wilt gaat doe dan `codex resume 019a4f57-2d6a-7500-a056-16b31d5f21ed`. De classify_detections.py files geven nog steeds een ModelID door, dat hoeft nu niet meer. Pas aan. 
 
-
-- Continue later with: I was making a shared tree selector. there are still some bugs. Check the tree select in the filter of data-browser and the analyse-advanced-wizard. Use claude --continue to debug further. Logs in the terminal on startup. 
-- continue with the data brwoser page
+- continue with the data brwoser page. Fix the species selection tree in the filters to look the same as in the wizard. 
 - make the detections page for full images too. 
 - try out my new PyPi package: https://pypi.org/project/st-segmented-buttons/
 - update to the newset MD version and make sure to adjust:
