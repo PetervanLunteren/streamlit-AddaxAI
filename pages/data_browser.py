@@ -90,7 +90,9 @@ if get_session_var("explore_results", "show_modal_image_viewer", False):
     modal_image_viewer = Modal(
         title="",
         key="image_viewer",
-        show_close_button=False
+        show_close_button=False,
+        show_title=False,
+        show_divider=False
     )
     with modal_image_viewer.container():
         image_viewer_modal()
@@ -117,7 +119,9 @@ if get_session_var("explore_results", "show_tree_modal", False):
     tree_modal = Modal(
         title="Select Species",
         key="tree_selector_modal",
-        show_close_button=False
+        show_close_button=False,
+        show_title=False,
+        show_divider=False
     )
 
     with tree_modal.container():
@@ -125,7 +129,8 @@ if get_session_var("explore_results", "show_tree_modal", False):
         result = tree_selector_modal(
             available=unique_classifications,
             selected=saved_selected_classifications,
-            key="explore_results_tree"
+            key="explore_results_tree",
+            title_mode="browser"
         )
 
         # Handle result
@@ -457,11 +462,12 @@ with col8:
                     st.info("No detection types available in the data")
 
                 # Detection confidence range
-                saved_det_conf_min = saved_settings.get('det_conf_min', 0.5)
+                from utils.config import DEFAULT_DETECTION_CONFIDENCE_THRESHOLD
+                saved_det_conf_min = saved_settings.get('det_conf_min', DEFAULT_DETECTION_CONFIDENCE_THRESHOLD)
                 saved_det_conf_max = saved_settings.get('det_conf_max', 1.0)
                 det_conf_range = st.slider(
                     "Confidence range",
-                    min_value=0.0,
+                    min_value=0.01,
                     max_value=1.0,
                     value=(saved_det_conf_min, saved_det_conf_max),
                     step=0.01,
@@ -472,6 +478,11 @@ with col8:
             # CLASSIFICATIONS SECTION (with modal tree selector)
             with st.container(border=True):
                 print_widget_label("Classifications")
+
+                st.markdown(
+                    "<span style='color:#353640; font-size:0.85rem;'>Classes</span>",
+                    unsafe_allow_html=True
+                )
 
                 # Get unique classifications from current dataframe
                 if 'classification_label' in df.columns:
@@ -488,25 +499,41 @@ with col8:
                 selected_count = len(saved_selected_classifications)
                 total_count = len(unique_classifications)
 
-                # Display selection count
-                st.markdown(f"**{selected_count}** of **{total_count}** species selected")
+                col_btn, col_summary = st.columns([1, 3])
+                with col_btn:
+                    if st.form_submit_button(
+                        ":material/pets: Select",
+                        use_container_width=True,
+                        key="select_species_button"
+                    ):
+                        set_session_var("explore_results", "show_tree_modal", True)
+                        st.rerun()
 
-                # Button to open modal
-                if st.form_submit_button("Select species", use_container_width=True):
-                    set_session_var("explore_results", "show_tree_modal", True)
-                    # Trigger rerun to show modal
-                    st.rerun()
-
-            # CLASSIFICATION CONFIDENCE SECTION (in form)
-            with st.container(border=True):
-                print_widget_label("Classification confidence")
+                with col_summary:
+                    if total_count > 0:
+                        text = (
+                            "You have selected "
+                            f"<code style='color:#086164; font-family:monospace;'>{selected_count}</code>"
+                            " of "
+                            f"<code style='color:#086164; font-family:monospace;'>{total_count}</code> classes."
+                        )
+                        st.markdown(
+                            f"""
+                                <div style=\"background-color: #f0f2f6; padding: 7px; border-radius: 8px;\">
+                                    &nbsp;&nbsp;{text}
+                                </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                    else:
+                        st.info("No species classifications available in the current dataset.")
 
                 # Classification confidence range
-                saved_cls_conf_min = saved_settings.get('cls_conf_min', 0.5)
+                saved_cls_conf_min = saved_settings.get('cls_conf_min', 0.01)
                 saved_cls_conf_max = saved_settings.get('cls_conf_max', 1.0)
                 cls_conf_range = st.slider(
                     "Confidence range",
-                    min_value=0.0,
+                    min_value=0.01,
                     max_value=1.0,
                     value=(saved_cls_conf_min, saved_cls_conf_max),
                     step=0.01,
@@ -607,7 +634,10 @@ with col8:
                     unique_runs = []
 
                 # Run multiselect
-                saved_selected_runs = saved_settings.get('selected_runs', unique_runs)
+                saved_selected_runs = [
+                    run for run in saved_settings.get('selected_runs', unique_runs)
+                    if run in unique_runs
+                ]
                 if unique_runs:
                     selected_runs = st.multiselect(
                         "Runs",
@@ -634,7 +664,10 @@ with col8:
                     unique_detection_models = []
 
                 # Detection model multiselect
-                saved_selected_det_models = saved_settings.get('selected_detection_models', unique_detection_models)
+                saved_selected_det_models = [
+                    model for model in saved_settings.get('selected_detection_models', unique_detection_models)
+                    if model in unique_detection_models
+                ]
                 if unique_detection_models:
                     selected_detection_models = st.multiselect(
                         "Detection models",
@@ -656,7 +689,10 @@ with col8:
                     unique_classification_models = []
 
                 # Classification model multiselect
-                saved_selected_cls_models = saved_settings.get('selected_classification_models', unique_classification_models)
+                saved_selected_cls_models = [
+                    model for model in saved_settings.get('selected_classification_models', unique_classification_models)
+                    if model in unique_classification_models
+                ]
                 if unique_classification_models:
                     selected_classification_models = st.multiselect(
                         "Classification models",
@@ -723,9 +759,9 @@ with col8:
                     "aggrid_settings": {
                         "date_start": min_date.date().isoformat(),
                         "date_end": max_date.date().isoformat(),
-                        "det_conf_min": 0.5,
+                        "det_conf_min": DEFAULT_DETECTION_CONFIDENCE_THRESHOLD,
                         "det_conf_max": 1.0,
-                        "cls_conf_min": 0.5,
+                        "cls_conf_min": 0.01,
                         "cls_conf_max": 1.0,
                         "include_unclassified": True,
                         "selected_detection_types": unique_detection_types,

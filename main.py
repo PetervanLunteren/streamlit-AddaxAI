@@ -16,12 +16,10 @@ Run with micromamba:
 
 How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install [package-name]
-./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit_image_zoom
+./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install st-segmented-buttons
 
 TODOs FOR NOW:
-- WAARWASIK: Ik ben bezig met de met de taxonomy.csv nieuwe format. Als je door wilt gaat doe dan `codex resume 019a4f57-2d6a-7500-a056-16b31d5f21ed`. De classify_detections.py files geven nog steeds een ModelID door, dat hoeft nu niet meer. Pas aan. 
-
-- continue with the data brwoser page. Fix the species selection tree in the filters to look the same as in the wizard. 
+- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a54b7-a524-7923-85ff-62bcd41eb194`
 - make the detections page for full images too. 
 - try out my new PyPi package: https://pypi.org/project/st-segmented-buttons/
 - update to the newset MD version and make sure to adjust:
@@ -465,6 +463,11 @@ if mode == 1:  # Advanced mode requires project context
 # Modal for adding new project - only create when needed
 if get_session_var("analyse_advanced", "show_modal_add_project", False):
     modal_add_project = Modal(
-        title="#### Describe new project", key="add_project", show_close_button=False)
+        title="#### Describe new project",
+        key="add_project",
+        show_close_button=False,
+        show_title=False,
+        show_divider=False
+    )
     with modal_add_project.container():
         add_project_modal()

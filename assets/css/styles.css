@@ -9,23 +9,27 @@ footer {visibility: hidden;}
     padding-top: 30px !important;
 }
 
-/* Target st-modal containers - force 800px width */
+/* Responsive modal sizing: min 640px, scales up to 80vw capped at 1100px */
 div[data-modal-container='true'] > div:first-child {
-    min-width: 800px !important;
-    width: 800px !important;
-    max-width: 800px !important;
-}
-
-div[data-modal-container='true'] > div:first-child > div:first-child > div:first-child {
-    min-width: 800px !important;
-    width: 800px !important;
-    max-width: 800px !important;
+    width: min(max(640px, 80vw), 1100px) !important;
+    max-height: calc(95vh - 40px) !important;
+    margin: auto !important;
     box-sizing: border-box !important;
 }
 
-/* Force all content inside modals to respect the 800px width */
+div[data-modal-container='true'] > div:first-child > div:first-child {
+    max-height: inherit !important;
+    overflow-y: auto !important;
+}
+
+div[data-modal-container='true'] > div:first-child > div:first-child > div:first-child {
+    width: min(max(640px, 80vw), 1100px) !important;
+    box-sizing: border-box !important;
+}
+
+/* Allow modal content to use the full responsive width */
 div[data-modal-container='true'] * {
-    max-width: none !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
 }
 

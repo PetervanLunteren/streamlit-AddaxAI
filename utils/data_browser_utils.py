@@ -15,7 +15,7 @@ from utils.config import ADDAXAI_ROOT, log
 from utils.common import load_vars, update_vars
 
 # Thumbnail generation constants
-MODAL_IMAGE_SIZE = 1000  # High resolution modal images (pixels) - 1000x1000 for quality
+MODAL_IMAGE_SIZE = 1000  # High-resolution modal images (pixels) used for export/zoom
 IMAGE_BACKGROUND_COLOR = (220, 227, 232)
 IMAGE_PADDING_PIXELS = 100  # Padding around bbox in pixels (new padding system)
 IMAGE_BLUR_RADIUS = 15  # Blur radius for background extension
@@ -265,7 +265,7 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # Create high-resolution modal image (1000x1000)
+            # Create high-resolution modal image (square at MODAL_IMAGE_SIZE)
             modal_size = (MODAL_IMAGE_SIZE, MODAL_IMAGE_SIZE)
             crop_info = None
             
@@ -516,7 +516,7 @@ def image_viewer_modal():
     image_path = current_row.get('absolute_path', '')
     
     # Main layout: image on left, metadata on right
-    img_col, meta_col = st.columns([2, 1])
+    img_col, meta_col = st.columns([1, 1])
     
     with img_col:
         # Generate high-resolution modal image on-demand
@@ -537,7 +537,7 @@ def image_viewer_modal():
         # Pass label text to generation function via function attribute (simple approach)
         generate_modal_image._current_label_text = label_text
         
-        # Generate modal image at 1000x1000 resolution
+        # Generate modal image at MODAL_IMAGE_SIZE resolution
         modal_image_url = generate_modal_image(
             image_path, 
             bbox_data, 
@@ -547,113 +547,125 @@ def image_viewer_modal():
         
         # Display the high-resolution modal image
         if modal_image_url:
-            st.markdown(f'<img src="{modal_image_url}" style="width: 100%; max-width: 600px; height: auto;">', unsafe_allow_html=True)
+            st.markdown(
+                f'<img src="{modal_image_url}" style="width: 480px; height: auto;">',
+                unsafe_allow_html=True
+            )
         else:
             st.error("Could not load image")
-    
+        st.markdown("<hr style='margin: 12px 0; border: none; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
+
     with meta_col:
-        # Close button
-        if st.button(":material/cancel: Close", type="secondary", width="stretch"):
-            set_session_var("explore_results", "show_modal_image_viewer", False)
-            st.rerun()
-        
-        # Download button
-        # Convert base64 image to downloadable format
-        if modal_image_url and modal_image_url.startswith('data:image/jpeg;base64,'):
-            # Extract base64 data
-            import base64
-            base64_data = modal_image_url.split(',')[1]
-            image_bytes = base64.b64decode(base64_data)
-            
-            # Create filename with timestamp
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            download_filename = f"addaxai-{timestamp}.jpg"
-            
-            st.download_button(
-                label=":material/download: Export",
-                data=image_bytes,
-                file_name=download_filename,
-                mime="image/jpeg",
+        top_col_export, top_col_close = st.columns([1, 1])
+
+        with top_col_export:
+            if modal_image_url and modal_image_url.startswith('data:image/jpeg;base64,'):
+                import base64
+                base64_data = modal_image_url.split(',')[1]
+                image_bytes = base64.b64decode(base64_data)
+
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                download_filename = f"addaxai-{timestamp}.jpg"
+
+                st.download_button(
+                    label=":material/download: Export",
+                    data=image_bytes,
+                    file_name=download_filename,
+                    mime="image/jpeg",
+                    type="secondary",
+                    key="modal_export_button",
+                    use_container_width=True
+                )
+
+        with top_col_close:
+            if st.button(
+                ":material/close: Close",
                 type="secondary",
-                width="stretch"
-            )
+                width="stretch",
+                key="modal_close_button"
+            ):
+                set_session_var("explore_results", "show_modal_image_viewer", False)
+                st.rerun()
         
-        st.divider()
-        
-        # Show box segmented control
-        st.markdown("**Show box**")
-        bbox_options = ["No", "Yes"]
-        
-        # Get user's last choice, defaulting to "Yes"
+        nav_col_prev, nav_col_next = st.columns([1, 1])
+
+        with nav_col_prev:
+            if st.button(
+                ":material/chevron_left: Previous",
+                disabled=(current_index <= 0),
+                width="stretch",
+                type="secondary"
+            ):
+                set_session_var("explore_results", "modal_current_image_index", current_index - 1)
+                st.rerun()
+
+        with nav_col_next:
+            if st.button(
+                "Next :material/chevron_right:",
+                disabled=(current_index >= len(df_filtered) - 1),
+                width="stretch",
+                type="secondary"
+            ):
+                set_session_var("explore_results", "modal_current_image_index", current_index + 1)
+                st.rerun()
+
         show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
-        default_option = bbox_options[1] if show_bbox else bbox_options[0]
-        
+        bbox_options = ["hide", "show"]
+        option_labels = {
+            "hide": ":material/visibility_off: Hide",
+            "show": ":material/visibility: Show",
+        }
+
         selected_option = st.segmented_control(
             "Show box",
             options=bbox_options,
-            default=default_option,
+            default="show" if show_bbox else "hide",
+            format_func=lambda opt: option_labels.get(opt, opt.title()),
             key="bbox_toggle",
             label_visibility="collapsed",
             width="stretch"
         )
-        
-        # Update bbox state if changed and save preference
-        new_show_bbox = (selected_option == "Yes")
+
+        new_show_bbox = (selected_option == "show")
         if new_show_bbox != show_bbox:
             set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
-            st.rerun()  # Force immediate UI update
-        
-        st.divider()
-        
-        # Timestamp
-        timestamp = current_row.get('timestamp', 'N/A')
-        if timestamp != 'N/A':
-            # Parse and format timestamp to human readable
-            try:
-                from datetime import datetime
-                parsed_timestamp = datetime.strptime(timestamp, '%Y:%m:%d %H:%M:%S')
-                human_readable = parsed_timestamp.strftime('%Y-%m-%d %H:%M:%S')
-                timestamp_display = human_readable
-            except:
-                timestamp_display = timestamp
-        else:
-            timestamp_display = timestamp
-        st.markdown(f"**Timestamp** {code_span(timestamp_display)}", unsafe_allow_html=True)
-        
-        # Location
-        location_id = current_row.get('location_id', 'N/A')
-        st.markdown(f"**Location** {code_span(location_id)}", unsafe_allow_html=True)
-        
-        # File
-        rel_path = current_row.get('relative_path', 'N/A')
-        if rel_path != 'N/A':
-            filename = os.path.basename(rel_path)
-            # Shorten to last 20 chars if too long
-            if len(filename) > 20:
-                display_filename = "..." + filename[-20:]
+            st.rerun()
+
+        with st.container(border=True):
+            timestamp = current_row.get('timestamp', 'N/A')
+            if timestamp != 'N/A':
+                try:
+                    from datetime import datetime
+                    parsed_timestamp = datetime.strptime(timestamp, '%Y:%m:%d %H:%M:%S')
+                    human_readable = parsed_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                    timestamp_display = human_readable
+                except:
+                    timestamp_display = timestamp
             else:
-                display_filename = filename
-        else:
-            display_filename = 'N/A'
-        st.markdown(f"**File** {code_span(display_filename)}", unsafe_allow_html=True)
-    
-    # Navigation buttons
-    st.divider()
-    col1, col2, col3 = st.columns([1, 1, 1])
-    
-    with col1:
-        if st.button(":material/chevron_left: Previous", disabled=(current_index <= 0), width="stretch"):
-            set_session_var("explore_results", "modal_current_image_index", current_index - 1)
-            st.rerun()
-    
-    with col2:
-        st.markdown(f"<div style='display: flex; align-items: center; justify-content: center; height: 38px;'>{code_span(current_index + 1)} &nbsp; of &nbsp; {code_span(len(df_filtered))}</div>", unsafe_allow_html=True)
-    
-    with col3:
-        if st.button("Next :material/chevron_right:", disabled=(current_index >= len(df_filtered) - 1), width="stretch"):
-            set_session_var("explore_results", "modal_current_image_index", current_index + 1)
-            st.rerun()
+                timestamp_display = timestamp
+
+            metadata_rows = []
+            metadata_rows.append(("Timestamp", timestamp_display))
+
+            location_id = current_row.get('location_id', 'N/A')
+            metadata_rows.append(("Location", location_id))
+
+            rel_path = current_row.get('relative_path', 'N/A')
+            if rel_path != 'N/A':
+                filename = os.path.basename(rel_path)
+                if len(filename) > 20:
+                    display_filename = "..." + filename[-20:]
+                else:
+                    display_filename = filename
+            else:
+                display_filename = 'N/A'
+            metadata_rows.append(("File", display_filename))
+
+            metadata_rows.append(("Detection", f"{current_index + 1} of {len(df_filtered)}"))
+
+            for label, value in metadata_rows:
+                st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
 
 
 def classification_selector_modal(nodes, all_leaf_values):

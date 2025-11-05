@@ -110,3 +110,6 @@ DEFAULT_DETECTION_MODEL = "MD5A-0-0"
 
 # Default classification model ID (NONE means no classification)
 DEFAULT_CLASSIFICATION_MODEL = "NONE"
+
+# Default detection confidence threshold
+DEFAULT_DETECTION_CONFIDENCE_THRESHOLD = 0.50

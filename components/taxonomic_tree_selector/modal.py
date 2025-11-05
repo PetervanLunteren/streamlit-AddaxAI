@@ -10,7 +10,7 @@ from utils.common import get_session_var, set_session_var, update_session_vars
 from .tree_builder import build_tree_from_species, get_all_species_from_tree
 
 
-def tree_selector_modal(available, selected, key="tree_selector"):
+def tree_selector_modal(available, selected, key="tree_selector", title_mode="wizard"):
     """
     Display a modal with hierarchical tree selector for species.
 
@@ -77,26 +77,86 @@ def tree_selector_modal(available, selected, key="tree_selector"):
     total_count = len(all_species_in_tree)
 
     from components.ui_helpers import code_span
-    st.markdown(
-        f"<div style='text-align:center;'>Selected {code_span(str(selected_count))} of {code_span(str(total_count))}</div>",
-        unsafe_allow_html=True,
-    )
+
+    top_col_status, top_col_spacer, top_col_close = st.columns([6, 1, 1])
+    with top_col_status:
+        if title_mode == "browser":
+            heading = "Which species would you like to filter by?"
+        else:
+            heading = "Which species are present in your project area?"
+        status_html = (
+            "<div style='padding-top:6px;'>"
+            f"<strong style='font-size:1.05rem;'>{heading}</strong>"
+            f"<div style='margin-top:4px;'>Selected {code_span(str(selected_count))} of {code_span(str(total_count))}</div>"
+            "</div>"
+        )
+        st.markdown(status_html, unsafe_allow_html=True)
+
+    with top_col_close:
+        if st.button(
+            ":material/close:",
+            key=f"{key}_dismiss",
+            use_container_width=True,
+            type="tertiary",
+            help="Close window",
+        ):
+            _clear_modal_state(key)
+            st.session_state[session_key_dismissed] = "cancel"
+            return None
+
     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
-    # Select All / Select None buttons
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.button("Select All", key=f"{key}_select_all", use_container_width=True):
-            st.session_state[session_key_selected] = all_species_in_tree
+    tree_state_key = f"{key}_tree"
+    tree_state = st.session_state.get(tree_state_key)
+    if tree_state is None:
+        tree_state = {
+            "checked": current_selected,
+            "expanded": current_expanded
+        }
+        st.session_state[tree_state_key] = tree_state
+
+    # Select all / Select none / Apply buttons
+    col_all, col_none, col_apply = st.columns([1, 1, 1])
+    with col_all:
+        if st.button("Select all", key=f"{key}_select_all", use_container_width=True):
+            all_selected = list(all_species_in_tree)
+            st.session_state[session_key_selected] = all_selected
+            st.session_state[session_key_last] = {
+                "checked": all_selected,
+                "expanded": st.session_state.get(session_key_expanded, [])
+            }
+            tree_state = st.session_state.get(tree_state_key)
+            if tree_state is None:
+                tree_state = {}
+            tree_state["checked"] = all_selected
+            tree_state["expanded"] = st.session_state.get(session_key_expanded, [])
+            st.session_state[tree_state_key] = tree_state
             st.rerun()
 
-    with col2:
-        if st.button("Select None", key=f"{key}_select_none", use_container_width=True):
+    with col_none:
+        if st.button("Select none", key=f"{key}_select_none", use_container_width=True):
             st.session_state[session_key_selected] = []
+            st.session_state[session_key_last] = {
+                "checked": [],
+                "expanded": st.session_state.get(session_key_expanded, [])
+            }
+            tree_state = st.session_state.get(tree_state_key)
+            if tree_state is None:
+                tree_state = {}
+            tree_state["checked"] = []
+            tree_state["expanded"] = st.session_state.get(session_key_expanded, [])
+            st.session_state[tree_state_key] = tree_state
             st.rerun()
+
+    with col_apply:
+        if st.button("Apply selection", key=f"{key}_apply", use_container_width=True, type="primary"):
+            final_selection = st.session_state[session_key_selected]
+            _clear_modal_state(key)
+            st.session_state[session_key_dismissed] = "apply"
+            return final_selection
 
     # Tree widget
-    with st.container(border=True, height=500):
+    with st.container(border=True, height=400):
         tree_result = checkbox_tree(
             tree,
             check_model="leaf",
@@ -125,29 +185,6 @@ def tree_selector_modal(available, selected, key="tree_selector"):
             st.session_state[session_key_last] = tree_result
             st.rerun()
 
-    # Selection summary
-    # Apply / Cancel buttons
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        if st.button("Cancel", key=f"{key}_cancel", use_container_width=True):
-            # Clear modal state
-            _clear_modal_state(key)
-            st.session_state[session_key_dismissed] = "cancel"
-            return None
-
-    with col2:
-        if st.button("Apply", key=f"{key}_apply", use_container_width=True, type="primary"):
-            # Get final selection
-            final_selection = st.session_state[session_key_selected]
-
-            # Clear modal state
-            _clear_modal_state(key)
-            st.session_state[session_key_dismissed] = "apply"
-
-            # Return selection
-            return final_selection
-
     # Modal is still open, return None (no action yet)
     return None
 
@@ -163,7 +200,8 @@ def _clear_modal_state(key):
         f"{key}_selected",
         f"{key}_expanded",
         f"{key}_last",
-        f"{key}_dismissed"
+        f"{key}_dismissed",
+        f"{key}_tree"
     ]
 
     for session_key in session_keys:
