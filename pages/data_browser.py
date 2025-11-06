@@ -166,6 +166,18 @@ image_size_options = {
     for size, height in ROW_HEIGHT_OPTIONS.items()
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# VIEW LEVEL SWITCHER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+BROWSER_VIEWS = [
+    (":material/crop_free:", "Detections"),
+    (":material/photo:", "Files"),
+    (":material/event:", "Events"),
+]
+VIEW_LABELS = [label for _, label in BROWSER_VIEWS]
+ICON_LOOKUP = {label: icon for icon, label in BROWSER_VIEWS}
+
 # Store raw data (never changes)
 if 'results_raw' not in st.session_state:
     st.session_state['results_raw'] = df.copy()
@@ -354,10 +366,40 @@ if 'results_modified' not in st.session_state:
 # Use filtered dataframe for export
 df_to_export = st.session_state['results_modified']
 
-# Controls row
-col1, col2, col3, col4, col5, col6, col7, col8, col9, col10 = st.columns(10)
+# Controls row (segmented control spans first column width 8, popovers right-aligned)
+level_col, _, _, sort_col, filter_col, export_col, settings_col = st.columns(
+    (8, 1, 1, 1, 1, 1, 1)
+)
 
-with col7:
+
+def on_view_mode_change():
+    """Persist the selected browse level in session state."""
+    selection = st.session_state.get("data_browser_level")
+    if selection:
+        set_session_var("explore_results", "browser_view_mode", selection)
+
+
+# Ensure we always have a stored default
+current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
+set_session_var("explore_results", "browser_view_mode", current_view)
+
+
+
+
+with level_col:
+    st.segmented_control(
+        "Browse level",
+        options=VIEW_LABELS,
+        format_func=lambda label: f"{ICON_LOOKUP[label]} {label}",
+        default=current_view,
+        key="data_browser_level",
+        selection_mode="single",
+        label_visibility="collapsed",
+        width="stretch",
+        on_change=on_view_mode_change,
+    )
+
+with sort_col:
     # Column sorting popover
     with st.popover(":material/swap_vert:", help="Sort", width="stretch"):
         with st.form("sort_form", border=False):
@@ -427,7 +469,7 @@ with col7:
 
                         st.rerun()
 
-with col8:
+with filter_col:
     # Simple date filter popover
     with st.popover(":material/tune:", help="Filter", width="stretch"):
         # ═══════════════════════════════════════════════════════════════════════
@@ -788,7 +830,7 @@ with col8:
                 
                 st.rerun()
 
-with col9:
+with export_col:
     # Export popover with material icon
     with st.popover(":material/download:", help="Export", width="stretch"):
         # Generate timestamp for filename
@@ -857,7 +899,7 @@ with col9:
                 width="stretch"
             )
 
-with col10:
+with settings_col:
     # Settings popover with material icon
     with st.popover(":material/settings:", help="Settings", width="stretch"):
         # Settings container

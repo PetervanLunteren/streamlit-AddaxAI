@@ -19,7 +19,10 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install st-segmented-buttons
 
 TODOs FOR NOW:
-- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a54b7-a524-7923-85ff-62bcd41eb194`
+- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a54b7-a524-7923-85ff-62bcd41eb194`. He knows what to do to go from detection to file. Ask him for a plan. 
+
+
+
 - make the detections page for full images too. 
 - try out my new PyPi package: https://pypi.org/project/st-segmented-buttons/
 - update to the newset MD version and make sure to adjust:
