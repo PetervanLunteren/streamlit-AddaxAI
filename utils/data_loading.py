@@ -553,7 +553,7 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
         ]
         detection_counter = Counter(detection_labels)
         detections_summary = ", ".join(
-            f"{label}×{count}" for label, count in detection_counter.items()
+            f"{label} ({count})" for label, count in detection_counter.items()
         )
 
         # Build classification summary from classification labels
@@ -569,7 +569,7 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
         if classification_labels:
             classification_counter = Counter(classification_labels)
             classifications_summary = ", ".join(
-                f"{label}×{count}" for label, count in classification_counter.items()
+                f"{label} ({count})" for label, count in classification_counter.items()
             )
             classifications_count = sum(classification_counter.values())
         else:
@@ -611,7 +611,11 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
                 }
             )
 
-        timestamp_series = pd.to_datetime(group["timestamp"], errors="coerce")
+        timestamp_series = pd.to_datetime(
+            group["timestamp"],
+            format="%Y:%m:%d %H:%M:%S",
+            errors="coerce",
+        )
         timestamp_first = timestamp_series.min()
         timestamp_last = timestamp_series.max()
 

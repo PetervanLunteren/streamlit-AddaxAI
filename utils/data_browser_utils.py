@@ -483,6 +483,133 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
     except Exception as e:
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
 
+def generate_file_modal_image(image_path, detection_details, show_bbox=True, show_labels=True):
+    """
+    Generate full-image modal preview with all detections drawn.
+
+    Args:
+        image_path (str): Absolute path to media file.
+        detection_details (list): List of detection dicts with bbox info.
+        show_bbox (bool): Whether to draw bounding boxes.
+        show_labels (bool): Whether to render labels next to boxes.
+
+    Returns:
+        str: Base64 encoded image suitable for HTML img tag.
+    """
+    try:
+        if not image_path or not os.path.exists(image_path):
+            return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+
+        with Image.open(image_path) as img:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            orig_width, orig_height = img.size
+
+            max_width = MODAL_IMAGE_SIZE
+            if orig_width > max_width:
+                scale = max_width / float(orig_width)
+                display_width = max_width
+                display_height = int(orig_height * scale)
+                img = img.resize((display_width, display_height), Image.Resampling.LANCZOS)
+            else:
+                display_width = orig_width
+                display_height = orig_height
+
+            draw = ImageDraw.Draw(img)
+
+            if show_bbox and detection_details:
+                for idx, detection in enumerate(detection_details):
+                    bbox = detection.get("bbox") or {}
+                    x_norm = bbox.get("x")
+                    y_norm = bbox.get("y")
+                    w_norm = bbox.get("width")
+                    h_norm = bbox.get("height")
+
+                    if None in (x_norm, y_norm, w_norm, h_norm):
+                        continue
+
+                    if pd.isna(x_norm) or pd.isna(y_norm) or pd.isna(w_norm) or pd.isna(h_norm):
+                        continue
+
+                    x1 = int(x_norm * display_width)
+                    y1 = int(y_norm * display_height)
+                    x2 = int((x_norm + w_norm) * display_width)
+                    y2 = int((y_norm + h_norm) * display_height)
+
+                    line_width = max(1, int(min(display_width, display_height) * 0.003))
+                    draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=line_width)
+
+                    if show_labels:
+                        det_label = detection.get("detection_label") or "detection"
+                        det_conf = detection.get("detection_confidence")
+                        cls_label = detection.get("classification_label")
+                        cls_conf = detection.get("classification_confidence")
+
+                        lines = []
+                        if det_label:
+                            label = det_label
+                            if det_conf is not None:
+                                try:
+                                    label = f"{label} ({float(det_conf):.2f})"
+                                except (TypeError, ValueError):
+                                    pass
+                            lines.append(label)
+                        if cls_label:
+                            label = cls_label
+                            if cls_conf is not None:
+                                try:
+                                    label = f"{label} ({float(cls_conf):.2f})"
+                                except (TypeError, ValueError):
+                                    pass
+                            lines.append(label)
+
+                        label_text = "\n".join(lines) if lines else f"detection {idx + 1}"
+
+                        try:
+                            from PIL import ImageFont
+                            font = ImageFont.load_default()
+                        except Exception:
+                            font = None
+
+                        text_width = text_height = 0
+                        if font:
+                            text_bbox = draw.multiline_textbbox((0, 0), label_text, font=font, spacing=2)
+                            text_width = text_bbox[2] - text_bbox[0]
+                            text_height = text_bbox[3] - text_bbox[1]
+                        else:
+                            text_width = len(label_text) * 6
+                            text_height = 10
+
+                        padding = 4
+                        bg_x1 = x1 + padding
+                        bg_y1 = max(0, y1 - text_height - (2 * padding))
+                        bg_x2 = bg_x1 + text_width + (2 * padding)
+                        bg_y2 = bg_y1 + text_height + (2 * padding)
+
+                        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                        overlay_draw = ImageDraw.Draw(overlay)
+                        overlay_draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(0, 0, 0, 200))
+
+                        img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+                        draw = ImageDraw.Draw(img)
+
+                        draw.multiline_text(
+                            (bg_x1 + padding, bg_y1 + padding),
+                            label_text,
+                            fill='white',
+                            font=font,
+                            spacing=2
+                        )
+
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=IMAGE_QUALITY)
+            img_data = base64.b64encode(buffer.getvalue()).decode()
+
+            return f"data:image/jpeg;base64,{img_data}"
+    except Exception:
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+
 
 def image_viewer_modal():
     """
@@ -546,14 +673,15 @@ def image_viewer_modal():
         )
         
         # Display the high-resolution modal image
-        if modal_image_url:
-            st.markdown(
-                f'<img src="{modal_image_url}" style="width: 480px; height: auto;">',
-                unsafe_allow_html=True
-            )
-        else:
-            st.error("Could not load image")
-        st.markdown("<hr style='margin: 12px 0; border: none; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
+        with st.container(border=True):
+            if modal_image_url:
+                st.markdown(
+                    f'<img src="{modal_image_url}" style="width: 480px; height: auto;">',
+                    unsafe_allow_html=True
+                )
+            else:
+                st.error("Could not load image")
+            st.write("")
 
     with meta_col:
         top_col_export, top_col_close = st.columns([1, 1])
@@ -649,7 +777,7 @@ def image_viewer_modal():
             metadata_rows.append(("Timestamp", timestamp_display))
 
             location_id = current_row.get('location_id', 'N/A')
-            metadata_rows.append(("Location", location_id))
+            metadata_rows.append(("Location ID", location_id))
 
             rel_path = current_row.get('relative_path', 'N/A')
             if rel_path != 'N/A':
@@ -662,11 +790,172 @@ def image_viewer_modal():
                 display_filename = 'N/A'
             metadata_rows.append(("File", display_filename))
 
-            metadata_rows.append(("Detection", f"{current_index + 1} of {len(df_filtered)}"))
+            metadata_rows.append(("Observation", f"{current_index + 1} of {len(df_filtered)}"))
 
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
 
+
+def image_viewer_modal_file():
+    """
+    Display file-level modal showing full image with all detections overlaid.
+    """
+    import streamlit as st
+    import pandas as pd
+    from utils.common import get_session_var, set_session_var
+    from components.ui_helpers import code_span
+
+    df_files = st.session_state.get("results_files_filtered", pd.DataFrame())
+    current_index = get_session_var("explore_results", "modal_current_image_index", 0)
+    show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
+
+    if df_files.empty or current_index >= len(df_files):
+        st.error("No file data available")
+        if st.button("Close"):
+            set_session_var("explore_results", "show_modal_image_viewer", False)
+            st.rerun()
+        return
+
+    current_row = df_files.iloc[current_index]
+    image_path = current_row.get("absolute_path", "")
+    detection_details = current_row.get("detection_details", []) or []
+
+    modal_image_url = generate_file_modal_image(
+        image_path,
+        detection_details,
+        show_bbox=show_bbox,
+        show_labels=True,
+    )
+
+    img_col, meta_col = st.columns([1, 1])
+
+    with img_col:
+        with st.container(border=True):
+            if modal_image_url:
+                st.markdown(
+                    f'<img src="{modal_image_url}" style="width: 480px; height: auto;">',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.error("Could not load image")
+            st.write("")
+
+    with meta_col:
+        top_col_export, top_col_close = st.columns([1, 1])
+
+        with top_col_export:
+            if modal_image_url and modal_image_url.startswith("data:image/jpeg;base64,"):
+                import base64
+                from datetime import datetime
+
+                base64_data = modal_image_url.split(",")[1]
+                image_bytes = base64.b64decode(base64_data)
+
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                download_filename = f"addaxai-file-{timestamp}.jpg"
+
+                st.download_button(
+                    label=":material/download: Export",
+                    data=image_bytes,
+                    file_name=download_filename,
+                    mime="image/jpeg",
+                    type="secondary",
+                    key="file_modal_export_button",
+                    use_container_width=True,
+                )
+
+        with top_col_close:
+            if st.button(
+                ":material/close: Close",
+                type="secondary",
+                width="stretch",
+                key="file_modal_close_button",
+            ):
+                set_session_var("explore_results", "show_modal_image_viewer", False)
+                st.rerun()
+
+        nav_col_prev, nav_col_next = st.columns([1, 1])
+        with nav_col_prev:
+            if st.button(
+                ":material/chevron_left: Previous",
+                disabled=(current_index <= 0),
+                width="stretch",
+                type="secondary",
+            ):
+                set_session_var("explore_results", "modal_current_image_index", current_index - 1)
+                st.rerun()
+
+        with nav_col_next:
+            if st.button(
+                "Next :material/chevron_right:",
+                disabled=(current_index >= len(df_files) - 1),
+                width="stretch",
+                type="secondary",
+            ):
+                set_session_var("explore_results", "modal_current_image_index", current_index + 1)
+                st.rerun()
+
+        bbox_options = ["hide", "show"]
+        option_labels = {
+            "hide": ":material/visibility_off: Hide",
+            "show": ":material/visibility: Show",
+        }
+
+        selected_option = st.segmented_control(
+            "Show boxes",
+            options=bbox_options,
+            default="show" if show_bbox else "hide",
+            format_func=lambda opt: option_labels.get(opt, opt.title()),
+            key="file_bbox_toggle",
+            label_visibility="collapsed",
+            width="stretch",
+        )
+
+        new_show_bbox = selected_option == "show"
+        if new_show_bbox != show_bbox:
+            set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
+            st.rerun()
+
+        with st.container(border=True):
+            timestamp_first = current_row.get("timestamp_first")
+            timestamp_last = current_row.get("timestamp_last")
+
+            def format_ts(value):
+                if not value:
+                    return None
+                try:
+                    return pd.to_datetime(value).strftime("%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    return value
+
+            formatted_first = format_ts(timestamp_first)
+            formatted_last = format_ts(timestamp_last)
+
+            if formatted_first and formatted_last:
+                if formatted_first == formatted_last:
+                    timestamp_display = formatted_first
+                else:
+                    timestamp_display = f"{formatted_first} → {formatted_last}"
+            elif formatted_first:
+                timestamp_display = formatted_first
+            elif formatted_last:
+                timestamp_display = formatted_last
+            else:
+                timestamp_display = "N/A"
+
+            detections_summary = current_row.get("detections_summary", "N/A")
+            classifications_summary = current_row.get("classifications_summary", "N/A")
+            metadata_rows = [
+                ("Timestamp", timestamp_display),
+                ("Location ID", current_row.get("location_id", "N/A")),
+                ("File", os.path.basename(current_row.get("relative_path", "")) or "N/A"),
+                ("Position", f"{current_index + 1} of {len(df_files)}"),
+                ("Detections", detections_summary),
+                ("Classifications", classifications_summary),
+            ]
+
+            for label, value in metadata_rows:
+                st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
 
 def classification_selector_modal(nodes, all_leaf_values):
     """

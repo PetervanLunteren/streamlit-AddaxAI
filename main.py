@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install st-segmented-buttons
 
 TODOs FOR NOW:
-- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a54b7-a524-7923-85ff-62bcd41eb194`. He knows what to do to go from detection to file. Ask him for a plan. 
+- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a5ad9-39ff-7af3-a237-e29b5d6378b1`. I was at the file-level modal view and the bug that it cant open.  
 
 
 
@@ -240,7 +240,7 @@ if st.session_state == {}:
             aggregate_detections_to_files,
         )
         results_df = load_detection_results_dataframe()
-        st.session_state["results_detections"] = results_df
+        st.session_state["results_observations"] = results_df
 
         if len(results_df) > 0:
             log(f"Loaded {len(results_df)} detections from {len(results_df['run_id'].unique())} runs")
@@ -262,7 +262,7 @@ if st.session_state == {}:
         log(error_msg)
         st.warning(error_msg)
         # Create empty dataframe as fallback
-        st.session_state["results_detections"] = pd.DataFrame()
+        st.session_state["results_observations"] = pd.DataFrame()
         # Propagate failure for file aggregation by re-raising
         raise
 

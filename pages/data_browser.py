@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from utils.common import load_vars, update_vars, get_session_var, set_session_var
 from components import print_widget_label
 from utils.data_browser_utils import (
-    image_viewer_modal, image_to_base64_url,
+    image_viewer_modal, image_viewer_modal_file, image_to_base64_url,
     IMAGE_PADDING_PIXELS, IMAGE_BLUR_RADIUS, IMAGE_CORNER_RADIUS,
     IMAGE_BBOX_COLOR, IMAGE_QUALITY
 )
@@ -44,6 +44,10 @@ def render_file_level_browser(files_df: pd.DataFrame):
         st.warning("No files containing detections were found.")
         st.stop()
 
+    # Ensure we operate on positional index for consistent modal navigation
+    files_df_reset = files_df.reset_index(drop=True)
+    st.session_state["results_files_filtered"] = files_df_reset
+
     FILE_ROW_HEIGHT = 120
     DEFAULT_PAGE_SIZE = 20
     PAGE_SIZE_OPTIONS = [20, 50, 100]
@@ -57,7 +61,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
     page_size = st.session_state.file_grid_page_size
     current_page = st.session_state.file_grid_current_page
 
-    total_rows = len(files_df)
+    total_rows = len(files_df_reset)
     total_pages = max(1, (total_rows + page_size - 1) // page_size)
 
     if current_page > total_pages:
@@ -66,7 +70,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
 
     start_idx = (current_page - 1) * page_size
     end_idx = min(start_idx + page_size, total_rows)
-    df_page = files_df.iloc[start_idx:end_idx].copy()
+    df_page = files_df_reset.iloc[start_idx:end_idx].copy()
 
     thumbnail_cache_key = (
         f"files_page_{current_page}_size_{page_size}_height_{FILE_ROW_HEIGHT}"
@@ -115,21 +119,30 @@ def render_file_level_browser(files_df: pd.DataFrame):
             else 0
         )
 
+        if timestamp_first and timestamp_last:
+            if timestamp_first == timestamp_last:
+                timestamp_display = timestamp_first.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                timestamp_display = (
+                    f"{timestamp_first.strftime('%Y-%m-%d %H:%M:%S')} → "
+                    f"{timestamp_last.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+        elif timestamp_first:
+            timestamp_display = timestamp_first.strftime("%Y-%m-%d %H:%M:%S")
+        elif timestamp_last:
+            timestamp_display = timestamp_last.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            timestamp_display = ""
+
         display_rows.append(
             {
                 "_df_index": idx,
                 "image": image_url,
                 "relative_path": row.get("relative_path") or "",
-                "detections_count": detections_count,
-                "detections_summary": row.get("detections_summary") or "",
-                "classifications_count": classifications_count,
-                "classifications_summary": row.get("classifications_summary") or "",
-                "timestamp_first": timestamp_first.strftime("%Y-%m-%d %H:%M:%S")
-                if timestamp_first is not None
-                else "",
-                "timestamp_last": timestamp_last.strftime("%Y-%m-%d %H:%M:%S")
-                if timestamp_last is not None
-                else "",
+                "detections": row.get("detections_summary") or "",
+                "classifications": row.get("classifications_summary") or "",
+                "count": detections_count,
+                "timestamp": timestamp_display,
                 "location_id": row.get("location_id") or "",
                 "run_id": row.get("run_id") or "",
             }
@@ -156,6 +169,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
                         img.style.height = '{FILE_ROW_HEIGHT}px';
                         img.style.objectFit = 'contain';
                         img.style.border = 'none';
+                        img.style.cursor = 'pointer';
                     }}
                     this.eGui = document.createElement('div');
                     this.eGui.appendChild(img);
@@ -169,14 +183,12 @@ def render_file_level_browser(files_df: pd.DataFrame):
     )
 
     gb.configure_column("relative_path", headerName="File", width=220)
-    gb.configure_column("detections_count", headerName="Detections", width=110, type="numericColumn")
-    gb.configure_column("detections_summary", headerName="Detection labels", width=200)
-    gb.configure_column("classifications_count", headerName="Classifications", width=130, type="numericColumn")
-    gb.configure_column("classifications_summary", headerName="Classification labels", width=220)
-    gb.configure_column("timestamp_first", headerName="First seen", width=160)
-    gb.configure_column("timestamp_last", headerName="Last seen", width=160)
-    gb.configure_column("location_id", headerName="Location", width=120)
-    gb.configure_column("run_id", headerName="Run", width=120)
+    gb.configure_column("detections", headerName="Detections", width=200)
+    gb.configure_column("classifications", headerName="Classifications", width=220)
+    gb.configure_column("count", headerName="Count", width=90, type="numericColumn")
+    gb.configure_column("timestamp", headerName="Timestamp", width=220)
+    gb.configure_column("location_id", headerName="Location ID", width=120)
+    gb.configure_column("run_id", headerName="Run ID", width=120)
 
     gb.configure_default_column(
         resizable=True,
@@ -186,20 +198,37 @@ def render_file_level_browser(files_df: pd.DataFrame):
         headerClass='ag-left-aligned-header'
     )
 
-    gb.configure_selection("none")
+    gb.configure_selection(selection_mode='single', use_checkbox=False)
     gb.configure_grid_options(rowHeight=FILE_ROW_HEIGHT + 10)
 
     grid_options = gb.build()
 
     grid_height = (len(display_df) * (FILE_ROW_HEIGHT + 10)) + 55
 
-    AgGrid(
+    st.markdown(
+        """
+        <style>
+        .ag-left-aligned-header .ag-header-cell-label {
+            justify-content: flex-start !important;
+            text-align: left !important;
+        }
+        .ag-header-cell-label {
+            justify-content: flex-start !important;
+            text-align: left !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    grid_response = AgGrid(
         display_df,
         gridOptions=grid_options,
         height=grid_height,
         allow_unsafe_jscode=True,
         theme="streamlit",
         fit_columns_on_grid_load=False,
+        update_on=['selectionChanged'],
     )
 
     bottom_menu = st.columns((4, 1, 1))
@@ -234,10 +263,30 @@ def render_file_level_browser(files_df: pd.DataFrame):
             st.session_state.file_grid_current_page = 1
             st.rerun()
 
+    # Handle row selection and open modal
+    if grid_response['selected_rows'] is not None and len(grid_response['selected_rows']) > 0:
+        selected_row = grid_response['selected_rows'].iloc[0]
+        original_index = selected_row.get('_df_index')
+
+        df_filtered_files = st.session_state.get("results_files_filtered", pd.DataFrame())
+
+        if not df_filtered_files.empty and original_index is not None:
+            try:
+                modal_index = df_filtered_files.index.get_loc(original_index)
+            except KeyError:
+                modal_index = int(original_index) if isinstance(original_index, (int, float)) else 0
+        else:
+            modal_index = 0
+
+        set_session_var("explore_results", "modal_current_image_index", modal_index)
+        set_session_var("explore_results", "modal_source", "file")
+        set_session_var("explore_results", "show_modal_image_viewer", True)
+        st.rerun()
+
 
 # View selection configuration
 BROWSER_VIEWS = [
-    (":material/crop_free:", "Detections"),
+    (":material/crop_free:", "Observations"),
     (":material/photo:", "Files"),
     (":material/event:", "Events"),
 ]
@@ -270,7 +319,6 @@ def render_view_mode_control(current_view):
             "Browse level",
             options=VIEW_LABELS,
             format_func=lambda label: f"{ICON_LOOKUP[label]} {label}",
-            default=current_view,
             key="data_browser_level",
             selection_mode="single",
             label_visibility="collapsed",
@@ -315,21 +363,23 @@ saved_settings = filter_config.get("aggrid_settings", {})
 saved_sort_column = saved_settings.get('sort_column', 'timestamp')
 saved_sort_direction = saved_settings.get('sort_direction', '↓')  # Descending for newest first
 
-# Check if detection results are available
-if "results_detections" not in st.session_state:
+# Check if observation results are available
+if "results_observations" not in st.session_state:
     st.error("No detection results found. Please ensure detection data is loaded.")
     st.stop()
 
 # Load data
-df = st.session_state["results_detections"]
+df = st.session_state["results_observations"]
 
 if df.empty:
     st.warning("No detection results found.")
     st.stop()
 
 # Determine current view mode and render segmented control row
-current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
-set_session_var("explore_results", "browser_view_mode", current_view)
+current_view = get_session_var("explore_results", "browser_view_mode", None)
+if current_view is None:
+    current_view = VIEW_LABELS[0]
+    set_session_var("explore_results", "browser_view_mode", current_view)
 
 sort_col, filter_col, export_col, settings_col = render_view_mode_control(current_view)
 
@@ -350,6 +400,7 @@ elif current_view == "Events":
 
 # Check if image viewer modal should be displayed
 if get_session_var("explore_results", "show_modal_image_viewer", False):
+    modal_source = get_session_var("explore_results", "modal_source", "observation")
     # Only render the modal, skip all heavy grid processing
     modal_image_viewer = Modal(
         title="",
@@ -359,7 +410,10 @@ if get_session_var("explore_results", "show_modal_image_viewer", False):
         show_divider=False
     )
     with modal_image_viewer.container():
-        image_viewer_modal()
+        if modal_source == "file":
+            image_viewer_modal_file()
+        else:
+            image_viewer_modal()
     st.stop()  # Don't render anything else
 
 # Check if tree selector modal should be displayed
@@ -435,7 +489,7 @@ image_size_options = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 BROWSER_VIEWS = [
-    (":material/crop_free:", "Detections"),
+    (":material/crop_free:", "Observations"),
     (":material/photo:", "Files"),
     (":material/event:", "Events"),
 ]
@@ -1480,6 +1534,7 @@ if (grid_response['selected_rows'] is not None and len(grid_response['selected_r
         
         # Set modal state and open
         set_session_var("explore_results", "modal_current_image_index", modal_index)
+        set_session_var("explore_results", "modal_source", "observation")
         set_session_var("explore_results", "show_modal_image_viewer", True)
         st.rerun()
 
