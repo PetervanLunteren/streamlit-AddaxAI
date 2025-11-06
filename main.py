@@ -235,7 +235,10 @@ if st.session_state == {}:
     time.sleep(0.5)  # Simulate loading time
     
     try:
-        from utils.data_loading import load_detection_results_dataframe
+        from utils.data_loading import (
+            load_detection_results_dataframe,
+            aggregate_detections_to_files,
+        )
         results_df = load_detection_results_dataframe()
         st.session_state["results_detections"] = results_df
 
@@ -244,12 +247,24 @@ if st.session_state == {}:
         else:
             log("No detection results found in completed runs")
 
+        loader.update_text("Aggregating file-level data...")
+
+        results_files_df = aggregate_detections_to_files(results_df)
+        st.session_state["results_files"] = results_files_df
+
+        log(
+            "Aggregated detection results into "
+            f"{len(results_files_df)} unique files"
+        )
+
     except Exception as e:
         error_msg = f"Failed to load detection results: {str(e)}"
         log(error_msg)
         st.warning(error_msg)
         # Create empty dataframe as fallback
         st.session_state["results_detections"] = pd.DataFrame()
+        # Propagate failure for file aggregation by re-raising
+        raise
 
     # ─────────────────────────────────────────────────────────────────────────
     # Load global taxonomy data (for taxonomic tree selector)

@@ -33,6 +33,253 @@ def parse_timestamps(timestamp_series):
     """Parse timestamps in EXIF format: 2013:01:17 13:05:40"""
     return pd.to_datetime(timestamp_series, format='%Y:%m:%d %H:%M:%S')
 
+
+def render_file_level_browser(files_df: pd.DataFrame):
+    """Render the file-level data browser view using aggregated detections."""
+    if files_df is None:
+        st.error("File-level dataset was not initialized. Please restart the application.")
+        st.stop()
+
+    if files_df.empty:
+        st.warning("No files containing detections were found.")
+        st.stop()
+
+    FILE_ROW_HEIGHT = 120
+    DEFAULT_PAGE_SIZE = 20
+    PAGE_SIZE_OPTIONS = [20, 50, 100]
+
+    # Initialize pagination state
+    if "file_grid_page_size" not in st.session_state:
+        st.session_state.file_grid_page_size = DEFAULT_PAGE_SIZE
+    if "file_grid_current_page" not in st.session_state:
+        st.session_state.file_grid_current_page = 1
+
+    page_size = st.session_state.file_grid_page_size
+    current_page = st.session_state.file_grid_current_page
+
+    total_rows = len(files_df)
+    total_pages = max(1, (total_rows + page_size - 1) // page_size)
+
+    if current_page > total_pages:
+        current_page = total_pages
+        st.session_state.file_grid_current_page = current_page
+
+    start_idx = (current_page - 1) * page_size
+    end_idx = min(start_idx + page_size, total_rows)
+    df_page = files_df.iloc[start_idx:end_idx].copy()
+
+    thumbnail_cache_key = (
+        f"files_page_{current_page}_size_{page_size}_height_{FILE_ROW_HEIGHT}"
+    )
+    if "file_thumbnail_cache" not in st.session_state:
+        st.session_state.file_thumbnail_cache = {}
+
+    thumbnails = st.session_state.file_thumbnail_cache.get(thumbnail_cache_key)
+
+    if thumbnails is None:
+        thumbnails = []
+        for _, row in df_page.iterrows():
+            image_url = image_to_base64_url(
+                row.get("absolute_path"),
+                bbox_data=None,
+                max_size=(FILE_ROW_HEIGHT, FILE_ROW_HEIGHT),
+            )
+            thumbnails.append(image_url)
+        st.session_state.file_thumbnail_cache.clear()
+        st.session_state.file_thumbnail_cache[thumbnail_cache_key] = thumbnails
+
+    display_rows = []
+    for (idx, row), image_url in zip(df_page.iterrows(), thumbnails):
+        timestamp_first = (
+            pd.to_datetime(row.get("timestamp_first"))
+            if row.get("timestamp_first")
+            else None
+        )
+        timestamp_last = (
+            pd.to_datetime(row.get("timestamp_last"))
+            if row.get("timestamp_last")
+            else None
+        )
+
+        detections_count_value = row.get("detections_count")
+        detections_count = (
+            int(detections_count_value)
+            if detections_count_value is not None and not pd.isna(detections_count_value)
+            else 0
+        )
+
+        classifications_count_value = row.get("classifications_count")
+        classifications_count = (
+            int(classifications_count_value)
+            if classifications_count_value is not None and not pd.isna(classifications_count_value)
+            else 0
+        )
+
+        display_rows.append(
+            {
+                "_df_index": idx,
+                "image": image_url,
+                "relative_path": row.get("relative_path") or "",
+                "detections_count": detections_count,
+                "detections_summary": row.get("detections_summary") or "",
+                "classifications_count": classifications_count,
+                "classifications_summary": row.get("classifications_summary") or "",
+                "timestamp_first": timestamp_first.strftime("%Y-%m-%d %H:%M:%S")
+                if timestamp_first is not None
+                else "",
+                "timestamp_last": timestamp_last.strftime("%Y-%m-%d %H:%M:%S")
+                if timestamp_last is not None
+                else "",
+                "location_id": row.get("location_id") or "",
+                "run_id": row.get("run_id") or "",
+            }
+        )
+
+    display_df = pd.DataFrame(display_rows)
+
+    gb = GridOptionsBuilder.from_dataframe(display_df)
+    gb.configure_column("_df_index", hide=True)
+
+    gb.configure_column(
+        "image",
+        headerName="Image",
+        width=FILE_ROW_HEIGHT + 20,
+        autoHeight=True,
+        cellRenderer=JsCode(
+            f"""
+            class ImageRenderer {{
+                init(params) {{
+                    const img = document.createElement('img');
+                    if (params.value) {{
+                        img.src = params.value;
+                        img.style.width = '{FILE_ROW_HEIGHT}px';
+                        img.style.height = '{FILE_ROW_HEIGHT}px';
+                        img.style.objectFit = 'contain';
+                        img.style.border = 'none';
+                    }}
+                    this.eGui = document.createElement('div');
+                    this.eGui.appendChild(img);
+                }}
+                getGui() {{
+                    return this.eGui;
+                }}
+            }}
+            """
+        ),
+    )
+
+    gb.configure_column("relative_path", headerName="File", width=220)
+    gb.configure_column("detections_count", headerName="Detections", width=110, type="numericColumn")
+    gb.configure_column("detections_summary", headerName="Detection labels", width=200)
+    gb.configure_column("classifications_count", headerName="Classifications", width=130, type="numericColumn")
+    gb.configure_column("classifications_summary", headerName="Classification labels", width=220)
+    gb.configure_column("timestamp_first", headerName="First seen", width=160)
+    gb.configure_column("timestamp_last", headerName="Last seen", width=160)
+    gb.configure_column("location_id", headerName="Location", width=120)
+    gb.configure_column("run_id", headerName="Run", width=120)
+
+    gb.configure_default_column(
+        resizable=True,
+        sortable=False,
+        filter=False,
+        cellStyle={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'flex-start'},
+        headerClass='ag-left-aligned-header'
+    )
+
+    gb.configure_selection("none")
+    gb.configure_grid_options(rowHeight=FILE_ROW_HEIGHT + 10)
+
+    grid_options = gb.build()
+
+    grid_height = (len(display_df) * (FILE_ROW_HEIGHT + 10)) + 55
+
+    AgGrid(
+        display_df,
+        gridOptions=grid_options,
+        height=grid_height,
+        allow_unsafe_jscode=True,
+        theme="streamlit",
+        fit_columns_on_grid_load=False,
+    )
+
+    bottom_menu = st.columns((4, 1, 1))
+    with bottom_menu[0]:
+        st.markdown(
+            f"Page **{current_page}** of **{total_pages}** "
+            f"(Showing files {start_idx + 1}-{end_idx} of {total_rows:,})"
+        )
+
+    with bottom_menu[1]:
+        new_page = st.number_input(
+            "Page",
+            min_value=1,
+            max_value=total_pages,
+            step=1,
+            value=current_page,
+            key="file_grid_page_input",
+        )
+        if new_page != current_page:
+            st.session_state.file_grid_current_page = new_page
+            st.rerun()
+
+    with bottom_menu[2]:
+        new_page_size = st.selectbox(
+            "Page Size",
+            options=PAGE_SIZE_OPTIONS,
+            index=PAGE_SIZE_OPTIONS.index(page_size),
+            key="file_grid_page_size_input",
+        )
+        if new_page_size != page_size:
+            st.session_state.file_grid_page_size = new_page_size
+            st.session_state.file_grid_current_page = 1
+            st.rerun()
+
+
+# View selection configuration
+BROWSER_VIEWS = [
+    (":material/crop_free:", "Detections"),
+    (":material/photo:", "Files"),
+    (":material/event:", "Events"),
+]
+VIEW_LABELS = [label for _, label in BROWSER_VIEWS]
+ICON_LOOKUP = {label: icon for icon, label in BROWSER_VIEWS}
+
+
+def on_view_mode_change():
+    """Persist the selected browse level in session state."""
+    selection = st.session_state.get("data_browser_level")
+    if selection:
+        set_session_var("explore_results", "browser_view_mode", selection)
+
+
+def render_view_mode_control(current_view):
+    """Render segmented control row and return popover columns."""
+    columns = st.columns((8, 1, 1, 1, 1, 1, 1))
+    (
+        level_col,
+        spacer_one,
+        spacer_two,
+        sort_col,
+        filter_col,
+        export_col,
+        settings_col,
+    ) = columns
+
+    with level_col:
+        st.segmented_control(
+            "Browse level",
+            options=VIEW_LABELS,
+            format_func=lambda label: f"{ICON_LOOKUP[label]} {label}",
+            default=current_view,
+            key="data_browser_level",
+            selection_mode="single",
+            label_visibility="collapsed",
+            width="stretch",
+            on_change=on_view_mode_change,
+        )
+
+    return sort_col, filter_col, export_col, settings_col
+
 # Constants
 # Row heights and image sizes
 ROW_HEIGHT_OPTIONS = {
@@ -78,6 +325,23 @@ df = st.session_state["results_detections"]
 
 if df.empty:
     st.warning("No detection results found.")
+    st.stop()
+
+# Determine current view mode and render segmented control row
+current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
+set_session_var("explore_results", "browser_view_mode", current_view)
+
+sort_col, filter_col, export_col, settings_col = render_view_mode_control(current_view)
+
+# Reread in case selection changed during control rendering
+current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
+
+if current_view == "Files":
+    files_df = st.session_state.get("results_files")
+    render_file_level_browser(files_df)
+    st.stop()
+elif current_view == "Events":
+    st.info("Event-level browser coming soon.")
     st.stop()
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -365,39 +629,6 @@ if 'results_modified' not in st.session_state:
 
 # Use filtered dataframe for export
 df_to_export = st.session_state['results_modified']
-
-# Controls row (segmented control spans first column width 8, popovers right-aligned)
-level_col, _, _, sort_col, filter_col, export_col, settings_col = st.columns(
-    (8, 1, 1, 1, 1, 1, 1)
-)
-
-
-def on_view_mode_change():
-    """Persist the selected browse level in session state."""
-    selection = st.session_state.get("data_browser_level")
-    if selection:
-        set_session_var("explore_results", "browser_view_mode", selection)
-
-
-# Ensure we always have a stored default
-current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
-set_session_var("explore_results", "browser_view_mode", current_view)
-
-
-
-
-with level_col:
-    st.segmented_control(
-        "Browse level",
-        options=VIEW_LABELS,
-        format_func=lambda label: f"{ICON_LOOKUP[label]} {label}",
-        default=current_view,
-        key="data_browser_level",
-        selection_mode="single",
-        label_visibility="collapsed",
-        width="stretch",
-        on_change=on_view_mode_change,
-    )
 
 with sort_col:
     # Column sorting popover
