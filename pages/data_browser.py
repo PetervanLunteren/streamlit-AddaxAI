@@ -34,6 +34,26 @@ def parse_timestamps(timestamp_series):
     return pd.to_datetime(timestamp_series, format='%Y:%m:%d %H:%M:%S')
 
 
+# Global display constants shared across views
+ROW_HEIGHT_OPTIONS = {
+    "small": 30,
+    "medium": 100,
+    "large": 250
+}
+IMAGE_SIZE_RATIO = 1.5
+IMAGE_COLUMN_WIDTHS = {
+    size: int(height * IMAGE_SIZE_RATIO)
+    for size, height in ROW_HEIGHT_OPTIONS.items()
+}
+image_size_options = {
+    size: {"height": height, "width": IMAGE_COLUMN_WIDTHS[size]}
+    for size, height in ROW_HEIGHT_OPTIONS.items()
+}
+DEFAULT_SIZE_OPTION = "medium"
+IMAGE_PADDING_PERCENT = 0.01
+IMAGE_PADDING_MIN = 10
+
+
 def render_file_level_browser(files_df: pd.DataFrame):
     """Render the file-level data browser view using aggregated detections."""
     if files_df is None:
@@ -48,7 +68,9 @@ def render_file_level_browser(files_df: pd.DataFrame):
     files_df_reset = files_df.reset_index(drop=True)
     st.session_state["results_files_filtered"] = files_df_reset
 
-    FILE_ROW_HEIGHT = 120
+    image_size_setting = st.session_state.get("aggrid_image_size_control", DEFAULT_SIZE_OPTION)
+    size_config = image_size_options.get(image_size_setting, image_size_options[DEFAULT_SIZE_OPTION])
+    FILE_ROW_HEIGHT = size_config["height"]
     DEFAULT_PAGE_SIZE = 20
     PAGE_SIZE_OPTIONS = [20, 50, 100]
 
@@ -73,7 +95,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
     df_page = files_df_reset.iloc[start_idx:end_idx].copy()
 
     thumbnail_cache_key = (
-        f"files_page_{current_page}_size_{page_size}_height_{FILE_ROW_HEIGHT}"
+        f"files_page_{current_page}_size_{page_size}_height_{FILE_ROW_HEIGHT}_setting_{image_size_setting}"
     )
     if "file_thumbnail_cache" not in st.session_state:
         st.session_state.file_thumbnail_cache = {}
@@ -332,30 +354,6 @@ def render_view_mode_control(current_view):
         )
 
     return sort_col, filter_col, export_col, settings_col
-
-# Constants
-# Row heights and image sizes
-ROW_HEIGHT_OPTIONS = {
-    "small": 30,   # Small thumbnail
-    "medium": 100,  # Medium size
-    "large": 250   # Large size
-}
-
-# Image size ratio (width = height * ratio)
-IMAGE_SIZE_RATIO = 1.5
-
-# Image column widths (calculated from row height * ratio)
-IMAGE_COLUMN_WIDTHS = {
-    size: int(height * IMAGE_SIZE_RATIO) 
-    for size, height in ROW_HEIGHT_OPTIONS.items()
-}
-
-# Display settings (thumbnail generation constants are imported from utils)
-DEFAULT_SIZE_OPTION = "medium"  # Default size selection
-
-# Legacy padding settings (no longer used)
-IMAGE_PADDING_PERCENT = 0.01
-IMAGE_PADDING_MIN = 10
 
 # Page config
 st.set_page_config(layout="wide")
@@ -1247,6 +1245,8 @@ with settings_col:
                     del st.session_state['aggrid_thumbnail_cache']
                 if 'aggrid_last_cache_key' in st.session_state:
                     del st.session_state['aggrid_last_cache_key']
+                if 'file_thumbnail_cache' in st.session_state:
+                    del st.session_state['file_thumbnail_cache']
                 st.rerun()
 
 # Get current size configuration

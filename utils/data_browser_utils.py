@@ -792,6 +792,12 @@ def image_viewer_modal():
 
             metadata_rows.append(("Row", f"{current_index + 1} of {len(df_filtered)}"))
 
+            det_label = current_row.get("detection_label") or "N/A"
+            metadata_rows.append(("Detection", det_label))
+
+            cls_label = current_row.get("classification_label") or "N/A"
+            metadata_rows.append(("Classification", cls_label))
+
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
 
