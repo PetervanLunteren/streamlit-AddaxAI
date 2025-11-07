@@ -790,7 +790,7 @@ def image_viewer_modal():
                 display_filename = 'N/A'
             metadata_rows.append(("File", display_filename))
 
-            metadata_rows.append(("Observation", f"{current_index + 1} of {len(df_filtered)}"))
+            metadata_rows.append(("Row", f"{current_index + 1} of {len(df_filtered)}"))
 
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
@@ -949,7 +949,7 @@ def image_viewer_modal_file():
                 ("Timestamp", timestamp_display),
                 ("Location ID", current_row.get("location_id", "N/A")),
                 ("File", os.path.basename(current_row.get("relative_path", "")) or "N/A"),
-                ("Position", f"{current_index + 1} of {len(df_files)}"),
+                ("Row", f"{current_index + 1} of {len(df_files)}"),
                 ("Detections", detections_summary),
                 ("Classifications", classifications_summary),
             ]

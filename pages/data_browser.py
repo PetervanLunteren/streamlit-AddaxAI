@@ -170,6 +170,10 @@ def render_file_level_browser(files_df: pd.DataFrame):
                         img.style.objectFit = 'contain';
                         img.style.border = 'none';
                         img.style.cursor = 'pointer';
+                        img.addEventListener('click', (e) => {{
+                            e.stopPropagation();
+                            params.node.setSelected(true);
+                        }});
                     }}
                     this.eGui = document.createElement('div');
                     this.eGui.appendChild(img);
@@ -198,7 +202,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
         headerClass='ag-left-aligned-header'
     )
 
-    gb.configure_selection(selection_mode='single', use_checkbox=False)
+    gb.configure_selection(selection_mode='single', use_checkbox=True)
     gb.configure_grid_options(rowHeight=FILE_ROW_HEIGHT + 10)
 
     grid_options = gb.build()
@@ -319,6 +323,7 @@ def render_view_mode_control(current_view):
             "Browse level",
             options=VIEW_LABELS,
             format_func=lambda label: f"{ICON_LOOKUP[label]} {label}",
+            default=current_view,
             key="data_browser_level",
             selection_mode="single",
             label_visibility="collapsed",
@@ -387,6 +392,18 @@ sort_col, filter_col, export_col, settings_col = render_view_mode_control(curren
 current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
 
 if current_view == "Files":
+    if get_session_var("explore_results", "show_modal_image_viewer", False) and get_session_var("explore_results", "modal_source", "observation") == "file":
+        modal_image_viewer = Modal(
+            title="",
+            key="file_image_viewer",
+            show_close_button=False,
+            show_title=False,
+            show_divider=False
+        )
+        with modal_image_viewer.container():
+            image_viewer_modal_file()
+        st.stop()
+
     files_df = st.session_state.get("results_files")
     render_file_level_browser(files_df)
     st.stop()
@@ -401,20 +418,20 @@ elif current_view == "Events":
 # Check if image viewer modal should be displayed
 if get_session_var("explore_results", "show_modal_image_viewer", False):
     modal_source = get_session_var("explore_results", "modal_source", "observation")
-    # Only render the modal, skip all heavy grid processing
-    modal_image_viewer = Modal(
-        title="",
-        key="image_viewer",
-        show_close_button=False,
-        show_title=False,
-        show_divider=False
-    )
-    with modal_image_viewer.container():
-        if modal_source == "file":
-            image_viewer_modal_file()
-        else:
+    if modal_source == "file":
+        # File modal handled in file view branch
+        pass
+    else:
+        modal_image_viewer = Modal(
+            title="",
+            key="image_viewer",
+            show_close_button=False,
+            show_title=False,
+            show_divider=False
+        )
+        with modal_image_viewer.container():
             image_viewer_modal()
-    st.stop()  # Don't render anything else
+        st.stop()  # Don't render anything else
 
 # Check if tree selector modal should be displayed
 if get_session_var("explore_results", "show_tree_modal", False):
@@ -1404,10 +1421,10 @@ gb.configure_column("bbox_width", headerName="BBox W", width=80, filter=False, s
 gb.configure_column("bbox_height", headerName="BBox H", width=80, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
 gb.configure_column("image_width", headerName="Img W", width=80, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
 gb.configure_column("image_height", headerName="Img H", width=80, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
-gb.configure_column("latitude", headerName="Latitude", width=100, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header")
-gb.configure_column("longitude", headerName="Longitude", width=100, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header")
-gb.configure_column("detection_model_id", headerName="Detection model", width=120, filter=False, sortable=False)
-gb.configure_column("classification_model_id", headerName="Classification model", width=140, filter=False, sortable=False)
+gb.configure_column("latitude", headerName="Latitude", width=100, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
+gb.configure_column("longitude", headerName="Longitude", width=100, filter=False, sortable=False, type="numericColumn", headerClass="ag-left-aligned-header", hide=True)
+gb.configure_column("detection_model_id", headerName="Detection model", width=120, filter=False, sortable=False, hide=True)
+gb.configure_column("classification_model_id", headerName="Classification model", width=140, filter=False, sortable=False, hide=True)
 
 # Set column order to match explore_results.py
 column_order = [

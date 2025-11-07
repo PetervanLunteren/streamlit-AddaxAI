@@ -407,8 +407,32 @@ def load_detection_results_dataframe():
                         error_count += 1
                         continue
                         
-        # Create DataFrame
+        # Create DataFrame and ensure required schema even when empty
         df = pd.DataFrame(results_list)
+        if df.empty:
+            expected_columns = [
+                "project_id",
+                "location_id",
+                "run_id",
+                "absolute_path",
+                "relative_path",
+                "detection_label",
+                "detection_confidence",
+                "classification_label",
+                "classification_confidence",
+                "bbox_x",
+                "bbox_y",
+                "bbox_width",
+                "bbox_height",
+                "timestamp",
+                "latitude",
+                "longitude",
+                "image_width",
+                "image_height",
+                "detection_model_id",
+                "classification_model_id",
+            ]
+            df = pd.DataFrame(columns=expected_columns)
 
         # Load taxonomy for each classification model encountered
         taxonomy_dict = {}
