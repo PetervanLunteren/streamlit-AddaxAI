@@ -24,6 +24,7 @@ from utils.common import load_vars, update_vars, get_session_var, set_session_va
 from components import print_widget_label
 from utils.data_browser_utils import (
     image_viewer_modal, image_viewer_modal_file, image_to_base64_url,
+    image_to_base64_with_boxes,
     IMAGE_PADDING_PIXELS, IMAGE_BLUR_RADIUS, IMAGE_CORNER_RADIUS,
     IMAGE_BBOX_COLOR, IMAGE_QUALITY
 )
@@ -105,10 +106,11 @@ def render_file_level_browser(files_df: pd.DataFrame):
     if thumbnails is None:
         thumbnails = []
         for _, row in df_page.iterrows():
-            image_url = image_to_base64_url(
+            detection_details = row.get("detection_details") or []
+            image_url = image_to_base64_with_boxes(
                 row.get("absolute_path"),
-                bbox_data=None,
-                max_size=(FILE_ROW_HEIGHT, FILE_ROW_HEIGHT),
+                detection_details=detection_details,
+                max_height=FILE_ROW_HEIGHT,
             )
             thumbnails.append(image_url)
         st.session_state.file_thumbnail_cache.clear()
@@ -355,6 +357,52 @@ def render_view_mode_control(current_view):
 
     return sort_col, filter_col, export_col, settings_col
 
+
+def render_settings_popover(settings_col, saved_settings):
+    with settings_col:
+        with st.popover(":material/settings:", help="Settings", width="stretch"):
+            with st.container(border=True):
+                print_widget_label("Image size")
+
+                default_image_size = saved_settings.get('image_size', DEFAULT_SIZE_OPTION)
+                selected_size = st.segmented_control(
+                    "Image Size",
+                    options=list(image_size_options.keys()),
+                    default=default_image_size,
+                    key="aggrid_image_size_control",
+                    label_visibility="collapsed",
+                    width="stretch"
+                )
+
+                if selected_size != default_image_size:
+                    filter_settings = {
+                        "aggrid_settings": {
+                            "date_start": saved_settings.get('date_start', ''),
+                            "date_end": saved_settings.get('date_end', ''),
+                            "det_conf_min": saved_settings.get('det_conf_min', 0.0),
+                            "det_conf_max": saved_settings.get('det_conf_max', 1.0),
+                            "cls_conf_min": saved_settings.get('cls_conf_min', 0.0),
+                            "cls_conf_max": saved_settings.get('cls_conf_max', 1.0),
+                            "include_unclassified": saved_settings.get('include_unclassified', True),
+                            "selected_detection_types": saved_settings.get('selected_detection_types', []),
+                            "selected_classifications": saved_settings.get('selected_classifications', []),
+                            "selected_locations": saved_settings.get('selected_locations', []),
+                            "selected_runs": saved_settings.get('selected_runs', []),
+                            "selected_detection_models": saved_settings.get('selected_detection_models', []),
+                            "selected_classification_models": saved_settings.get('selected_classification_models', []),
+                            "image_size": selected_size
+                        }
+                    }
+                    update_vars("explore_results", filter_settings)
+
+                    if 'aggrid_thumbnail_cache' in st.session_state:
+                        del st.session_state['aggrid_thumbnail_cache']
+                    if 'aggrid_last_cache_key' in st.session_state:
+                        del st.session_state['aggrid_last_cache_key']
+                    if 'file_thumbnail_cache' in st.session_state:
+                        del st.session_state['file_thumbnail_cache']
+                    st.rerun()
+
 # Page config
 st.set_page_config(layout="wide")
 
@@ -390,6 +438,7 @@ sort_col, filter_col, export_col, settings_col = render_view_mode_control(curren
 current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
 
 if current_view == "Files":
+    render_settings_popover(settings_col, saved_settings)
     if get_session_var("explore_results", "show_modal_image_viewer", False) and get_session_var("explore_results", "modal_source", "observation") == "file":
         modal_image_viewer = Modal(
             title="",
@@ -1199,55 +1248,7 @@ with export_col:
                 width="stretch"
             )
 
-with settings_col:
-    # Settings popover with material icon
-    with st.popover(":material/settings:", help="Settings", width="stretch"):
-        # Settings container
-        with st.container(border=True):
-            print_widget_label("Image size")
-
-            # Get the saved or default value for the segmented control
-            default_image_size = saved_settings.get('image_size', DEFAULT_SIZE_OPTION)
-
-            selected_size = st.segmented_control(
-                "Image Size",
-                options=list(image_size_options.keys()),
-                default=default_image_size,
-                key="aggrid_image_size_control",
-                label_visibility="collapsed",
-                width="stretch"
-            )
-
-            # Save the setting when changed
-            if selected_size != default_image_size:
-                filter_settings = {
-                    "aggrid_settings": {
-                        "date_start": saved_settings.get('date_start', ''),
-                        "date_end": saved_settings.get('date_end', ''),
-                        "det_conf_min": saved_settings.get('det_conf_min', 0.0),
-                        "det_conf_max": saved_settings.get('det_conf_max', 1.0),
-                        "cls_conf_min": saved_settings.get('cls_conf_min', 0.0),
-                        "cls_conf_max": saved_settings.get('cls_conf_max', 1.0),
-                        "include_unclassified": saved_settings.get('include_unclassified', True),
-                        "selected_detection_types": saved_settings.get('selected_detection_types', []),
-                        "selected_classifications": saved_settings.get('selected_classifications', []),
-                        "selected_locations": saved_settings.get('selected_locations', []),
-                        "selected_runs": saved_settings.get('selected_runs', []),
-                        "selected_detection_models": saved_settings.get('selected_detection_models', []),
-                        "selected_classification_models": saved_settings.get('selected_classification_models', []),
-                        "image_size": selected_size
-                    }
-                }
-                update_vars("explore_results", filter_settings)
-
-                # Clear the thumbnail cache when size changes
-                if 'aggrid_thumbnail_cache' in st.session_state:
-                    del st.session_state['aggrid_thumbnail_cache']
-                if 'aggrid_last_cache_key' in st.session_state:
-                    del st.session_state['aggrid_last_cache_key']
-                if 'file_thumbnail_cache' in st.session_state:
-                    del st.session_state['file_thumbnail_cache']
-                st.rerun()
+render_settings_popover(settings_col, saved_settings)
 
 # Get current size configuration
 selected_size = st.session_state.get("aggrid_image_size_control", DEFAULT_SIZE_OPTION)

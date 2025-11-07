@@ -185,8 +185,10 @@ def image_to_base64_url(image_path, bbox_data, max_size):
             else:
                 crop_info = None
             
-            # Create thumbnail
-            img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            # Create thumbnail (cap height to keep processing fast)
+            max_width, max_height = max_size
+            max_height = max(60, min(max_height, 180))
+            img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
             thumbnail_size = img.size
             
             # Draw red border if we have crop info
@@ -415,7 +417,15 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
                     
                     try:
                         from PIL import ImageFont
-                        font = ImageFont.load_default()
+                        font = None
+                        for font_name in ("DejaVuSans.ttf", "Arial.ttf", "arial.ttf"):
+                            try:
+                                font = ImageFont.truetype(font_name, 15)
+                                break
+                            except Exception:
+                                continue
+                        if font is None:
+                            font = ImageFont.load_default()
                     except:
                         font = None
                     
@@ -481,6 +491,81 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
             return f"data:image/jpeg;base64,{img_data}"
             
     except Exception as e:
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+
+
+def image_to_base64_with_boxes(image_path, detection_details, max_height):
+    """
+    Generate a scaled image with all detections drawn for table thumbnails.
+
+    Args:
+        image_path (str): Absolute path to file
+        detection_details (list): Detection dictionaries with normalized bbox values
+        max_height (int): Target height of thumbnail
+
+    Returns:
+        str: Base64 data URL
+    """
+    try:
+        if not image_path or not os.path.exists(image_path):
+            return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+
+        with Image.open(image_path) as img:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            orig_width, orig_height = img.size
+            max_height = max(60, min(max_height, 180))
+
+            if orig_height > max_height:
+                scale = max_height / float(orig_height)
+                new_width = int(orig_width * scale)
+                img = img.resize((new_width, max_height), Image.Resampling.LANCZOS)
+            else:
+                new_width, max_height = orig_width, orig_height
+
+            draw = ImageDraw.Draw(img)
+
+            for detection in detection_details or []:
+                bbox = detection.get("bbox") or {}
+                x_norm = bbox.get("x")
+                y_norm = bbox.get("y")
+                w_norm = bbox.get("width")
+                h_norm = bbox.get("height")
+                if None in (x_norm, y_norm, w_norm, h_norm):
+                    continue
+                if any(pd.isna(value) for value in (x_norm, y_norm, w_norm, h_norm)):
+                    continue
+
+                x1 = int(x_norm * new_width)
+                y1 = int(y_norm * max_height)
+                x2 = int((x_norm + w_norm) * new_width)
+                y2 = int((y_norm + h_norm) * max_height)
+
+                line_width = max(1, int(min(new_width, max_height) * 0.003))
+                draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=line_width)
+
+            if IMAGE_CORNER_RADIUS > 0:
+                mask = Image.new('L', img.size, 0)
+                mask_draw = ImageDraw.Draw(mask)
+                scaled_radius = max(5, min(int(IMAGE_CORNER_RADIUS), min(new_width, max_height) // 4))
+                mask_draw.rounded_rectangle(
+                    [(0, 0), (new_width - 1, max_height - 1)],
+                    radius=scaled_radius,
+                    fill=255
+                )
+                output = Image.new('RGBA', img.size, (255, 255, 255, 0))
+                output.paste(img, (0, 0))
+                output.putalpha(mask)
+                final = Image.new('RGB', img.size, 'white')
+                final.paste(output, (0, 0), output)
+                img = final
+
+            buffer = io.BytesIO()
+            img.save(buffer, format='JPEG', quality=IMAGE_QUALITY)
+            img_data = base64.b64encode(buffer.getvalue()).decode()
+            return f"data:image/jpeg;base64,{img_data}"
+    except Exception:
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
 
 def generate_file_modal_image(image_path, detection_details, show_bbox=True, show_labels=True):
@@ -568,9 +653,17 @@ def generate_file_modal_image(image_path, detection_details, show_bbox=True, sho
 
                         try:
                             from PIL import ImageFont
-                            font = ImageFont.load_default()
-                        except Exception:
                             font = None
+                            for font_name in ("DejaVuSans.ttf", "Arial.ttf", "arial.ttf"):
+                                try:
+                                    font = ImageFont.truetype(font_name, 20)
+                                    break
+                                except Exception:
+                                    continue
+                            if font is None:
+                                font = ImageFont.load_default()
+                        except Exception:
+                            font = ImageFont.load_default()
 
                         text_width = text_height = 0
                         if font:
