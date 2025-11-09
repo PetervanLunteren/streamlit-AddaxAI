@@ -203,6 +203,49 @@ def load_lang_txts():
         txts = json.load(file)
     return txts
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# APPLICATION SETTINGS (config/settings.json)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+APP_SETTINGS_FILE = os.path.join(ADDAXAI_ROOT, "config", "settings.json")
+DEFAULT_APP_SETTINGS = {
+    "data_import": {
+        "detection_conf_threshold": 0.5
+    }
+}
+
+
+def load_app_settings():
+    """
+    Load application-level settings from config/settings.json.
+    Creates the file with defaults if missing or invalid.
+    """
+    os.makedirs(os.path.dirname(APP_SETTINGS_FILE), exist_ok=True)
+
+    if not os.path.exists(APP_SETTINGS_FILE):
+        save_app_settings(DEFAULT_APP_SETTINGS)
+        return DEFAULT_APP_SETTINGS.copy()
+
+    try:
+        with open(APP_SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("settings.json must contain an object")
+        return data
+    except (json.JSONDecodeError, ValueError):
+        save_app_settings(DEFAULT_APP_SETTINGS)
+        return DEFAULT_APP_SETTINGS.copy()
+
+
+def save_app_settings(settings_dict):
+    """
+    Persist application-level settings to config/settings.json.
+    """
+    os.makedirs(os.path.dirname(APP_SETTINGS_FILE), exist_ok=True)
+    with open(APP_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(settings_dict, f, indent=2)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODEL METADATA MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════

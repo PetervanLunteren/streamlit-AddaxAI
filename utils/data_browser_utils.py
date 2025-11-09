@@ -886,10 +886,18 @@ def image_viewer_modal():
             metadata_rows.append(("Row", f"{current_index + 1} of {len(df_filtered)}"))
 
             det_label = current_row.get("detection_label") or "N/A"
-            metadata_rows.append(("Detection", det_label))
+            det_conf = current_row.get("detection_confidence")
+            detection_display = det_label
+            if det_conf is not None and not pd.isna(det_conf):
+                detection_display = f"{det_label} {float(det_conf):.2f}"
+            metadata_rows.append(("Detection", detection_display))
 
             cls_label = current_row.get("classification_label") or "N/A"
-            metadata_rows.append(("Classification", cls_label))
+            cls_conf = current_row.get("classification_confidence")
+            classification_display = cls_label
+            if cls_conf is not None and not pd.isna(cls_conf):
+                classification_display = f"{cls_label} {float(cls_conf):.2f}"
+            metadata_rows.append(("Classification", classification_display))
 
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)

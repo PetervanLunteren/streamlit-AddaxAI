@@ -20,7 +20,8 @@ from PIL import Image, ImageDraw, ImageFilter
 import io
 import pandas as pd
 from datetime import datetime, timedelta
-from utils.common import load_vars, update_vars, get_session_var, set_session_var
+from utils.common import load_vars, update_vars, get_session_var, set_session_var, load_app_settings
+from utils.config import DEFAULT_DETECTION_CONFIDENCE_THRESHOLD
 from components import print_widget_label
 from utils.data_browser_utils import (
     image_viewer_modal, image_viewer_modal_file, image_to_base64_url,
@@ -409,6 +410,11 @@ st.set_page_config(layout="wide")
 # Load filter settings from config
 filter_config = load_vars("explore_results")
 saved_settings = filter_config.get("aggrid_settings", {})
+app_settings = load_app_settings()
+detection_import_threshold = float(
+    app_settings.get("data_import", {}).get("detection_conf_threshold", DEFAULT_DETECTION_CONFIDENCE_THRESHOLD)
+)
+detection_import_threshold = max(0.0, min(1.0, detection_import_threshold))
 
 # Get saved sort settings or set defaults
 saved_sort_column = saved_settings.get('sort_column', 'timestamp')
@@ -853,17 +859,24 @@ with filter_col:
                     st.info("No detection types available in the data")
 
                 # Detection confidence range
-                from utils.config import DEFAULT_DETECTION_CONFIDENCE_THRESHOLD
-                saved_det_conf_min = saved_settings.get('det_conf_min', DEFAULT_DETECTION_CONFIDENCE_THRESHOLD)
+                saved_det_conf_min = saved_settings.get('det_conf_min', detection_import_threshold)
+                saved_det_conf_min = max(saved_det_conf_min, detection_import_threshold)
                 saved_det_conf_max = saved_settings.get('det_conf_max', 1.0)
+                if saved_det_conf_max < saved_det_conf_min:
+                    saved_det_conf_max = saved_det_conf_min
                 det_conf_range = st.slider(
                     "Confidence range",
-                    min_value=0.01,
+                    min_value=float(detection_import_threshold),
                     max_value=1.0,
                     value=(saved_det_conf_min, saved_det_conf_max),
                     step=0.01,
                     format="%.2f",
-                    key="detection_confidence_slider"
+                    key="detection_confidence_slider",
+                    help=(
+                        "This table only shows detections that were loaded during app startup. "
+                        "To include detections below this minimum threshold, adjust the Data import "
+                        "settings and reload the app."
+                    ),
                 )
 
             # CLASSIFICATIONS SECTION (with modal tree selector)
@@ -1150,7 +1163,7 @@ with filter_col:
                     "aggrid_settings": {
                         "date_start": min_date.date().isoformat(),
                         "date_end": max_date.date().isoformat(),
-                        "det_conf_min": DEFAULT_DETECTION_CONFIDENCE_THRESHOLD,
+                        "det_conf_min": detection_import_threshold,
                         "det_conf_max": 1.0,
                         "cls_conf_min": 0.01,
                         "cls_conf_max": 1.0,

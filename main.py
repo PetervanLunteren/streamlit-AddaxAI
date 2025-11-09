@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install st-segmented-buttons
 
 TODOs FOR NOW:
-- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a5ad9-39ff-7af3-a237-e29b5d6378b1`. I was at the file-level modal view and the bug that it cant open.  
+- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a5ad9-39ff-7af3-a237-e29b5d6378b1`.
 
 
 
@@ -81,6 +81,13 @@ st.markdown("""
 with open(os.path.join(ADDAXAI_ROOT, "assets", "css", "styles.css"), "r") as f:
     css_content = f.read()
 st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
+
+# Handle forced resets triggered from settings page
+if st.session_state.get("_force_reset"):
+    keys_to_delete = list(st.session_state.keys())
+    for key in keys_to_delete:
+        del st.session_state[key]
+    st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STARTUP INITIALIZATION (runs only when session_state is empty)
