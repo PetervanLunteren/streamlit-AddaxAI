@@ -192,7 +192,7 @@ def run_process_queue(
     # Show cancel button at the top
     _, col_cancel, _ = st.columns([1, 2, 1])
     with col_cancel:
-        if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+        if st.button(":material/cancel: Cancel", width="stretch", type="secondary"):
             cancel_processing(cancel_key)
     # st.divider()
 
@@ -222,7 +222,7 @@ def run_process_queue(
         st.warning("Processing was cancelled by user.")
         st.session_state[cancel_key] = False
         set_session_var("analyse_advanced", "show_modal_process_queue", False)
-        if st.button("Close", use_container_width=True):
+        if st.button("Close", width="stretch"):
             st.rerun()
         return
 
@@ -988,7 +988,7 @@ def add_location_modal():
 
     # button to save location
     with col1:
-        if st.button(":material/save: Save location", use_container_width=True, type="primary"):
+        if st.button(":material/save: Save location", width="stretch", type="primary"):
 
             # check validity
             if new_location_id == "":
@@ -1027,7 +1027,7 @@ def add_location_modal():
                 st.rerun()
 
     with col2:
-        if st.button(":material/cancel: Cancel", use_container_width=True):
+        if st.button(":material/cancel: Cancel", width="stretch"):
             # Close modal by setting session state flag to False
             set_session_var("analyse_advanced",
                             "show_modal_add_location", False)
@@ -1117,7 +1117,7 @@ def show_none_model_info_modal():
 
     col1, _ = st.columns([1, 1])
     with col1:
-        if st.button(":material/close: Close", use_container_width=True):
+        if st.button(":material/close: Close", width="stretch"):
             # Close modal by setting session state flag to False
             set_session_var("analyse_advanced",
                             "show_modal_none_model_info", False)
@@ -1276,7 +1276,7 @@ def show_cls_model_info_modal(model_info):
 
     col1, _ = st.columns([1, 1])
     with col1:
-        if st.button(":material/close: Close", use_container_width=True):
+        if st.button(":material/close: Close", width="stretch"):
             # Close modal by setting session state flag to False
             set_session_var("analyse_advanced",
                             "show_modal_cls_model_info", False)
@@ -1305,7 +1305,7 @@ def add_project_modal():
 
     # button to save project
     with col1:
-        if st.button(":material/save: Save project", use_container_width=True, type="primary"):
+        if st.button(":material/save: Save project", width="stretch", type="primary"):
 
             # check validity
             if not project_id.strip():
@@ -1324,7 +1324,7 @@ def add_project_modal():
                 st.rerun()
 
     with col2:
-        if st.button(":material/cancel: Cancel", use_container_width=True):
+        if st.button(":material/cancel: Cancel", width="stretch"):
             # Close modal by setting session state flag to False
             set_session_var("analyse_advanced",
                             "show_modal_add_project", False)
@@ -1348,7 +1348,7 @@ def download_model(
         # Show cancel button at the top during ongoing download
         _, col_cancel, _ = st.columns([1, 2, 1])
         with col_cancel:
-            if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+            if st.button(":material/cancel: Cancel", width="stretch", type="secondary"):
                 cancel_download(download_modelID, cancel_key)
         return
 
@@ -1359,7 +1359,7 @@ def download_model(
     # Show cancel button at the top
     _, col_cancel, _ = st.columns([1, 2, 1])
     with col_cancel:
-        if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+        if st.button(":material/cancel: Cancel", width="stretch", type="secondary"):
             cancel_download(download_modelID, cancel_key)
     # st.divider()
 
@@ -1380,7 +1380,7 @@ def download_model(
         st.warning("Download was cancelled by user.")
         st.session_state[cancel_key] = False
         set_session_var("analyse_advanced", "show_modal_download_model", False)
-        if st.button("Close", use_container_width=True):
+        if st.button("Close", width="stretch"):
             st.rerun()
         return
 
@@ -1538,7 +1538,7 @@ def install_env(env_name: str):
     # Show cancel button at the top
     _, col_cancel, _ = st.columns([1, 2, 1])
     with col_cancel:
-        if st.button(":material/cancel: Cancel", use_container_width=True, type="secondary"):
+        if st.button(":material/cancel: Cancel", width="stretch", type="secondary"):
             cancel_installation(env_name, cancel_key)
     # st.divider()
 
@@ -1556,7 +1556,7 @@ def install_env(env_name: str):
         st.warning("Installation was cancelled by user.")
         st.session_state[cancel_key] = False
         set_session_var("analyse_advanced", "show_modal_install_env", False)
-        if st.button("Close", use_container_width=True):
+        if st.button("Close", width="stretch"):
             st.rerun()
         return
 
@@ -1700,7 +1700,7 @@ def location_selector_widget():
 
     # if first location, show only button and no dropdown
     if locations == {}:
-        if st.button(":material/add_circle: Define your first location", use_container_width=True):
+        if st.button(":material/add_circle: Define your first location", width="stretch"):
             # Set session state flag to show modal on next rerun
             set_session_var("analyse_advanced",
                             "show_modal_add_location", True)
@@ -1745,7 +1745,7 @@ def location_selector_widget():
 
         # popover to add a new location
         with col2:
-            if st.button(":material/add_circle: New", use_container_width=True, help="Add a new location"):
+            if st.button(":material/add_circle: New", width="stretch", help="Add a new location"):
                 # Set session state flag to show modal on next rerun
                 set_session_var("analyse_advanced",
                                 "show_modal_add_location", True)
@@ -2005,7 +2005,7 @@ def browse_directory_widget():
 
     col1, col2 = st.columns([1, 3])  # , vertical_alignment="center")
     with col1:
-        if st.button(":material/folder: Browse", key="folder_select_button", use_container_width=True):
+        if st.button(":material/folder: Browse", key="folder_select_button", width='stretch'):
             # Set flag to show folder selection modal
             set_session_var("analyse_advanced", "show_folder_selector_modal", True)
             st.rerun()
@@ -2208,7 +2208,7 @@ def det_model_selector_widget(model_meta):
                             "previously_selected_det_modelID": selected_modelID})
 
     with col2:
-        if st.button(":material/info: Info", use_container_width=True, help="Model information", key="det_model_info_button"):
+        if st.button(":material/info: Info", width='stretch', help="Model information", key="det_model_info_button"):
             # Store model info in session state for modal access, including the model ID
             model_info_with_id = det_model_meta[selected_modelID].copy()
             model_info_with_id['id'] = selected_modelID
@@ -2349,7 +2349,7 @@ def cls_model_selector_widget(model_meta):
 
     with col2:
         if selected_modelID != "NONE":
-            if st.button(":material/info: Info", use_container_width=True, help="Model information", key="cls_model_info_button"):
+            if st.button(":material/info: Info", width='stretch', help="Model information", key="cls_model_info_button"):
                 # Store model info in session state for modal access, including the model ID
                 model_info_with_id = cls_model_meta[selected_modelID].copy()
                 model_info_with_id['id'] = selected_modelID
@@ -2360,7 +2360,7 @@ def cls_model_selector_widget(model_meta):
                                 "show_modal_cls_model_info", True)
                 st.rerun()
         else:
-            if st.button(":material/info: Info", use_container_width=True, help="Model information", key="none_model_info_button"):
+            if st.button(":material/info: Info", width='stretch', help="Model information", key="none_model_info_button"):
                 # Set session state flag to show modal on next rerun
                 set_session_var("analyse_advanced",
                                 "show_modal_none_model_info", True)
@@ -3321,7 +3321,7 @@ def species_selector_widget(taxon_mapping, cls_model_ID):
     col1, col2 = st.columns([1, 3])
     with col1:
         # Button to open tree selector modal
-        if st.button(":material/pets: Select", use_container_width=True):
+        if st.button(":material/pets: Select", width='stretch'):
             # Store all species list in session state for modal
             set_session_var("analyse_advanced", "modal_all_species", all_species)
             # Set session state flag to show modal on next rerun

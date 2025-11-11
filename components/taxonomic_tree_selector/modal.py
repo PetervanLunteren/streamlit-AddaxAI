@@ -96,7 +96,7 @@ def tree_selector_modal(available, selected, key="tree_selector", title_mode="wi
         if st.button(
             ":material/close:",
             key=f"{key}_dismiss",
-            use_container_width=True,
+            width='stretch',
             type="tertiary",
             help="Close window",
         ):
@@ -118,7 +118,7 @@ def tree_selector_modal(available, selected, key="tree_selector", title_mode="wi
     # Select all / Select none / Apply buttons
     col_all, col_none, col_apply = st.columns([1, 1, 1])
     with col_all:
-        if st.button("Select all", key=f"{key}_select_all", use_container_width=True):
+        if st.button("Select all", key=f"{key}_select_all", width='stretch'):
             all_selected = list(all_species_in_tree)
             st.session_state[session_key_selected] = all_selected
             st.session_state[session_key_last] = {
@@ -134,7 +134,7 @@ def tree_selector_modal(available, selected, key="tree_selector", title_mode="wi
             st.rerun()
 
     with col_none:
-        if st.button("Select none", key=f"{key}_select_none", use_container_width=True):
+        if st.button("Select none", key=f"{key}_select_none", width='stretch'):
             st.session_state[session_key_selected] = []
             st.session_state[session_key_last] = {
                 "checked": [],
@@ -149,7 +149,7 @@ def tree_selector_modal(available, selected, key="tree_selector", title_mode="wi
             st.rerun()
 
     with col_apply:
-        if st.button("Apply selection", key=f"{key}_apply", use_container_width=True, type="primary"):
+        if st.button("Apply selection", key=f"{key}_apply", width='stretch', type="primary"):
             final_selection = st.session_state[session_key_selected]
             _clear_modal_state(key)
             st.session_state[session_key_dismissed] = "apply"

@@ -43,11 +43,11 @@ st.caption(
 with st.form("data_import_settings_form"):
     detection_threshold_value = st.slider(
         "Detection confidence threshold",
-        min_value=0.0,
+        min_value=0.10,
         max_value=1.0,
         value=detection_threshold,
         step=0.01,
-        help="Detections below this confidence will be ignored during import.",
+        help="Detections below this threshold will be ignored during import. Detections below 0.10 are not saved or classified to conserve storage and compute.",
     )
 
     submitted = st.form_submit_button("Save and reload app", type="primary", width="stretch")
@@ -109,7 +109,7 @@ with st.expander("st.session_state", expanded=False):
     st.write(st.session_state)
 with st.expander("Detection Results DataFrame", expanded=False):
     if "results_observations" in st.session_state:
-        st.dataframe(st.session_state["results_observations"], use_container_width=True)
+        st.dataframe(st.session_state["results_observations"], width='stretch')
     else:
         st.warning("Detection results not loaded in session state")
     
@@ -135,7 +135,7 @@ with st.expander("Detection Results DataFrame", expanded=False):
 
 
 # # Save settings
-# save_btn = st.button(":material/save: Save settings", use_container_width=True,
+# save_btn = st.button(":material/save: Save settings", width='stretch',
 #                         type = "primary")
 # if save_btn:
 #     save_vars({"mode": mode_selected, "lang": lang_selected})

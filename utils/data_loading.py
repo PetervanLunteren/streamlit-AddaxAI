@@ -13,6 +13,7 @@ from collections import Counter
 import pandas as pd
 import streamlit as st
 from utils.config import log
+from utils.common import load_app_settings
 
 def decode_gps_info(gps_info):
     """
@@ -252,12 +253,18 @@ def load_detection_results_dataframe():
     """
     
     results_list = []
+    detection_keys = set()
     error_count = 0
     classification_models_seen = set()
     model_taxonomy_descriptions = {}
     model_category_labels = {}
 
     try:
+        app_settings = load_app_settings()
+        detection_threshold = float(
+            app_settings.get("data_import", {}).get("detection_conf_threshold", 0.0)
+        )
+        detection_threshold = max(0.0, min(1.0, detection_threshold))
         # Load MAP_JSON from session state
         map_file_path = st.session_state["shared"]["MAP_FILE_PATH"]
 
@@ -346,6 +353,7 @@ def load_detection_results_dataframe():
                                 # For deployments, use location GPS
                                 image_latitude = default_latitude
                                 image_longitude = default_longitude
+                            valid_detection_found = False
                             
                             # Process each detection in the image
                             for detection in image_data.get("detections", []):
@@ -353,6 +361,8 @@ def load_detection_results_dataframe():
                                 # Extract detection data - no defaults, should always be present
                                 detection_category_id = detection["category"]
                                 detection_conf = detection["conf"]
+                                if detection_conf < detection_threshold:
+                                    continue
                                 bbox = detection["bbox"]
                                 
                                 # Map detection category ID to actual label
@@ -393,10 +403,38 @@ def load_detection_results_dataframe():
                                     'image_width': image_width,
                                     'image_height': image_height,
                                     'detection_model_id': detection_model_id,
-                                    'classification_model_id': classification_model_id
+                                    'classification_model_id': classification_model_id,
+                                    'is_empty_file': False,
                                 }
                                 
                                 results_list.append(row)
+                                detection_keys.add((project_id, location_id, run_id, image_filename))
+                                valid_detection_found = True
+
+                            if not valid_detection_found:
+                                results_list.append({
+                                    'project_id': project_id,
+                                    'location_id': location_id,
+                                    'run_id': run_id,
+                                    'absolute_path': absolute_path,
+                                    'relative_path': image_filename,
+                                    'detection_label': None,
+                                    'detection_confidence': None,
+                                    'classification_label': None,
+                                    'classification_confidence': None,
+                                    'bbox_x': None,
+                                    'bbox_y': None,
+                                    'bbox_width': None,
+                                    'bbox_height': None,
+                                    'timestamp': image_datetime,
+                                    'latitude': image_latitude,
+                                    'longitude': image_longitude,
+                                    'image_width': image_width,
+                                    'image_height': image_height,
+                                    'detection_model_id': detection_model_id,
+                                    'classification_model_id': classification_model_id
+                                })
+                                detection_keys.add((project_id, location_id, run_id, image_filename))
                                 
                     except json.JSONDecodeError as e:
                         log(f"Invalid JSON in {run_json_path}: {str(e)}")
@@ -433,6 +471,53 @@ def load_detection_results_dataframe():
                 "classification_model_id",
             ]
             df = pd.DataFrame(columns=expected_columns)
+
+        # Append empty files that had no detections
+        empty_rows = []
+        for project_id, project_data in map_data.get("projects", {}).items():
+            for location_id, location_data in project_data.get("locations", {}).items():
+                for run_id, run_data in location_data.get("runs", {}).items():
+                    run_folder = run_data.get("folder")
+                    if not run_folder:
+                        continue
+                    metadata = run_data.get("addaxai_metadata", {})
+                    det_model_id = metadata.get("selected_det_modelID", "unknown")
+                    cls_model_id = metadata.get("selected_cls_modelID", "unknown")
+                    for image_data in run_data.get("images", []):
+                        image_filename = image_data.get("file")
+                        absolute_path = os.path.join(run_folder, image_filename) if image_filename else None
+                        relative_path = image_filename
+                        key = (project_id, location_id, run_id, relative_path)
+                        if key in detection_keys:
+                            continue
+                        if not image_data.get("detections") or key not in detection_keys:
+                            empty_rows.append({
+                                "project_id": project_id,
+                                "location_id": location_id,
+                                "run_id": run_id,
+                                "absolute_path": absolute_path,
+                                "relative_path": relative_path,
+                                "detection_label": None,
+                                "detection_confidence": None,
+                                "classification_label": None,
+                                "classification_confidence": None,
+                                "bbox_x": None,
+                                "bbox_y": None,
+                                "bbox_width": None,
+                                "bbox_height": None,
+                                "timestamp": image_data.get("datetime"),
+                                "latitude": None,
+                                "longitude": None,
+                                "image_width": image_data.get("width"),
+                                "image_height": image_data.get("height"),
+                                "detection_model_id": det_model_id,
+                                "classification_model_id": cls_model_id,
+                                "is_empty_file": True,
+                            })
+
+        if empty_rows:
+            empty_df = pd.DataFrame(empty_rows)
+            df = pd.concat([df, empty_df], ignore_index=True)
 
         # Load taxonomy for each classification model encountered
         taxonomy_dict = {}
@@ -567,24 +652,24 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
             relative_path,
         ) = group_keys
 
-        detections_count = int(len(group))
+        real_rows = group[group["detection_label"].notna()]
+        detections_count = int(len(real_rows))
 
-        # Build detection summary from detection labels
         detection_labels = [
             str(label).strip()
-            for label in group["detection_label"]
-            if not pd.isna(label) and str(label).strip()
+            for label in real_rows["detection_label"]
+            if str(label).strip()
         ]
-        detection_counter = Counter(detection_labels)
-        detections_summary = ", ".join(
-            f"{label} ({count})" for label, count in detection_counter.items()
-        )
+        if detection_labels:
+            detection_counter = Counter(detection_labels)
+            detections_summary = ", ".join(
+                f"{label} ({count})" for label, count in detection_counter.items()
+            )
+        else:
+            detections_summary = "None"
 
-        # Build classification summary from classification labels
         classification_labels = []
-        for value in group["classification_label"]:
-            if pd.isna(value):
-                continue
+        for value in real_rows["classification_label"]:
             label = str(value).strip()
             if not label or label.upper() == "N/A":
                 continue
@@ -597,13 +682,11 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
             )
             classifications_count = sum(classification_counter.values())
         else:
-            classification_counter = Counter()
-            classifications_summary = "Unclassified"
+            classifications_summary = "None"
             classifications_count = 0
 
-        # Preserve raw detection details for drill-down views
         detection_details = []
-        for _, detection_row in group.iterrows():
+        for _, detection_row in real_rows.iterrows():
             detection_details.append(
                 {
                     "detection_label": detection_row.get("detection_label"),

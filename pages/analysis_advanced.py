@@ -363,7 +363,7 @@ with st.container(border=True):
 
             with col_btn_next:
                 if selected_folder and os.path.isdir(selected_folder):
-                    if st.button(":material/arrow_forward: Next", use_container_width=True):
+                    if st.button(":material/arrow_forward: Next", width='stretch'):
                         # Get current deployment type setting
                         last_deployment_type = general_settings_vars.get("last_deployment_type", True)
                         is_deployment = get_session_var("analyse_advanced", "is_deployment", last_deployment_type)
@@ -395,7 +395,7 @@ with st.container(border=True):
                         st.rerun()
                 else:
                     st.button(":material/arrow_forward: Next",
-                            use_container_width=True,
+                            width='stretch',
                             disabled=True,
                             key="data_next_button_dummy")
 
@@ -426,7 +426,7 @@ with st.container(border=True):
 
         # the previous button is always enabled
         with col_btn_prev:
-            if st.button(":material/replay: Start over", use_container_width=True):
+            if st.button(":material/replay: Start over", width='stretch'):
                 # Clear only temporary session state, preserve persistent queue
                 clear_vars("analyse_advanced")
                 st.rerun()
@@ -441,7 +441,7 @@ with st.container(border=True):
             
         if can_proceed:
             with col_btn_next:
-                if st.button(":material/arrow_forward: Next", use_container_width=True):
+                if st.button(":material/arrow_forward: Next", width='stretch'):
                     # Store deployment metadata and advance step
                     update_session_vars("analyse_advanced", {
                         "step": 2,
@@ -452,7 +452,7 @@ with st.container(border=True):
         else:
             with col_btn_next:
                 st.button(":material/arrow_forward: Next",
-                          use_container_width=True, disabled=True)
+                          width='stretch', disabled=True)
 
     elif step == 2:
 
@@ -478,7 +478,7 @@ with st.container(border=True):
                     warning_box(title="Virtual environment required",
                                 msg=f"The selected model needs a specific virtual environment that is not yet installed. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.",
                                 icon=":material/warning:")
-                    if st.button(f"Install virtual environment", key="install_cls_virtual_env", use_container_width=False):
+                    if st.button(f"Install virtual environment", key="install_cls_virtual_env", width='content'):
                         set_session_var(
                             "analyse_advanced", "required_env_name", availability['env_name'])
                         # Set session state flag to show modal on next rerun
@@ -492,7 +492,7 @@ with st.container(border=True):
                     warning_box(
                         title="Model download required",
                         msg=f"The selected classification model still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-                    if st.button(f"Download model files", use_container_width=False, key="download_cls_model_button"):
+                    if st.button(f"Download model files", width='content', key="download_cls_model_button"):
                         set_session_var(
                             "analyse_advanced", "download_modelID", selected_cls_modelID)
                         # Set session state flag to show modal on next rerun
@@ -519,7 +519,7 @@ with st.container(border=True):
                         warning_box(title="Virtual environment required",
                                     msg=f"The selected model needs a specific virtual environment that is not yet installed. Please install it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.",
                                     icon=":material/warning:")
-                        if st.button(f"Install virtual environment", key="install_det_virtual_env", use_container_width=False):
+                        if st.button(f"Install virtual environment", key="install_det_virtual_env", width='content'):
                             set_session_var(
                                 "analyse_advanced", "required_env_name", availability['env_name'])
                             # Set session state flag to show modal on next rerun
@@ -533,7 +533,7 @@ with st.container(border=True):
                         warning_box(
                             title="Model download required",
                             msg=f"The selected classification model still needs to be downloaded. Please download it before proceeding. This is a one-time setup step and may take a few minutes, depending on your internet speed.")
-                        if st.button(f"Download model files", use_container_width=False, key="download_det_model_button"):
+                        if st.button(f"Download model files", width='content', key="download_det_model_button"):
                             set_session_var(
                                 "analyse_advanced", "download_modelID", selected_det_modelID)
                             # Set session state flag to show modal on next rerun
@@ -546,7 +546,7 @@ with st.container(border=True):
 
         # the previous button is always enabled
         with col_btn_prev:
-            if st.button(":material/replay: Start over", use_container_width=True):
+            if st.button(":material/replay: Start over", width='stretch'):
                 clear_vars(section="analyse_advanced")
                 st.rerun()
 
@@ -564,7 +564,7 @@ with st.container(border=True):
                         button_text = ":material/arrow_forward: Next"
                         button_type = "secondary"
                     
-                    if st.button(button_text, use_container_width=True, type=button_type):
+                    if st.button(button_text, width='stretch', type=button_type):
                         # Check version compatibility before proceeding
                         is_compatible, incompatible_models = check_selected_models_version_compatibility(
                             selected_cls_modelID, selected_det_modelID, model_meta)
@@ -606,11 +606,11 @@ with st.container(border=True):
                                 )
                 else:
                     st.button(":material/arrow_forward: Next",
-                              use_container_width=True, disabled=True,
+                              width='stretch', disabled=True,
                               key="model_next_button_dummy", help="You need to install the required virtual environment or download the model files for the selected models before proceeding. ")
             else:
                 st.button(":material/arrow_forward: Next",
-                          use_container_width=True, disabled=True,
+                          width='stretch', disabled=True,
                           key="model_next_button_dummy", help="You need to select both a species identification model and an animal detection model before proceeding.")
 
     elif step == 3:
@@ -651,12 +651,12 @@ with st.container(border=True):
 
         # the previous button is always enabled
         with col_btn_prev:
-            if st.button(":material/replay: Start over", use_container_width=True):
+            if st.button(":material/replay: Start over", width='stretch'):
                 clear_vars("analyse_advanced")
                 st.rerun()
 
         with col_btn_next:
-            if st.button(":material/playlist_add: Add to queue", use_container_width=True, type="primary"):
+            if st.button(":material/playlist_add: Add to queue", width='stretch', type="primary"):
                 
                 # Validate model requirements
                 from components.speciesnet_ui import validate_speciesnet_requirements
@@ -700,7 +700,7 @@ st.subheader(":material/traffic_jam: Process queue", divider="grey")
 process_queue = analyse_advanced_vars.get("process_queue", [])
 if len(process_queue) == 0:
     st.write("You currently have no runs in the queue. Please add a run to the queue to start processing.")
-    st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary", disabled=True,
+    st.button(":material/rocket_launch: Process queue", width='stretch', type="primary", disabled=True,
               help="You need to add a run to the queue first.")
 else:
 
@@ -735,11 +735,11 @@ else:
 
                     with col2:
                         if st.button(":material/delete:", help="Remove from queue", key=f"remove_{i}",
-                                     use_container_width=True):
+                                     width='stretch'):
                             remove_run_from_queue(i)
                             st.rerun()
                     with col3:
-                        with st.popover(":material/visibility:", help="Show details", use_container_width=True):
+                        with st.popover(":material/visibility:", help="Show details", width='stretch'):
                             # Format all run details with consistent styling
                             folder_short = "..." + run['selected_folder'][-45:] if len(run['selected_folder']) > 45 else run['selected_folder']
                             
@@ -774,7 +774,7 @@ else:
                                         unsafe_allow_html=True
                                     )
 
-    if st.button(":material/rocket_launch: Process queue", use_container_width=True, type="primary"):
+    if st.button(":material/rocket_launch: Process queue", width='stretch', type="primary"):
         # Set session state flag to show modal on next rerun
         set_session_var("analyse_advanced", "show_modal_process_queue", True)
         st.rerun()

@@ -796,7 +796,7 @@ def image_viewer_modal():
                     mime="image/jpeg",
                     type="secondary",
                     key="modal_export_button",
-                    use_container_width=True
+                    width='stretch'
                 )
 
         with top_col_close:
@@ -968,7 +968,7 @@ def image_viewer_modal_file():
                     mime="image/jpeg",
                     type="secondary",
                     key="file_modal_export_button",
-                    use_container_width=True,
+                    width='stretch',
                 )
 
         with top_col_close:
@@ -1079,11 +1079,11 @@ def classification_selector_modal(nodes, all_leaf_values):
     # Select all / none buttons
     col1, col2 = st.columns([1, 1])
     with col1:
-        if st.button(":material/select_check_box: Select all", use_container_width=True, key="cls_select_all"):
+        if st.button(":material/select_check_box: Select all", width='stretch', key="cls_select_all"):
             set_session_var("explore_results", "selected_classifications", all_leaf_values)
             st.rerun()
     with col2:
-        if st.button(":material/check_box_outline_blank: Select none", use_container_width=True, key="cls_select_none"):
+        if st.button(":material/check_box_outline_blank: Select none", width='stretch', key="cls_select_none"):
             set_session_var("explore_results", "selected_classifications", [])
             set_session_var("explore_results", "expanded_cls_nodes", [])
             st.rerun()
@@ -1119,10 +1119,10 @@ def classification_selector_modal(nodes, all_leaf_values):
     # Cancel / Apply buttons
     col1, col2 = st.columns([1, 1])
     with col1:
-        if st.button(":material/cancel: Cancel", use_container_width=True, key="cls_cancel"):
+        if st.button(":material/cancel: Cancel", width='stretch', key="cls_cancel"):
             set_session_var("explore_results", "show_modal_cls_selector", False)
             st.rerun()
     with col2:
-        if st.button(":material/check: Apply", use_container_width=True, type="primary", key="cls_apply"):
+        if st.button(":material/check: Apply", width='stretch', type="primary", key="cls_apply"):
             set_session_var("explore_results", "show_modal_cls_selector", False)
             st.rerun()
