@@ -389,6 +389,7 @@ def load_detection_results_dataframe():
                                     'run_id': run_id,
                                     'absolute_path': absolute_path,
                                     'relative_path': image_filename,
+                                    'run_json_path': run_json_path,
                                     'detection_label': detection_label,
                                     'detection_confidence': float(detection_conf),
                                     'classification_label': classification_label,
@@ -454,6 +455,7 @@ def load_detection_results_dataframe():
                 "run_id",
                 "absolute_path",
                 "relative_path",
+                "run_json_path",
                 "detection_label",
                 "detection_confidence",
                 "classification_label",
@@ -497,6 +499,7 @@ def load_detection_results_dataframe():
                                 "run_id": run_id,
                                 "absolute_path": absolute_path,
                                 "relative_path": relative_path,
+                                "run_json_path": run_json_path,
                                 "detection_label": None,
                                 "detection_confidence": None,
                                 "classification_label": None,
@@ -568,12 +571,12 @@ FILE_AGGREGATION_COLUMNS = [
     "run_id",
     "absolute_path",
     "relative_path",
+    "run_json_path",
     "detections_count",
     "detections_summary",
     "classifications_count",
     "classifications_summary",
-    "timestamp_first",
-    "timestamp_last",
+    "timestamp",
     "image_width",
     "image_height",
     "latitude",
@@ -723,8 +726,11 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
             format="%Y:%m:%d %H:%M:%S",
             errors="coerce",
         )
-        timestamp_first = timestamp_series.min()
-        timestamp_last = timestamp_series.max()
+        timestamp_value = None
+        if not timestamp_series.empty:
+            timestamp_value = timestamp_series.min()
+            if pd.notna(timestamp_value):
+                timestamp_value = timestamp_value.isoformat()
 
         # Resolve single-value columns with sensible fallbacks
         def first_non_null(series):
@@ -735,6 +741,7 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
         image_height = first_non_null(group["image_height"])
         latitude = first_non_null(group["latitude"])
         longitude = first_non_null(group["longitude"])
+        run_json_path = first_non_null(group["run_json_path"])
 
         aggregated_files.append(
             {
@@ -743,16 +750,12 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
                 "run_id": run_id,
                 "absolute_path": absolute_path,
                 "relative_path": relative_path,
+                "run_json_path": run_json_path,
                 "detections_count": detections_count,
                 "detections_summary": detections_summary,
                 "classifications_count": classifications_count,
                 "classifications_summary": classifications_summary,
-                "timestamp_first": timestamp_first.isoformat()
-                if pd.notna(timestamp_first)
-                else None,
-                "timestamp_last": timestamp_last.isoformat()
-                if pd.notna(timestamp_last)
-                else None,
+                "timestamp": timestamp_value,
                 "image_width": image_width,
                 "image_height": image_height,
                 "latitude": latitude,
