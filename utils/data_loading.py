@@ -419,6 +419,7 @@ def load_detection_results_dataframe():
                                     'run_id': run_id,
                                     'absolute_path': absolute_path,
                                     'relative_path': image_filename,
+                                    'run_json_path': run_json_path,
                                     'detection_label': None,
                                     'detection_confidence': None,
                                     'classification_label': None,
