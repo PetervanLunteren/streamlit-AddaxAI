@@ -120,10 +120,17 @@ def render_file_level_browser(files_df: pd.DataFrame):
         raw_timestamp = row.get("timestamp")
         timestamp_value = pd.to_datetime(raw_timestamp) if raw_timestamp else None
 
-        filtered_count_value = row.get("filtered_detections_count")
-        filtered_count = (
-            int(filtered_count_value)
-            if filtered_count_value is not None and not pd.isna(filtered_count_value)
+        detections_count_value = row.get("detections_count")
+        detections_count = (
+            int(detections_count_value)
+            if detections_count_value is not None and not pd.isna(detections_count_value)
+            else 0
+        )
+
+        classifications_count_value = row.get("classifications_count")
+        classifications_count = (
+            int(classifications_count_value)
+            if classifications_count_value is not None and not pd.isna(classifications_count_value)
             else 0
         )
 
@@ -136,13 +143,14 @@ def render_file_level_browser(files_df: pd.DataFrame):
                 "_df_index": idx,
                 "image": image_url,
                 "relative_path": row.get("relative_path") or "",
-                "detections": row.get("filtered_detections_summary") or "None",
-                "classifications": row.get("filtered_classifications_summary") or "None",
-                "count": filtered_count,
+                "detections": row.get("detections_summary") or "",
+                "classifications": row.get("classifications_summary") or "",
+                "count": detections_count,
                 "timestamp": timestamp_display,
                 "location_id": row.get("location_id") or "",
             }
         )
+
 
     display_df = pd.DataFrame(display_rows)
 
