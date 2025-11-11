@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install st-segmented-buttons
 
 TODOs FOR NOW:
-- WAARWASIK: ik was een plan aan het maken om van detection-level > file-level te gaan -> ga verder met: `codex resume 019a5ad9-39ff-7af3-a237-e29b5d6378b1`.
+- WAARWASIK: opschonen van de file browser code: this was our chat, but perhaps better to start a new one: 
 
 
 

@@ -45,7 +45,7 @@ def on_view_mode_change():
 
 
 def render_view_mode_control(current_view):
-    columns = st.columns((8, 1, 1, 1, 1, 1, 1))
+    columns = st.columns((2, 6, 1, 1, 1, 1, 1))
     (
         level_col,
         _spacer_one,
@@ -58,9 +58,9 @@ def render_view_mode_control(current_view):
 
     with level_col:
         st.segmented_control(
-            "Browse level",
+            "Level",
             options=VIEW_LABELS,
-            format_func=lambda label: f"{ICON_LOOKUP[label]} {label}",
+            format_func=lambda label: ICON_LOOKUP[label],
             default=current_view,
             key="data_browser_level",
             selection_mode="single",
@@ -139,6 +139,8 @@ def render_data_browser_page():
 
     render_settings_popover(settings_col, saved_settings)
     render_filter_popover(filter_col, df, saved_settings, detection_import_threshold)
+
+    st.subheader(f"{ICON_LOOKUP[current_view]} {current_view}", divider="grey")
 
     filtered_detection_df = compute_filtered_detections(
         df=df,

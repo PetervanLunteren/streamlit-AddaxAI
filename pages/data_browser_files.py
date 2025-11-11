@@ -120,17 +120,10 @@ def render_file_level_browser(files_df: pd.DataFrame):
         raw_timestamp = row.get("timestamp")
         timestamp_value = pd.to_datetime(raw_timestamp) if raw_timestamp else None
 
-        detections_count_value = row.get("detections_count")
-        detections_count = (
-            int(detections_count_value)
-            if detections_count_value is not None and not pd.isna(detections_count_value)
-            else 0
-        )
-
-        classifications_count_value = row.get("classifications_count")
-        classifications_count = (
-            int(classifications_count_value)
-            if classifications_count_value is not None and not pd.isna(classifications_count_value)
+        filtered_count_value = row.get("filtered_detections_count")
+        filtered_count = (
+            int(filtered_count_value)
+            if filtered_count_value is not None and not pd.isna(filtered_count_value)
             else 0
         )
 
@@ -143,9 +136,9 @@ def render_file_level_browser(files_df: pd.DataFrame):
                 "_df_index": idx,
                 "image": image_url,
                 "relative_path": row.get("relative_path") or "",
-                "detections": row.get("detections_summary") or "",
-                "classifications": row.get("classifications_summary") or "",
-                "count": detections_count,
+                "detections": row.get("filtered_detections_summary") or "None",
+                "classifications": row.get("filtered_classifications_summary") or "None",
+                "count": filtered_count,
                 "timestamp": timestamp_display,
                 "location_id": row.get("location_id") or "",
             }
@@ -158,8 +151,9 @@ def render_file_level_browser(files_df: pd.DataFrame):
 
     gb.configure_column(
         "image",
-        headerName="Image",
-        width=file_row_height + 20,
+        headerName="",
+        width=file_row_height + 40,
+        minWidth=file_row_height + 40,
         autoHeight=True,
         cellRenderer=JsCode(
             f"""
@@ -189,12 +183,29 @@ def render_file_level_browser(files_df: pd.DataFrame):
         ),
     )
 
-    gb.configure_column("relative_path", headerName="File", width=220)
-    gb.configure_column("detections", headerName="Detections", width=200)
-    gb.configure_column("classifications", headerName="Classifications", width=220)
-    gb.configure_column("count", headerName="Count", width=90, type="numericColumn", headerClass="ag-left-aligned-header")
-    gb.configure_column("timestamp", headerName="Timestamp", width=220)
-    gb.configure_column("location_id", headerName="Location ID", width=120)
+    flex_columns = [
+        ("relative_path", "File"),
+        ("detections", "Detections"),
+        ("classifications", "Classifications"),
+        ("timestamp", "Timestamp"),
+        ("location_id", "Location"),
+    ]
+    for col_id, header in flex_columns:
+        gb.configure_column(
+            col_id,
+            headerName=header,
+            flex=1,
+            filter=False,
+            sortable=False,
+        )
+
+    gb.configure_column(
+        "count",
+        headerName="Count",
+        flex=1,
+        type="numericColumn",
+        headerClass="ag-left-aligned-header",
+    )
 
     gb.configure_default_column(
         resizable=True,
@@ -204,26 +215,13 @@ def render_file_level_browser(files_df: pd.DataFrame):
         headerClass='ag-left-aligned-header'
     )
     gb.configure_selection(selection_mode='single', use_checkbox=True)
-    gb.configure_grid_options(rowHeight=file_row_height + 10)
+    gb.configure_grid_options(
+        rowHeight=file_row_height + 10,
+        domLayout="normal",
+    )
 
     grid_options = gb.build()
     grid_height = (len(display_df) * (file_row_height + 10)) + 55
-
-    st.markdown(
-        """
-        <style>
-        .ag-left-aligned-header .ag-header-cell-label {
-            justify-content: flex-start !important;
-            text-align: left !important;
-        }
-        .ag-header-cell-label {
-            justify-content: flex-start !important;
-            text-align: left !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
     grid_response = AgGrid(
         display_df,
@@ -231,7 +229,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
         height=grid_height,
         allow_unsafe_jscode=True,
         theme="streamlit",
-        fit_columns_on_grid_load=False,
+        fit_columns_on_grid_load=True,
         update_on=['selectionChanged'],
     )
 

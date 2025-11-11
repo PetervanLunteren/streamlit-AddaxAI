@@ -13,6 +13,8 @@ import streamlit as st
 from st_modal import Modal
 
 from components import print_widget_label
+from collections import Counter
+
 from utils.common import update_vars, set_session_var, get_session_var
 
 
@@ -482,26 +484,80 @@ def handle_tree_selector_modal(df: pd.DataFrame, saved_settings: dict):
 def filter_files_by_detections(
     files_df: pd.DataFrame, detections_df: pd.DataFrame
 ) -> pd.DataFrame:
-    """Filter aggregated files based on filtered detections."""
+    """
+    Annotate each file with filtered detection/classification summaries while keeping all files.
+    """
     if files_df is None:
         return None
-    if files_df.empty:
+
+    files_df = files_df.copy()
+    files_df["filtered_detections_count"] = 0
+    files_df["filtered_detections_summary"] = "None"
+    files_df["filtered_classifications_count"] = 0
+    files_df["filtered_classifications_summary"] = "None"
+    for col in [
+        'filtered_detections_count',
+        'filtered_detections_summary',
+        'filtered_classifications_count',
+        'filtered_classifications_summary',
+    ]:
+        if col not in files_df.columns:
+            files_df[col] = 0 if 'count' in col else 'None'
+
+    if files_df.empty or detections_df is None or detections_df.empty:
         return files_df
-    if detections_df is None or detections_df.empty:
-        return files_df.iloc[0:0]
 
-    key_cols = ["project_id", "location_id", "run_id", "relative_path"]
-    if all(col in detections_df.columns for col in key_cols):
-        detections_keys = (
-            detections_df[key_cols].astype(str).agg("|".join, axis=1).dropna().unique()
+    if "absolute_path" not in detections_df.columns or "absolute_path" not in files_df.columns:
+        return files_df
+
+    def _format_summary(values, skip_na=True):
+        labels = [
+            str(label).strip()
+            for label in values
+            if label is not None
+            and str(label).strip()
+            and (not skip_na or str(label).strip().lower() not in {"n/a", "none"})
+        ]
+        if not labels:
+            return "None"
+        counts = Counter(labels)
+        return ", ".join(f"{label} ({count})" for label, count in counts.items())
+
+    def _summarize(group: pd.DataFrame) -> pd.Series:
+        classification_series = group["classification_label"].fillna("").astype(str).str.strip()
+        valid_cls = classification_series[
+            (classification_series != "") & (classification_series.str.upper() != "N/A")
+        ]
+        return pd.Series(
+            {
+                "filtered_detections_count": int(len(group)),
+                "filtered_detections_summary": _format_summary(group["detection_label"]),
+                "filtered_classifications_count": int(len(valid_cls)),
+                "filtered_classifications_summary": _format_summary(
+                    valid_cls, skip_na=False
+                ),
+            }
         )
-        files_df = files_df.copy()
-        file_keys = files_df[key_cols].astype(str).agg("|".join, axis=1)
-        return files_df[file_keys.isin(detections_keys)].copy()
 
-    if "absolute_path" in detections_df.columns and "absolute_path" in files_df.columns:
-        valid_paths = detections_df["absolute_path"].dropna().astype(str).unique()
-        return files_df[files_df["absolute_path"].astype(str).isin(valid_paths)].copy()
+    summary_df = (
+        detections_df.groupby("absolute_path", dropna=False)
+        .apply(_summarize)
+        .reset_index()
+    )
+
+    files_df = files_df.merge(summary_df, on="absolute_path", how="left")
+
+    for col in [
+        "filtered_detections_count",
+        "filtered_classifications_count",
+    ]:
+        files_df[col] = files_df[col].fillna(0).astype(int)
+
+    for col in [
+        "filtered_detections_summary",
+        "filtered_classifications_summary",
+    ]:
+        files_df[col] = files_df[col].fillna("None")
 
     return files_df
 

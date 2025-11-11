@@ -20,11 +20,7 @@ from utils.common import set_session_var, get_session_var, update_vars
 from components import print_widget_label
 
 # Local constants for the observation grid
-ROW_HEIGHT_OPTIONS = {
-    "small": 30,
-    "medium": 100,
-    "large": 250,
-}
+ROW_HEIGHT_OPTIONS = {"small": 30, "medium": 100, "large": 250}
 IMAGE_SIZE_RATIO = 1.5
 IMAGE_COLUMN_WIDTHS = {
     size: int(height * IMAGE_SIZE_RATIO) for size, height in ROW_HEIGHT_OPTIONS.items()
@@ -263,38 +259,44 @@ def render_observations_view(
 
     gb.configure_column(
         "image",
-        headerName="Image",
+        headerName="",
         cellRenderer=image_jscode,
         width=current_image_width + 20,
         autoHeight=True,
     )
 
-    gb.configure_column("relative_path", headerName="File", width=150, filter=False, sortable=False)
-    gb.configure_column("detection_label", headerName="Detection", width=100, filter=False, sortable=False)
-    gb.configure_column(
-        "detection_confidence",
-        headerName="Detection confidence",
-        width=120,
-        filter=False,
-        sortable=False,
-        valueFormatter="x.toFixed(2)",
-        type="numericColumn",
-        headerClass="ag-left-aligned-header",
-    )
-    gb.configure_column("classification_label", headerName="Classification", width=100, filter=False, sortable=False)
-    gb.configure_column(
-        "classification_confidence",
-        headerName="Classification confidence",
-        width=140,
-        filter=False,
-        sortable=False,
-        valueFormatter="x.toFixed(2)",
-        type="numericColumn",
-        headerClass="ag-left-aligned-header",
-    )
-    gb.configure_column("timestamp", headerName="Timestamp", width=150, filter=False, sortable=False)
+    flex_columns = [
+        ("relative_path", "File"),
+        ("detection_label", "Detection"),
+        ("classification_label", "Classification"),
+        ("timestamp", "Timestamp"),
+        ("location_id", "Location"),
+    ]
+    for col_id, header in flex_columns:
+        gb.configure_column(
+            col_id,
+            headerName=header,
+            flex=1,
+            filter=False,
+            sortable=False,
+        )
+
+    for col_id, header in [
+        ("detection_confidence", "Detection confidence"),
+        ("classification_confidence", "Classification confidence"),
+    ]:
+        gb.configure_column(
+            col_id,
+            headerName=header,
+            flex=1,
+            filter=False,
+            sortable=False,
+            valueFormatter="x.toFixed(2)",
+            type="numericColumn",
+            headerClass="ag-left-aligned-header",
+        )
+
     gb.configure_column("project_id", headerName="Project ID", width=100, hide=True)
-    gb.configure_column("location_id", headerName="Location ID", width=100, filter=False, sortable=False)
 
     gb.configure_default_column(
         resizable=True,
@@ -308,7 +310,10 @@ def render_observations_view(
         headerClass="ag-left-aligned-header",
     )
     gb.configure_selection(selection_mode="single", use_checkbox=True)
-    gb.configure_grid_options(rowHeight=current_row_height + 10)
+    gb.configure_grid_options(
+        rowHeight=current_row_height + 10,
+        domLayout="normal",
+    )
     grid_options = gb.build()
 
     row_height = current_row_height + 10
@@ -322,7 +327,7 @@ def render_observations_view(
         height=grid_height,
         allow_unsafe_jscode=True,
         theme="streamlit",
-        fit_columns_on_grid_load=False,
+        fit_columns_on_grid_load=True,
         update_on=["selectionChanged"],
     )
 
