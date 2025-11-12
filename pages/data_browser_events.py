@@ -355,15 +355,10 @@ def show_event_modal():
         col_image, col_meta = st.columns([2, 1])
         with col_image:
             if collage_b64:
-                if "," in collage_b64:
-                    _, encoded = collage_b64.split(",", 1)
-                else:
-                    encoded = collage_b64
-                try:
-                    image = Image.open(BytesIO(base64.b64decode(encoded)))
-                    st.image(image, use_container_width=True)
-                except Exception:
-                    st.info("Unable to render event collage.")
+                st.markdown(
+                    f'<img src="{collage_b64}" style="width: 480px; height: auto;">',
+                    unsafe_allow_html=True,
+                )
             else:
                 st.info("No images available for this event.")
 

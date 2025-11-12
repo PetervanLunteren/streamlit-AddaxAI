@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit-shortcuts
 
 TODOs FOR NOW:
-- WAARWASIK: verder gaan met de even table: codex resume 019a774d-0e50-7670-801d-222554641fcc
+- WAARWASIK: verder gaan met de event table: codex resume 019a78ab-fedb-7230-838b-8c507ccc2a31
 
 # IMPORTANT TODOS:
 - get rid of the runID, and make it a deploymentID. FDorce users to do single deployments per run. That means renaming the run_id to deployment_id everywhere, and getting rid of the runID code around "Is this a single deployment?" widget.

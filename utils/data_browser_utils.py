@@ -95,119 +95,105 @@ def image_to_base64_url(image_path, bbox_data, max_size):
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # Crop to bounding box if available
-            if bbox_data and all(pd.notna([bbox_data['x'], bbox_data['y'], 
-                                           bbox_data['width'], bbox_data['height']])):
-                img_width, img_height = img.size
-                x = int(bbox_data['x'] * img_width)
-                y = int(bbox_data['y'] * img_height)
-                w = int(bbox_data['width'] * img_width)
-                h = int(bbox_data['height'] * img_height)
-                
-                # New padding procedure: max(bbox_width, bbox_height) + padding pixels
-                target_size = max(w, h) + (IMAGE_PADDING_PIXELS * 2)
-                
-                # Calculate bbox center
-                bbox_center_x = x + w // 2
-                bbox_center_y = y + h // 2
-                
-                # Try to center the square crop around bbox
-                x1_target = bbox_center_x - target_size // 2
-                y1_target = bbox_center_y - target_size // 2
-                x2_target = x1_target + target_size
-                y2_target = y1_target + target_size
-                
-                # Edge handling: shift padding if hitting boundaries
-                if x1_target < 0:
-                    # Shift right
-                    x1_target = 0
-                    x2_target = min(img_width, target_size)
-                elif x2_target > img_width:
-                    # Shift left
-                    x2_target = img_width
-                    x1_target = max(0, img_width - target_size)
-                
-                if y1_target < 0:
-                    # Shift down
-                    y1_target = 0
-                    y2_target = min(img_height, target_size)
-                elif y2_target > img_height:
-                    # Shift up
-                    y2_target = img_height
-                    y1_target = max(0, img_height - target_size)
-                
-                # Get the actual crop size we can achieve
-                actual_crop_width = x2_target - x1_target
-                actual_crop_height = y2_target - y1_target
-                
-                # Check if we can achieve target square size within image
-                if actual_crop_width == target_size and actual_crop_height == target_size:
-                    # Perfect fit - crop directly
-                    img = img.crop((x1_target, y1_target, x2_target, y2_target))
-                    
-                    # Store info for red border
-                    bbox_x_in_crop = x - x1_target
-                    bbox_y_in_crop = y - y1_target
-                    crop_info = {
-                        'bbox_x_in_crop': bbox_x_in_crop,
-                        'bbox_y_in_crop': bbox_y_in_crop,
-                        'bbox_w': w,
-                        'bbox_h': h,
-                        'crop_size': target_size
-                    }
+            target_width, target_height = max_size
+            target_width = max(1, int(target_width))
+            target_height = max(1, int(target_height))
+            target_ratio = target_width / target_height if target_height else 4 / 3
+
+            crop_info = None
+            img_width, img_height = img.size
+
+            if bbox_data and all(pd.notna([
+                bbox_data['x'], bbox_data['y'],
+                bbox_data['width'], bbox_data['height']
+            ])):
+                x = float(bbox_data['x']) * img_width
+                y = float(bbox_data['y']) * img_height
+                w = max(1.0, float(bbox_data['width']) * img_width)
+                h = max(1.0, float(bbox_data['height']) * img_height)
+
+                padded_w = w + (IMAGE_PADDING_PIXELS * 2)
+                padded_h = h + (IMAGE_PADDING_PIXELS * 2)
+
+                crop_width = padded_w
+                crop_height = padded_h
+                current_ratio = crop_width / crop_height if crop_height else target_ratio
+                if current_ratio > target_ratio:
+                    crop_height = crop_width / target_ratio
                 else:
-                    # Need background extension - use blurred crop as background
-                    cropped_img = img.crop((x1_target, y1_target, x2_target, y2_target))
-                    
-                    # Create blurred version of the crop for background
-                    blurred_crop = cropped_img.copy()
-                    blurred_crop = blurred_crop.filter(ImageFilter.GaussianBlur(radius=IMAGE_BLUR_RADIUS))
-                    
-                    # Resize blurred crop to fill target square (may stretch/distort)
-                    blurred_background = blurred_crop.resize((target_size, target_size), Image.Resampling.LANCZOS)
-                    
-                    # Calculate position to center original crop on blurred background
-                    paste_x = (target_size - actual_crop_width) // 2
-                    paste_y = (target_size - actual_crop_height) // 2
-                    
-                    # Paste original sharp crop onto blurred background
-                    blurred_background.paste(cropped_img, (paste_x, paste_y))
-                    img = blurred_background
-                    
-                    # Store info for red border (adjusted for blurred background)
-                    bbox_x_in_crop = (x - x1_target) + paste_x
-                    bbox_y_in_crop = (y - y1_target) + paste_y
-                    crop_info = {
-                        'bbox_x_in_crop': bbox_x_in_crop,
-                        'bbox_y_in_crop': bbox_y_in_crop,
-                        'bbox_w': w,
-                        'bbox_h': h,
-                        'crop_size': target_size
-                    }
+                    crop_width = crop_height * target_ratio
+
+                bbox_center_x = x + w / 2
+                bbox_center_y = y + h / 2
+
+                x1 = bbox_center_x - crop_width / 2
+                y1 = bbox_center_y - crop_height / 2
+                x2 = x1 + crop_width
+                y2 = y1 + crop_height
+
+                crop_box = (
+                    int(math.floor(x1)),
+                    int(math.floor(y1)),
+                    int(math.ceil(x2)),
+                    int(math.ceil(y2)),
+                )
+                img = img.crop(crop_box)
+
+                crop_width = crop_box[2] - crop_box[0]
+                crop_height = crop_box[3] - crop_box[1]
+                bbox_x_in_crop = x - crop_box[0]
+                bbox_y_in_crop = y - crop_box[1]
+                crop_info = {
+                    'bbox_x_in_crop': bbox_x_in_crop,
+                    'bbox_y_in_crop': bbox_y_in_crop,
+                    'bbox_w': w,
+                    'bbox_h': h,
+                    'crop_width': crop_width,
+                    'crop_height': crop_height,
+                }
             else:
-                crop_info = None
-            
-            # Create thumbnail while preserving aspect ratio
-            max_width, max_height = max_size
-            img = _fit_image_with_letterbox(img, max_width, max_height)
+                crop_width = img_width
+                crop_height = img_height
+                current_ratio = crop_width / crop_height if crop_height else target_ratio
+                if current_ratio > target_ratio:
+                    crop_height = crop_width / target_ratio
+                else:
+                    crop_width = crop_height * target_ratio
+
+                x1 = (img_width - crop_width) / 2
+                y1 = (img_height - crop_height) / 2
+                x2 = x1 + crop_width
+                y2 = y1 + crop_height
+                crop_box = (
+                    int(math.floor(x1)),
+                    int(math.floor(y1)),
+                    int(math.ceil(x2)),
+                    int(math.ceil(y2)),
+                )
+                img = img.crop(crop_box)
+                crop_width = crop_box[2] - crop_box[0]
+                crop_height = crop_box[3] - crop_box[1]
+
+            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
             thumbnail_size = img.size
-            
-            # Draw red border if we have crop info
+
             if crop_info:
-                scale_x = thumbnail_size[0] / crop_info['crop_size']
-                scale_y = thumbnail_size[1] / crop_info['crop_size']
-                
+                draw = ImageDraw.Draw(img)
+                crop_width = crop_info['crop_width']
+                crop_height = crop_info['crop_height']
+                scale_x = target_width / crop_width
+                scale_y = target_height / crop_height
+
                 bbox_x_thumb = crop_info['bbox_x_in_crop'] * scale_x
                 bbox_y_thumb = crop_info['bbox_y_in_crop'] * scale_y
                 bbox_w_thumb = crop_info['bbox_w'] * scale_x
                 bbox_h_thumb = crop_info['bbox_h'] * scale_y
-                
-                draw = ImageDraw.Draw(img)
+
                 x1 = int(max(0, bbox_x_thumb))
                 y1 = int(max(0, bbox_y_thumb))
-                x2 = int(min(thumbnail_size[0]-1, bbox_x_thumb + bbox_w_thumb))
-                y2 = int(min(thumbnail_size[1]-1, bbox_y_thumb + bbox_h_thumb))
-                
+                x2 = int(min(target_width - 1, bbox_x_thumb + bbox_w_thumb))
+                y2 = int(min(target_height - 1, bbox_y_thumb + bbox_h_thumb))
+
                 draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=1)
             
             # Apply rounded corners
@@ -249,249 +235,221 @@ def image_to_base64_url(image_path, bbox_data, max_size):
 
 def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True):
     """
-    Generate high-resolution image for modal display.
-    
-    Args:
-        image_path (str): Path to the image file
-        bbox_data (dict): Bounding box data with x, y, width, height
-        show_bbox (bool): Whether to draw bounding box
-        show_labels (bool): Whether to draw detection/classification labels
-        
-    Returns:
-        str: Base64 encoded image data URL
+    Generate the modal preview image with the same 4:3, detection-centered crop
+    used by the observation thumbnails.
     """
     try:
         if not image_path or not os.path.exists(image_path):
             return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
-        
+
         with Image.open(image_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            
-            # Create high-resolution modal image (square at MODAL_IMAGE_SIZE)
-            modal_size = (MODAL_IMAGE_SIZE, MODAL_IMAGE_SIZE)
+
+            modal_width = MODAL_IMAGE_SIZE
+            modal_height = int(round(MODAL_IMAGE_SIZE * 3 / 4))
+            target_ratio = modal_width / modal_height
+
+            img_width, img_height = img.size
             crop_info = None
-            
-            # Crop to bounding box if available
-            if bbox_data and all(pd.notna([bbox_data['x'], bbox_data['y'], 
-                                           bbox_data['width'], bbox_data['height']])):
-                img_width, img_height = img.size
-                x = int(bbox_data['x'] * img_width)
-                y = int(bbox_data['y'] * img_height)
-                w = int(bbox_data['width'] * img_width)
-                h = int(bbox_data['height'] * img_height)
-                
-                # Same padding logic as grid thumbnails
-                target_size = max(w, h) + (IMAGE_PADDING_PIXELS * 2)
-                
-                bbox_center_x = x + w // 2
-                bbox_center_y = y + h // 2
-                
-                x1_target = bbox_center_x - target_size // 2
-                y1_target = bbox_center_y - target_size // 2
-                x2_target = x1_target + target_size
-                y2_target = y1_target + target_size
-                
-                # Edge handling
-                if x1_target < 0:
-                    x1_target = 0
-                    x2_target = min(img_width, target_size)
-                elif x2_target > img_width:
-                    x2_target = img_width
-                    x1_target = max(0, img_width - target_size)
-                
-                if y1_target < 0:
-                    y1_target = 0
-                    y2_target = min(img_height, target_size)
-                elif y2_target > img_height:
-                    y2_target = img_height
-                    y1_target = max(0, img_height - target_size)
-                
-                actual_crop_width = x2_target - x1_target
-                actual_crop_height = y2_target - y1_target
-                
-                if actual_crop_width == target_size and actual_crop_height == target_size:
-                    # Perfect fit
-                    img = img.crop((x1_target, y1_target, x2_target, y2_target))
-                    bbox_x_in_crop = x - x1_target
-                    bbox_y_in_crop = y - y1_target
-                    crop_info = {
-                        'bbox_x_in_crop': bbox_x_in_crop,
-                        'bbox_y_in_crop': bbox_y_in_crop,
-                        'bbox_w': w,
-                        'bbox_h': h,
-                        'crop_size': target_size
-                    }
+
+            def _has_bbox(data):
+                return data and all(pd.notna([data['x'], data['y'], data['width'], data['height']]))
+
+            if _has_bbox(bbox_data):
+                x = float(bbox_data['x']) * img_width
+                y = float(bbox_data['y']) * img_height
+                w = max(1.0, float(bbox_data['width']) * img_width)
+                h = max(1.0, float(bbox_data['height']) * img_height)
+
+                padded_w = w + (IMAGE_PADDING_PIXELS * 2)
+                padded_h = h + (IMAGE_PADDING_PIXELS * 2)
+
+                crop_width = padded_w
+                crop_height = padded_h
+                current_ratio = crop_width / crop_height if crop_height else target_ratio
+                if current_ratio > target_ratio:
+                    crop_height = crop_width / target_ratio
                 else:
-                    # Need background extension
-                    cropped_img = img.crop((x1_target, y1_target, x2_target, y2_target))
-                    blurred_crop = cropped_img.copy()
-                    blurred_crop = blurred_crop.filter(ImageFilter.GaussianBlur(radius=IMAGE_BLUR_RADIUS))
-                    blurred_background = blurred_crop.resize((target_size, target_size), Image.Resampling.LANCZOS)
-                    
-                    paste_x = (target_size - actual_crop_width) // 2
-                    paste_y = (target_size - actual_crop_height) // 2
-                    blurred_background.paste(cropped_img, (paste_x, paste_y))
-                    img = blurred_background
-                    
-                    bbox_x_in_crop = (x - x1_target) + paste_x
-                    bbox_y_in_crop = (y - y1_target) + paste_y
-                    crop_info = {
-                        'bbox_x_in_crop': bbox_x_in_crop,
-                        'bbox_y_in_crop': bbox_y_in_crop,
-                        'bbox_w': w,
-                        'bbox_h': h,
-                        'crop_size': target_size
-                    }
-            
-            # Create high-resolution thumbnail
-            img.thumbnail(modal_size, Image.Resampling.LANCZOS)
+                    crop_width = crop_height * target_ratio
+
+                bbox_center_x = x + w / 2
+                bbox_center_y = y + h / 2
+
+                x1 = bbox_center_x - crop_width / 2
+                y1 = bbox_center_y - crop_height / 2
+                x2 = x1 + crop_width
+                y2 = y1 + crop_height
+
+                crop_box = (
+                    int(math.floor(x1)),
+                    int(math.floor(y1)),
+                    int(math.ceil(x2)),
+                    int(math.ceil(y2)),
+                )
+                img = img.crop(crop_box)
+
+                crop_width = crop_box[2] - crop_box[0]
+                crop_height = crop_box[3] - crop_box[1]
+                bbox_x_in_crop = x - crop_box[0]
+                bbox_y_in_crop = y - crop_box[1]
+                crop_info = {
+                    'bbox_x_in_crop': bbox_x_in_crop,
+                    'bbox_y_in_crop': bbox_y_in_crop,
+                    'bbox_w': w,
+                    'bbox_h': h,
+                    'crop_width': crop_width,
+                    'crop_height': crop_height,
+                }
+            else:
+                crop_width = img_width
+                crop_height = img_height
+                current_ratio = crop_width / crop_height if crop_height else target_ratio
+                if current_ratio > target_ratio:
+                    crop_height = crop_width / target_ratio
+                else:
+                    crop_width = crop_height * target_ratio
+
+                x1 = (img_width - crop_width) / 2
+                y1 = (img_height - crop_height) / 2
+                x2 = x1 + crop_width
+                y2 = y1 + crop_height
+                crop_box = (
+                    int(math.floor(x1)),
+                    int(math.floor(y1)),
+                    int(math.ceil(x2)),
+                    int(math.ceil(y2)),
+                )
+                img = img.crop(crop_box)
+                crop_width = crop_box[2] - crop_box[0]
+                crop_height = crop_box[3] - crop_box[1]
+
+            img = img.resize((modal_width, modal_height), Image.Resampling.LANCZOS)
             thumbnail_size = img.size
-            
-            # Store bbox coordinates for later drawing (after rounding)
+
             bbox_coords = None
             if crop_info and show_bbox:
-                scale_x = thumbnail_size[0] / crop_info['crop_size']
-                scale_y = thumbnail_size[1] / crop_info['crop_size']
-                
+                scale_x = modal_width / crop_info['crop_width']
+                scale_y = modal_height / crop_info['crop_height']
+
                 bbox_x_thumb = crop_info['bbox_x_in_crop'] * scale_x
                 bbox_y_thumb = crop_info['bbox_y_in_crop'] * scale_y
                 bbox_w_thumb = crop_info['bbox_w'] * scale_x
                 bbox_h_thumb = crop_info['bbox_h'] * scale_y
-                
+
                 x1 = int(max(0, bbox_x_thumb))
                 y1 = int(max(0, bbox_y_thumb))
-                x2 = int(min(thumbnail_size[0]-1, bbox_x_thumb + bbox_w_thumb))
-                y2 = int(min(thumbnail_size[1]-1, bbox_y_thumb + bbox_h_thumb))
-                
+                x2 = int(min(modal_width - 1, bbox_x_thumb + bbox_w_thumb))
+                y2 = int(min(modal_height - 1, bbox_y_thumb + bbox_h_thumb))
+
                 bbox_coords = (x1, y1, x2, y2)
-            
-            # Apply rounded corners
+
             if IMAGE_CORNER_RADIUS > 0:
                 mask = Image.new('L', img.size, 0)
                 mask_draw = ImageDraw.Draw(mask)
                 scaled_radius = int(IMAGE_CORNER_RADIUS * (thumbnail_size[0] / 250))
                 scaled_radius = max(8, min(scaled_radius, min(thumbnail_size) // 4))
-                
+
                 mask_draw.rounded_rectangle(
                     [(0, 0), (thumbnail_size[0]-1, thumbnail_size[1]-1)],
                     radius=scaled_radius,
                     fill=255
                 )
-                
+
                 output = Image.new('RGBA', img.size, (255, 255, 255, 0))
                 output.paste(img, (0, 0))
                 output.putalpha(mask)
-                
+
                 final = Image.new('RGB', img.size, 'white')
                 final.paste(output, (0, 0), output)
                 img = final
-            
-            # Draw bounding box and labels AFTER rounding (fixed sizes for consistency)
+
             if bbox_coords and show_bbox:
                 x1, y1, x2, y2 = bbox_coords
                 draw = ImageDraw.Draw(img)
-                
-                # Calculate bbox size in final image
+
                 bbox_width = x2 - x1
                 bbox_height = y2 - y1
-                bbox_min_dim = min(bbox_width, bbox_height)
-                
-                # Scale line width based on bbox size (1-3 pixels)
-                if bbox_min_dim < 100:  # Very small detection
+                bbox_min_dim = max(1, min(bbox_width, bbox_height))
+
+                if bbox_min_dim < 100:
                     line_width = 1
-                elif bbox_min_dim < 300:  # Medium detection
+                elif bbox_min_dim < 300:
                     line_width = 2
-                else:  # Large detection
+                else:
                     line_width = 3
-                
-                # Draw bounding box
+
                 draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=line_width)
-                
-                # Add labels if requested
+
                 if show_labels and hasattr(generate_modal_image, '_current_label_text'):
                     label_text = generate_modal_image._current_label_text
-                    
-                    # Scale font size based on bbox size (8-20px based on bbox dimension)
-                    # Smaller bbox = smaller font
-                    font_size = max(8, min(20, int(bbox_min_dim * 0.08)))
-                    
+                    font_size = max(10, min(24, int(bbox_min_dim * 0.08)))
+
                     try:
                         from PIL import ImageFont
                         font = None
                         for font_name in ("DejaVuSans.ttf", "Arial.ttf", "arial.ttf"):
                             try:
-                                font = ImageFont.truetype(font_name, 15)
+                                font = ImageFont.truetype(font_name, font_size)
                                 break
                             except Exception:
                                 continue
                         if font is None:
                             font = ImageFont.load_default()
-                    except:
+                    except Exception:
                         font = None
-                    
-                    # Split text into lines
+
                     lines = label_text.split('\n')
-                    
-                    # Get dimensions for multiline text
-                    max_width = 0
-                    total_height = 0
                     line_heights = []
-                    
-                    for line in lines:
-                        if font:
+                    max_width = 0
+                    if font is not None:
+                        for line in lines:
                             bbox_text = draw.textbbox((0, 0), line, font=font)
-                            line_width = bbox_text[2] - bbox_text[0]
-                            line_height = bbox_text[3] - bbox_text[1]
-                        else:
-                            line_width = len(line) * (font_size // 2)
-                            line_height = font_size
-                        
-                        max_width = max(max_width, line_width)
-                        line_heights.append(line_height)
-                        total_height += line_height
-                    
-                    # Add spacing between lines
+                            width = bbox_text[2] - bbox_text[0]
+                            height = bbox_text[3] - bbox_text[1]
+                            line_heights.append(height)
+                            max_width = max(max_width, width)
+                    else:
+                        for line in lines:
+                            width = len(line) * 6
+                            height = 10
+                            line_heights.append(height)
+                            max_width = max(max_width, width)
+
                     line_spacing = 2
-                    total_height += (len(lines) - 1) * line_spacing
-                    
-                    # Position text (above bbox if possible, below if not)
-                    text_x = max(4, min(x1, thumbnail_size[0] - max_width - 8))
+                    total_height = sum(line_heights) + line_spacing * (len(lines) - 1)
+
+                    text_x = x1
                     text_y = max(4, y1 - total_height - 6)
-                    
+
                     if text_y < 4:
                         text_y = min(y2 + 6, thumbnail_size[1] - total_height - 4)
-                    
-                    # Draw background
+
                     padding = 4
                     bg_x1 = text_x - padding
                     bg_y1 = text_y - padding
                     bg_x2 = text_x + max_width + padding
                     bg_y2 = text_y + total_height + padding
-                    
-                    # Draw semi-transparent background
+
                     overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
                     overlay_draw = ImageDraw.Draw(overlay)
                     overlay_draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill=(0, 0, 0, 200))
-                    
+
                     img_with_overlay = Image.alpha_composite(img.convert('RGBA'), overlay)
                     img = img_with_overlay.convert('RGB')
                     draw = ImageDraw.Draw(img)
-                    
-                    # Draw multiline text
+
                     y_offset = text_y
                     for i, line in enumerate(lines):
                         draw.text((text_x, y_offset), line, fill='white', font=font)
                         y_offset += line_heights[i] + line_spacing
-            
-            # Convert to base64
+
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=IMAGE_QUALITY)
             img_data = base64.b64encode(buffer.getvalue()).decode()
-            
+
             return f"data:image/jpeg;base64,{img_data}"
-            
-    except Exception as e:
+    except Exception:
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
 
 

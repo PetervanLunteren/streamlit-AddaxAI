@@ -245,7 +245,8 @@ def render_observations_view(
         headerName="",
         cellRenderer=image_jscode,
         width=current_image_width + 20,
-        autoHeight=False,
+        minWidth=current_image_width + 20,
+        autoHeight=True,
     )
 
     flex_columns = [
