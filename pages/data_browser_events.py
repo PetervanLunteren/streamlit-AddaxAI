@@ -73,6 +73,11 @@ def render_events_view(events_df: pd.DataFrame, export_col, sort_col):
     )
 
     df_sorted = sort_events_dataframe(events_df, sort_settings["column"], sort_settings["direction"])
+    st.session_state["events_results"] = df_sorted
+
+    if get_session_var("explore_results", "show_modal_event_viewer", False):
+        show_event_modal()
+        st.stop()
 
     image_size_setting = st.session_state.get(
         "browser_image_size_control",
@@ -103,8 +108,8 @@ def render_events_view(events_df: pd.DataFrame, export_col, sort_col):
     start_idx = (current_page - 1) * page_size
     end_idx = min(start_idx + page_size, total_rows)
 
-    df_page = df_sorted.iloc[start_idx:end_idx].reset_index(drop=True)
-    st.session_state["events_results"] = df_sorted
+    df_page = df_sorted.iloc[start_idx:end_idx].reset_index()
+    df_page = df_page.rename(columns={"index": "_df_index"})
 
     is_new_state = False
     if st.session_state.get("events_last_thumb_height") != current_thumb_height:
@@ -114,7 +119,7 @@ def render_events_view(events_df: pd.DataFrame, export_col, sort_col):
         is_new_state = True
         st.session_state["events_last_page"] = current_page
 
-    with st.spinner("Rendering event previews..."):
+    with st.container():
         render_event_table(
             df_page,
             base_row_height=current_row_height,
@@ -217,6 +222,7 @@ def render_event_table(
     image_width = int(base_row_height * 1.5)
 
     gb = GridOptionsBuilder.from_dataframe(display_df)
+    gb.configure_column("_df_index", hide=True)
     gb.configure_column("file_paths", hide=True)
     gb.configure_column("event_files", hide=True)
     gb.configure_column("species_list", hide=True)
@@ -232,6 +238,11 @@ def render_event_table(
                     img.style.height = '""" + str(thumb_height) + """px';
                     img.style.objectFit = 'cover';
                     img.style.borderRadius = '6px';
+                    img.style.cursor = 'pointer';
+                    img.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        params.node.setSelected(true);
+                    });
                 }
                 this.eGui = document.createElement('div');
                 this.eGui.style.display = 'flex';
@@ -251,6 +262,7 @@ def render_event_table(
         headerName="",
         cellRenderer=collage_renderer,
         width=thumb_width + 20,
+        suppressNavigable=True,
     )
 
     gb.configure_column("species_list_display", headerName="Species", flex=2)
@@ -274,7 +286,7 @@ def render_event_table(
         headerClass="ag-left-aligned-header",
     )
 
-    gb.configure_selection(selection_mode="single", use_checkbox=False)
+    gb.configure_selection(selection_mode="single", use_checkbox=True)
 
     row_height = base_row_height + 10
     gb.configure_grid_options(domLayout="normal", rowHeight=row_height)
@@ -296,11 +308,13 @@ def render_event_table(
         selected_row = grid_response["selected_rows"].iloc[0]
         df_filtered = st.session_state.get("events_results", pd.DataFrame())
         if not df_filtered.empty:
+            original_index = selected_row.get("_df_index")
+            if original_index is None:
+                original_index = 0
             try:
-                event_id = selected_row.get("event_id")
-                modal_index = df_filtered.index[df_filtered["event_id"] == event_id][0]
-            except IndexError:
-                modal_index = 0
+                modal_index = df_filtered.index.get_loc(original_index)
+            except KeyError:
+                modal_index = int(original_index) if isinstance(original_index, (int, float)) else 0
 
             set_session_var("explore_results", "modal_current_event_index", modal_index)
             set_session_var("explore_results", "modal_source", "event")
@@ -346,7 +360,7 @@ def show_event_modal():
                     encoded = collage_b64
                 try:
                     image = Image.open(BytesIO(base64.b64decode(encoded)))
-                    st.image(image, use_column_width=True)
+                    st.image(image, use_container_width=True)
                 except Exception:
                     st.info("Unable to render event collage.")
             else:
@@ -391,13 +405,13 @@ def show_event_modal():
                 st.rerun()
 
 
-def get_cached_event_collage(event_id, event_files, thumb_size):
+def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=None):
     cache = st.session_state.setdefault("events_collage_cache", {})
     identifier = event_id or "unknown"
-    cache_key = f"{identifier}_{thumb_size}"
+    cache_key = f"{identifier}_{thumb_height}_{thumb_width or thumb_height}"
     if cache_key not in cache:
         cache[cache_key] = (
-            build_event_collage_base64(event_files, thumb_size=thumb_size)
+            build_event_collage_base64(event_files, thumb_size=thumb_height)
             or PLACEHOLDER_IMAGE
         )
     return cache[cache_key]

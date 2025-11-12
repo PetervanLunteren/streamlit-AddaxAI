@@ -599,12 +599,33 @@ def build_event_collage_base64(event_files, max_grid=4, thumb_size=180):
         thumb_img = _base64_to_image(thumb_b64)
         if thumb_img is None:
             continue
-        thumb_img = thumb_img.resize((thumb_size, thumb_size))
+
+        thumb_img = _fit_image_with_letterbox(thumb_img, thumb_size)
         row = idx // grid_size
         col = idx % grid_size
         collage.paste(thumb_img, (col * thumb_size, row * thumb_size))
 
     return _image_to_base64(collage)
+
+
+def _fit_image_with_letterbox(image, box_size):
+    if image is None:
+        return None
+    img = image.copy()
+    img_width, img_height = img.size
+    if img_width == 0 or img_height == 0:
+        return None
+
+    scale = min(box_size / img_width, box_size / img_height)
+    new_width = max(1, int(img_width * scale))
+    new_height = max(1, int(img_height * scale))
+    img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    canvas = Image.new("RGB", (box_size, box_size), color=(30, 30, 30))
+    offset_x = (box_size - new_width) // 2
+    offset_y = (box_size - new_height) // 2
+    canvas.paste(img, (offset_x, offset_y))
+    return canvas
 
 
 def _lookup_detection_details(relative_path, detections_df):
