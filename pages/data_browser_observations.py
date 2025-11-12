@@ -231,9 +231,6 @@ def render_observations_view(
                     }});
                 }}
                 this.eGui = document.createElement('div');
-                this.eGui.style.display = 'flex';
-                this.eGui.style.justifyContent = 'center';
-                this.eGui.style.alignItems = 'center';
                 this.eGui.appendChild(img);
             }}
             getGui() {{
@@ -252,7 +249,6 @@ def render_observations_view(
     )
 
     flex_columns = [
-        ("relative_path", "File"),
         ("detection_label", "Detection"),
         ("classification_label", "Classification"),
         ("timestamp", "Timestamp"),
@@ -266,6 +262,12 @@ def render_observations_view(
             filter=False,
             sortable=False,
         )
+
+    gb.configure_column(
+        "relative_path",
+        headerName="File",
+        hide=True,
+    )
 
     for col_id, header in [
         ("detection_confidence", "Detection confidence"),

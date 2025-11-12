@@ -248,9 +248,6 @@ def render_file_level_browser(files_df: pd.DataFrame):
                         }});
                     }}
                     this.eGui = document.createElement('div');
-                    this.eGui.style.display = 'flex';
-                    this.eGui.style.justifyContent = 'center';
-                    this.eGui.style.alignItems = 'center';
                     this.eGui.appendChild(img);
                 }}
                 getGui() {{
