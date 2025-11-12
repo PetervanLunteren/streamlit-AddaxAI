@@ -88,9 +88,9 @@ def render_files_view(
         update_vars("explore_results", {"files_sort_settings": new_sort})
 
     def on_file_sort_applied():
-        for key in ["results_files_filtered", "file_thumbnail_cache"]:
+        for key in ["files_results", "files_thumbnail_cache"]:
             st.session_state.pop(key, None)
-        st.session_state.file_grid_current_page = 1
+        st.session_state.files_current_page = 1
         st.rerun()
 
     render_sort_popover(
@@ -123,7 +123,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
         st.stop()
 
     files_df_reset = files_df.reset_index(drop=True)
-    st.session_state["results_files_filtered"] = files_df_reset
+    st.session_state["files_results"] = files_df_reset
 
     image_size_setting = st.session_state.get(
         "browser_image_size_control",
@@ -137,19 +137,19 @@ def render_file_level_browser(files_df: pd.DataFrame):
     size_config = image_size_options.get(image_size_setting, image_size_options["medium"])
     file_row_height = size_config["height"]
 
-    if "file_grid_page_size" not in st.session_state:
-        st.session_state.file_grid_page_size = DEFAULT_PAGE_SIZE
-    if "file_grid_current_page" not in st.session_state:
-        st.session_state.file_grid_current_page = 1
+    if "files_page_size" not in st.session_state:
+        st.session_state.files_page_size = DEFAULT_PAGE_SIZE
+    if "files_current_page" not in st.session_state:
+        st.session_state.files_current_page = 1
 
-    page_size = st.session_state.file_grid_page_size
-    current_page = st.session_state.file_grid_current_page
+    page_size = st.session_state.files_page_size
+    current_page = st.session_state.files_current_page
     total_rows = len(files_df_reset)
     total_pages = max(1, (total_rows + page_size - 1) // page_size)
 
     if current_page > total_pages:
         current_page = total_pages
-        st.session_state.file_grid_current_page = current_page
+        st.session_state.files_current_page = current_page
 
     start_idx = (current_page - 1) * page_size
     end_idx = min(start_idx + page_size, total_rows)
@@ -164,10 +164,10 @@ def render_file_level_browser(files_df: pd.DataFrame):
         f"files_page_{current_page}_size_{page_size}_height_{file_row_height}_"
         f"setting_{image_size_setting}_sig_{signature}"
     )
-    if "file_thumbnail_cache" not in st.session_state:
-        st.session_state.file_thumbnail_cache = {}
+    if "files_thumbnail_cache" not in st.session_state:
+        st.session_state.files_thumbnail_cache = {}
 
-    thumbnails = st.session_state.file_thumbnail_cache.get(thumbnail_cache_key)
+    thumbnails = st.session_state.files_thumbnail_cache.get(thumbnail_cache_key)
 
     if thumbnails is None:
         thumbnails = []
@@ -179,8 +179,8 @@ def render_file_level_browser(files_df: pd.DataFrame):
                 max_height=file_row_height,
             )
             thumbnails.append(image_url)
-        st.session_state.file_thumbnail_cache.clear()
-        st.session_state.file_thumbnail_cache[thumbnail_cache_key] = thumbnails
+        st.session_state.files_thumbnail_cache.clear()
+        st.session_state.files_thumbnail_cache[thumbnail_cache_key] = thumbnails
 
     display_rows = []
     for (idx, row), image_url in zip(df_page.iterrows(), thumbnails):
@@ -248,6 +248,9 @@ def render_file_level_browser(files_df: pd.DataFrame):
                         }});
                     }}
                     this.eGui = document.createElement('div');
+                    this.eGui.style.display = 'flex';
+                    this.eGui.style.justifyContent = 'center';
+                    this.eGui.style.alignItems = 'center';
                     this.eGui.appendChild(img);
                 }}
                 getGui() {{
@@ -325,10 +328,10 @@ def render_file_level_browser(files_df: pd.DataFrame):
             max_value=total_pages,
             step=1,
             value=current_page,
-            key="file_grid_page_input",
+            key="files_page_input",
         )
         if new_page != current_page:
-            st.session_state.file_grid_current_page = new_page
+            st.session_state.files_current_page = new_page
             st.rerun()
 
     with bottom_menu[2]:
@@ -336,11 +339,11 @@ def render_file_level_browser(files_df: pd.DataFrame):
             "Page Size",
             options=PAGE_SIZE_OPTIONS,
             index=PAGE_SIZE_OPTIONS.index(page_size),
-            key="file_grid_page_size_input",
+            key="files_page_size_input",
         )
         if new_page_size != page_size:
-            st.session_state.file_grid_page_size = new_page_size
-            st.session_state.file_grid_current_page = 1
+            st.session_state.files_page_size = new_page_size
+            st.session_state.files_current_page = 1
             st.rerun()
 
     if (
@@ -350,7 +353,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
         selected_row = grid_response["selected_rows"].iloc[0]
         original_index = selected_row.get("_df_index")
 
-        df_filtered_files = st.session_state.get("results_files_filtered", pd.DataFrame())
+        df_filtered_files = st.session_state.get("files_results", pd.DataFrame())
         if not df_filtered_files.empty and original_index is not None:
             try:
                 modal_index = df_filtered_files.index.get_loc(original_index)

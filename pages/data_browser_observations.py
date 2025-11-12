@@ -44,7 +44,7 @@ def render_observations_view(
 ):
     """Render the detection-level (observations) table."""
 
-    st.session_state["results_modified"] = filtered_df
+    st.session_state["observations_results"] = filtered_df
     render_observation_export_popover(export_col, filtered_df)
 
     if get_session_var("explore_results", "show_modal_image_viewer", False):
@@ -89,12 +89,12 @@ def render_observations_view(
 
     def on_observation_sort_applied():
         for key in [
-            "results_modified",
-            "aggrid_thumbnail_cache",
-            "aggrid_last_cache_key",
+            "observations_results",
+            "observations_thumbnail_cache",
+            "observations_last_cache_key",
         ]:
             st.session_state.pop(key, None)
-        st.session_state.aggrid_current_page = 1
+        st.session_state.observations_current_page = 1
         st.rerun()
 
     render_sort_popover(
@@ -121,44 +121,44 @@ def render_observations_view(
 
     DEFAULT_PAGE_SIZE = 20
     PAGE_SIZE_OPTIONS = [20, 50, 100]
-    if "aggrid_page_size" not in st.session_state:
-        st.session_state.aggrid_page_size = DEFAULT_PAGE_SIZE
-    if "aggrid_current_page" not in st.session_state:
-        st.session_state.aggrid_current_page = 1
+    if "observations_page_size" not in st.session_state:
+        st.session_state.observations_page_size = DEFAULT_PAGE_SIZE
+    if "observations_current_page" not in st.session_state:
+        st.session_state.observations_current_page = 1
 
     total_rows = len(filtered_df)
     total_pages = max(
         1,
-        (total_rows + st.session_state.aggrid_page_size - 1)
-        // st.session_state.aggrid_page_size,
+        (total_rows + st.session_state.observations_page_size - 1)
+        // st.session_state.observations_page_size,
     )
 
-    if st.session_state.aggrid_current_page > total_pages:
-        st.session_state.aggrid_current_page = total_pages
+    if st.session_state.observations_current_page > total_pages:
+        st.session_state.observations_current_page = total_pages
 
-    start_idx = (st.session_state.aggrid_current_page - 1) * st.session_state.aggrid_page_size
-    end_idx = min(start_idx + st.session_state.aggrid_page_size, total_rows)
+    start_idx = (st.session_state.observations_current_page - 1) * st.session_state.observations_page_size
+    end_idx = min(start_idx + st.session_state.observations_page_size, total_rows)
 
     cache_key = (
-        f"page_{st.session_state.aggrid_current_page}_"
-        f"pagesize_{st.session_state.aggrid_page_size}_imgsize_{selected_size}"
+        f"page_{st.session_state.observations_current_page}_"
+        f"pagesize_{st.session_state.observations_page_size}_imgsize_{selected_size}"
     )
 
-    if "aggrid_thumbnail_cache" not in st.session_state:
-        st.session_state.aggrid_thumbnail_cache = {}
+    if "observations_thumbnail_cache" not in st.session_state:
+        st.session_state.observations_thumbnail_cache = {}
 
     if (
-        "aggrid_last_cache_key" not in st.session_state
-        or st.session_state.aggrid_last_cache_key != cache_key
+        "observations_last_cache_key" not in st.session_state
+        or st.session_state.observations_last_cache_key != cache_key
     ):
-        st.session_state.aggrid_thumbnail_cache = {}
-        st.session_state.aggrid_last_cache_key = cache_key
+        st.session_state.observations_thumbnail_cache = {}
+        st.session_state.observations_last_cache_key = cache_key
 
     df_page = filtered_df.iloc[start_idx:end_idx].copy()
 
     with st.spinner("Processing images for current page..."):
-        if cache_key in st.session_state.aggrid_thumbnail_cache:
-            image_urls = st.session_state.aggrid_thumbnail_cache[cache_key]
+        if cache_key in st.session_state.observations_thumbnail_cache:
+            image_urls = st.session_state.observations_thumbnail_cache[cache_key]
         else:
             image_urls = []
             for _, row in df_page.iterrows():
@@ -173,7 +173,7 @@ def render_observations_view(
                     row.get("absolute_path"), bbox_data, max_size=thumbnail_size
                 )
                 image_urls.append(image_url)
-            st.session_state.aggrid_thumbnail_cache[cache_key] = image_urls
+            st.session_state.observations_thumbnail_cache[cache_key] = image_urls
 
         display_data = []
         for (idx, row), image_url in zip(df_page.iterrows(), image_urls):
@@ -231,6 +231,9 @@ def render_observations_view(
                     }});
                 }}
                 this.eGui = document.createElement('div');
+                this.eGui.style.display = 'flex';
+                this.eGui.style.justifyContent = 'center';
+                this.eGui.style.alignItems = 'center';
                 this.eGui.appendChild(img);
             }}
             getGui() {{
@@ -320,7 +323,7 @@ def render_observations_view(
     if grid_response["selected_rows"] is not None and len(grid_response["selected_rows"]) > 0:
         selected_row = grid_response["selected_rows"].iloc[0]
         original_df_index = selected_row.get("_df_index")
-        df_filtered = st.session_state.get("results_modified")
+        df_filtered = st.session_state.get("observations_results")
         if original_df_index is not None and df_filtered is not None:
             try:
                 modal_index = df_filtered.index.get_loc(original_df_index)
@@ -335,7 +338,7 @@ def render_observations_view(
     bottom_menu = st.columns((4, 1, 1))
     with bottom_menu[0]:
         st.markdown(
-            f"Page **{st.session_state.aggrid_current_page}** of **{total_pages}** "
+            f"Page **{st.session_state.observations_current_page}** of **{total_pages}** "
             f"(Showing rows {start_idx + 1}-{end_idx} of {total_rows:,})"
         )
 
@@ -345,21 +348,21 @@ def render_observations_view(
             min_value=1,
             max_value=total_pages,
             step=1,
-            value=st.session_state.aggrid_current_page,
-            key="aggrid_page_input",
+            value=st.session_state.observations_current_page,
+            key="observations_page_input",
         )
-        if new_page != st.session_state.aggrid_current_page:
-            st.session_state.aggrid_current_page = new_page
+        if new_page != st.session_state.observations_current_page:
+            st.session_state.observations_current_page = new_page
             st.rerun()
 
     with bottom_menu[2]:
         new_page_size = st.selectbox(
             "Page Size",
             options=PAGE_SIZE_OPTIONS,
-            index=PAGE_SIZE_OPTIONS.index(st.session_state.aggrid_page_size),
-            key="aggrid_page_size_input",
+            index=PAGE_SIZE_OPTIONS.index(st.session_state.observations_page_size),
+            key="observations_page_size_input",
         )
-        if new_page_size != st.session_state.aggrid_page_size:
-            st.session_state.aggrid_page_size = new_page_size
-            st.session_state.aggrid_current_page = 1
+        if new_page_size != st.session_state.observations_page_size:
+            st.session_state.observations_page_size = new_page_size
+            st.session_state.observations_current_page = 1
             st.rerun()

@@ -251,7 +251,7 @@ if st.session_state == {}:
             aggregate_detections_to_files,
         )
         results_df = load_detection_results_dataframe()
-        st.session_state["results_observations"] = results_df
+        st.session_state["observations_source_df"] = results_df
 
         if len(results_df) > 0:
             log(f"Loaded {len(results_df)} detections from {len(results_df['run_id'].unique())} runs")
@@ -261,7 +261,7 @@ if st.session_state == {}:
         loader.update_text("Aggregating file-level data...")
 
         results_files_df = aggregate_detections_to_files(results_df)
-        st.session_state["results_files"] = results_files_df
+        st.session_state["files_source_df"] = results_files_df
 
         log(
             "Aggregated detection results into "
@@ -273,7 +273,7 @@ if st.session_state == {}:
         log(error_msg)
         st.warning(error_msg)
         # Create empty dataframe as fallback
-        st.session_state["results_observations"] = pd.DataFrame()
+        st.session_state["observations_source_df"] = pd.DataFrame()
         # Propagate failure for file aggregation by re-raising
         raise
 

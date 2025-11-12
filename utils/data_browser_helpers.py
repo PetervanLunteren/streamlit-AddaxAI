@@ -420,12 +420,15 @@ def render_filter_popover(
                         selected_locations = []
                         st.info("No locations available in the data.")
 
-                apply_filters = st.form_submit_button(
-                    "Apply filters", use_container_width=True, type="primary"
-                )
-                clear_filters = st.form_submit_button(
-                    "Clear filters", use_container_width=True
-                )
+                col_clear, col_apply = st.columns([1, 1])
+                with col_clear:
+                    clear_filters = st.form_submit_button(
+                        "Clear", use_container_width=True
+                    )
+                with col_apply:
+                    apply_filters = st.form_submit_button(
+                        "Apply", use_container_width=True, type="primary"
+                    )
 
                 if apply_filters:
                     new_settings = saved_settings.copy()

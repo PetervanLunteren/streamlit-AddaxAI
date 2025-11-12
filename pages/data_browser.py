@@ -120,11 +120,11 @@ def render_data_browser_page():
     saved_sort_column = saved_settings.get("sort_column", "timestamp")
     saved_sort_direction = saved_settings.get("sort_direction", "↓")
 
-    if "results_observations" not in st.session_state:
+    if "observations_source_df" not in st.session_state:
         st.error("No detection results found. Please ensure detection data is loaded.")
         st.stop()
 
-    df = st.session_state["results_observations"]
+    df = st.session_state["observations_source_df"]
     if df.empty:
         st.warning("No detection results found.")
         st.stop()
@@ -153,7 +153,7 @@ def render_data_browser_page():
     handle_tree_selector_modal(df, saved_settings)
 
     if current_view == "Files":
-        files_df = st.session_state.get("results_files")
+        files_df = st.session_state.get("files_source_df")
         files_view.render_files_view(files_df, filtered_detection_df, export_col, sort_col)
         return
 

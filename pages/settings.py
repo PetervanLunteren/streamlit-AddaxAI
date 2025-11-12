@@ -108,8 +108,8 @@ with st.expander("Current settings", expanded=False):
 with st.expander("st.session_state", expanded=False):
     st.write(st.session_state)
 with st.expander("Detection Results DataFrame", expanded=False):
-    if "results_observations" in st.session_state:
-        st.dataframe(st.session_state["results_observations"], width='stretch')
+    if "observations_source_df" in st.session_state:
+        st.dataframe(st.session_state["observations_source_df"], width='stretch')
     else:
         st.warning("Detection results not loaded in session state")
     

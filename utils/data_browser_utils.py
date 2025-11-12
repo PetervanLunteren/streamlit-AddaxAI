@@ -723,7 +723,7 @@ def image_viewer_modal():
     show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
     
     # Get the filtered dataframe from session state
-    df_filtered = st.session_state.get('results_modified', pd.DataFrame())
+    df_filtered = st.session_state.get('observations_results', pd.DataFrame())
     
     if df_filtered.empty or current_index >= len(df_filtered):
         st.error("No image data available")
@@ -928,7 +928,7 @@ def image_viewer_modal_file():
     from utils.common import get_session_var, set_session_var
     from components.ui_helpers import code_span
 
-    df_files = st.session_state.get("results_files_filtered", pd.DataFrame())
+    df_files = st.session_state.get("files_results", pd.DataFrame())
     current_index = get_session_var("explore_results", "modal_current_image_index", 0)
     show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
 
