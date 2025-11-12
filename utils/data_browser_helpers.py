@@ -320,19 +320,13 @@ def render_filter_popover(
                     except ValueError:
                         saved_end = max_date
 
-                    saved_start = min(max(saved_start, min_date), max_date)
-                    max_widget_date = datetime.now().date()
-                    saved_start = min(max(saved_start, min_date), max_date)
-                    saved_end = min(max(saved_end, min_date), min(max_date, max_widget_date))
-
                     if saved_start > saved_end:
                         saved_start = min_date
-                        saved_end = min(max_date, max_widget_date)
+                        saved_end = max_date
 
                     date_range = st.date_input(
                         "Captured between",
                         value=(saved_start, saved_end),
-                        max_value=max_widget_date,
                         format="YYYY/MM/DD",
                         label_visibility="collapsed",
                     )
@@ -403,7 +397,7 @@ def render_filter_popover(
 
                 if clear_filters:
                     min_iso = min_date.isoformat()
-                    max_iso = min(max_date, max_widget_date).isoformat()
+                    max_iso = max_date.isoformat()
                     default_settings = {
                         "selected_detection_types": unique_detection_types,
                         "det_conf_min": detection_import_threshold,

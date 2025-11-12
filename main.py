@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install st-segmented-buttons
 
 TODOs FOR NOW:
-- WAARWASIK: opschonen van de file browser code: this was our chat, but perhaps better to start a new one: 
+- WAARWASIK: opschonen van de file browser code
 
 
 

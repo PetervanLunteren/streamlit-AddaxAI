@@ -29,7 +29,10 @@ def render_files_view(
         st.error("File-level dataset was not initialized. Please restart the application.")
         st.stop()
 
-    if get_session_var("explore_results", "show_modal_image_viewer", False) and get_session_var("explore_results", "modal_source", "observation") == "file":
+    if (
+        get_session_var("explore_results", "show_modal_image_viewer", False)
+        and get_session_var("explore_results", "modal_source", "observation") == "file"
+    ):
         modal_image_viewer = Modal(
             title="",
             key="file_image_viewer",
@@ -39,6 +42,7 @@ def render_files_view(
         )
         with modal_image_viewer.container():
             image_viewer_modal_file()
+        st.stop()
 
     filtered_files_df = filter_files_by_detections(files_df, filtered_detections)
     render_file_level_browser(filtered_files_df)
