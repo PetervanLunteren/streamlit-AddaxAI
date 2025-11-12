@@ -14,6 +14,7 @@ from st_modal import Modal
 from utils.data_browser_helpers import (
     render_observation_export_popover,
     parse_timestamps,
+    render_sort_popover,
 )
 from utils.data_browser_utils import image_to_base64_url, image_viewer_modal
 from utils.common import set_session_var, get_session_var, update_vars
@@ -60,68 +61,50 @@ def render_observations_view(
                 image_viewer_modal()
             st.stop()
 
-    with sort_col:
-        with st.popover(":material/swap_vert:", help="Sort", width="stretch"):
-            with st.form("sort_form", border=False):
-                with st.container(border=True):
-                    print_widget_label("Sort by")
-                    sortable_columns = {
-                        "detection_label": "Detection",
-                        "detection_confidence": "Detection Confidence",
-                        "classification_label": "Classification",
-                        "classification_confidence": "Classification Confidence",
-                        "timestamp": "Timestamp",
-                        "location_id": "Location",
-                    }
-                    sort_col1, sort_col2, sort_col3 = st.columns([3, 1, 1])
+    observation_sortable_columns = [
+        ("detection_label", "Detection"),
+        ("detection_confidence", "Detection Confidence"),
+        ("classification_label", "Classification"),
+        ("classification_confidence", "Classification Confidence"),
+        ("timestamp", "Timestamp"),
+        ("location_id", "Location"),
+    ]
 
-                    with sort_col1:
-                        try:
-                            default_index = list(sortable_columns.keys()).index(
-                                saved_sort_column
-                            )
-                        except ValueError:
-                            default_index = 0
+    observation_sort_settings = {
+        "column": saved_settings.get("sort_column", "timestamp"),
+        "direction": saved_settings.get("sort_direction", "↓"),
+    }
+    saved_sort_column = observation_sort_settings["column"]
+    saved_sort_direction = observation_sort_settings["direction"]
 
-                        sort_column = st.selectbox(
-                            "Column to sort",
-                            options=list(sortable_columns.keys()),
-                            format_func=lambda x: sortable_columns[x],
-                            index=default_index,
-                            label_visibility="collapsed",
-                        )
+    def save_observation_sort(new_sort):
+        updated_settings = saved_settings.copy()
+        updated_settings.update(
+            {
+                "sort_column": new_sort["column"],
+                "sort_direction": new_sort["direction"],
+            }
+        )
+        update_vars("explore_results", {"aggrid_settings": updated_settings})
 
-                    with sort_col2:
-                        sort_direction = st.segmented_control(
-                            "Sorting method",
-                            options=["↑", "↓"],
-                            default=saved_sort_direction,
-                            label_visibility="collapsed",
-                            width="stretch",
-                        )
+    def on_observation_sort_applied():
+        for key in [
+            "results_modified",
+            "aggrid_thumbnail_cache",
+            "aggrid_last_cache_key",
+        ]:
+            st.session_state.pop(key, None)
+        st.session_state.aggrid_current_page = 1
+        st.rerun()
 
-                    with sort_col3:
-                        if st.form_submit_button(
-                            "Apply", width="stretch", type="primary"
-                        ):
-                            new_settings = saved_settings.copy()
-                            new_settings.update(
-                                {
-                                    "sort_column": sort_column,
-                                    "sort_direction": sort_direction,
-                                }
-                            )
-                            update_vars(
-                                "explore_results", {"aggrid_settings": new_settings}
-                            )
-                            for key in [
-                                "results_modified",
-                                "aggrid_thumbnail_cache",
-                                "aggrid_last_cache_key",
-                            ]:
-                                st.session_state.pop(key, None)
-                            st.session_state.aggrid_current_page = 1
-                            st.rerun()
+    render_sort_popover(
+        sort_col,
+        storage_key="observations",
+        current_settings=observation_sort_settings,
+        save_settings_fn=save_observation_sort,
+        sortable_columns=observation_sortable_columns,
+        on_apply_fn=on_observation_sort_applied,
+    )
 
     selected_size = st.session_state.get(
         "browser_image_size_control", DEFAULT_SIZE_OPTION
@@ -313,6 +296,10 @@ def render_observations_view(
     gb.configure_grid_options(
         rowHeight=current_row_height + 10,
         domLayout="normal",
+        autoSizeStrategy={
+            "type": "fitGridWidth",
+            "defaultMinWidth": 100,
+        },
     )
     grid_options = gb.build()
 
@@ -327,7 +314,6 @@ def render_observations_view(
         height=grid_height,
         allow_unsafe_jscode=True,
         theme="streamlit",
-        fit_columns_on_grid_load=True,
         update_on=["selectionChanged"],
     )
 

@@ -11,18 +11,43 @@ from st_aggrid.shared import JsCode
 import pandas as pd
 from st_modal import Modal
 
-from utils.data_browser_helpers import filter_files_by_detections, render_export_popover
+from utils.data_browser_helpers import (
+    filter_files_by_detections,
+    render_export_popover,
+    render_sort_popover,
+)
 from utils.data_browser_utils import image_to_base64_with_boxes, image_viewer_modal_file
-from utils.common import set_session_var, get_session_var
+from utils.common import set_session_var, get_session_var, load_vars, update_vars
 
 DEFAULT_PAGE_SIZE = 20
 PAGE_SIZE_OPTIONS = [20, 50, 100]
+
+
+def sort_files_dataframe(files_df: pd.DataFrame, column: str, direction: str) -> pd.DataFrame:
+    if files_df is None or files_df.empty:
+        return files_df
+
+    if column not in files_df.columns:
+        return files_df
+
+    ascending = direction == "↑"
+    files_df = files_df.copy()
+
+    if column == "timestamp":
+        temp_col = "_temp_timestamp"
+        files_df[temp_col] = pd.to_datetime(files_df[column], errors="coerce")
+        files_df = files_df.sort_values(by=temp_col, ascending=ascending, na_position="last")
+        files_df = files_df.drop(columns=[temp_col])
+        return files_df
+
+    return files_df.sort_values(by=column, ascending=ascending, na_position="last")
 
 
 def render_files_view(
     files_df: pd.DataFrame,
     filtered_detections: pd.DataFrame,
     export_col,
+    sort_col,
 ):
     """Render the file-level browser with shared filters applied."""
     if files_df is None:
@@ -44,7 +69,45 @@ def render_files_view(
             image_viewer_modal_file()
         st.stop()
 
+    filter_config = load_vars("explore_results")
+    saved_sort_settings = filter_config.get("files_sort_settings", {})
+    file_sort_settings = {
+        "column": saved_sort_settings.get("column", "timestamp"),
+        "direction": saved_sort_settings.get("direction", "↓"),
+    }
+
+    sortable_columns = [
+        ("timestamp", "Timestamp"),
+        ("detections_summary", "Detections"),
+        ("classifications_summary", "Classifications"),
+        ("detections_count", "Count"),
+        ("location_id", "Location"),
+    ]
+
+    def save_file_sort_settings(new_sort):
+        update_vars("explore_results", {"files_sort_settings": new_sort})
+
+    def on_file_sort_applied():
+        for key in ["results_files_filtered", "file_thumbnail_cache"]:
+            st.session_state.pop(key, None)
+        st.session_state.file_grid_current_page = 1
+        st.rerun()
+
+    render_sort_popover(
+        sort_col,
+        storage_key="files",
+        current_settings=file_sort_settings,
+        save_settings_fn=save_file_sort_settings,
+        sortable_columns=sortable_columns,
+        on_apply_fn=on_file_sort_applied,
+    )
+
     filtered_files_df = filter_files_by_detections(files_df, filtered_detections)
+    filtered_files_df = sort_files_dataframe(
+        filtered_files_df,
+        column=file_sort_settings["column"],
+        direction=file_sort_settings["direction"],
+    )
     render_file_level_browser(filtered_files_df)
     render_export_popover(export_col, filtered_files_df, "Files")
 
@@ -230,6 +293,10 @@ def render_file_level_browser(files_df: pd.DataFrame):
     gb.configure_grid_options(
         rowHeight=file_row_height + 10,
         domLayout="normal",
+        autoSizeStrategy={
+            "type": "fitGridWidth",
+            "defaultMinWidth": 100,
+        },
     )
 
     grid_options = gb.build()
@@ -241,7 +308,6 @@ def render_file_level_browser(files_df: pd.DataFrame):
         height=grid_height,
         allow_unsafe_jscode=True,
         theme="streamlit",
-        fit_columns_on_grid_load=True,
         update_on=['selectionChanged'],
     )
 

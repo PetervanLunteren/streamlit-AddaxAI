@@ -16,7 +16,7 @@ Run with micromamba:
 
 How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install [package-name]
-./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install st-segmented-buttons
+./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit-shortcuts
 
 TODOs FOR NOW:
 - WAARWASIK: opschonen van de file browser code
@@ -194,6 +194,10 @@ if st.session_state == {}:
                 "cls_conf_max": 1.0,
                 "include_unclassified": True,
                 "image_size": "medium"
+            },
+            "files_sort_settings": {
+                "column": "timestamp",
+                "direction": "↓"
             }
         }
         with open(explore_results_file, "w") as f:

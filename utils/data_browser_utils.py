@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageFilter
 import pandas as pd
 from utils.config import ADDAXAI_ROOT, log
 from utils.common import load_vars, update_vars
+from components.shortcut_utils import register_shortcuts, clear_shortcut_listeners
 
 # Thumbnail generation constants
 MODAL_IMAGE_SIZE = 1000  # High-resolution modal images (pixels) used for export/zoom
@@ -729,6 +730,7 @@ def image_viewer_modal():
         if st.button("Close"):
             set_session_var("explore_results", "show_modal_image_viewer", False)
             st.rerun()
+        clear_shortcut_listeners()
         return
     
     # Get current row data
@@ -804,8 +806,10 @@ def image_viewer_modal():
                 ":material/close: Close",
                 type="secondary",
                 width="stretch",
-                key="modal_close_button"
+                key="modal_close_button",
+                help="Closes the window (shortcut `Esc`)",
             ):
+                clear_shortcut_listeners()
                 set_session_var("explore_results", "show_modal_image_viewer", False)
                 st.rerun()
         
@@ -816,7 +820,9 @@ def image_viewer_modal():
                 ":material/chevron_left: Previous",
                 disabled=(current_index <= 0),
                 width="stretch",
-                type="secondary"
+                type="secondary",
+                key="observation_modal_prev_button",
+                help="Show previous row (shortcut `←`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index - 1)
                 st.rerun()
@@ -826,10 +832,13 @@ def image_viewer_modal():
                 "Next :material/chevron_right:",
                 disabled=(current_index >= len(df_filtered) - 1),
                 width="stretch",
-                type="secondary"
+                type="secondary",
+                key="observation_modal_next_button",
+                help="Show next row (shortcut `→`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index + 1)
                 st.rerun()
+
 
         show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
         bbox_options = ["hide", "show"]
@@ -852,6 +861,7 @@ def image_viewer_modal():
         if new_show_bbox != show_bbox:
             set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
             st.rerun()
+
 
         with st.container(border=True):
             timestamp = current_row.get('timestamp', 'N/A')
@@ -901,6 +911,12 @@ def image_viewer_modal():
 
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
+
+        register_shortcuts(
+            observation_modal_prev_button=["arrowleft"],
+            observation_modal_next_button=["arrowright"],
+            modal_close_button=["escape"],
+        )
 
 
 def image_viewer_modal_file():
@@ -977,7 +993,9 @@ def image_viewer_modal_file():
                 type="secondary",
                 width="stretch",
                 key="file_modal_close_button",
+                help="Closes the window (shortcut `Esc`)",
             ):
+                clear_shortcut_listeners()
                 set_session_var("explore_results", "show_modal_image_viewer", False)
                 st.rerun()
 
@@ -988,6 +1006,8 @@ def image_viewer_modal_file():
                 disabled=(current_index <= 0),
                 width="stretch",
                 type="secondary",
+                key="file_modal_prev_button",
+                help="Show previous row (shortcut `←`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index - 1)
                 st.rerun()
@@ -998,9 +1018,12 @@ def image_viewer_modal_file():
                 disabled=(current_index >= len(df_files) - 1),
                 width="stretch",
                 type="secondary",
+                key="file_modal_next_button",
+                help="Show next row (shortcut `→`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index + 1)
                 st.rerun()
+
 
         bbox_options = ["hide", "show"]
         option_labels = {
@@ -1023,30 +1046,14 @@ def image_viewer_modal_file():
             set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
             st.rerun()
 
+
         with st.container(border=True):
-            timestamp_first = current_row.get("timestamp_first")
-            timestamp_last = current_row.get("timestamp_last")
-
-            def format_ts(value):
-                if not value:
-                    return None
+            raw_timestamp = current_row.get("timestamp")
+            if raw_timestamp:
                 try:
-                    return pd.to_datetime(value).strftime("%Y-%m-%d %H:%M:%S")
+                    timestamp_display = pd.to_datetime(raw_timestamp).strftime("%Y-%m-%d %H:%M:%S")
                 except Exception:
-                    return value
-
-            formatted_first = format_ts(timestamp_first)
-            formatted_last = format_ts(timestamp_last)
-
-            if formatted_first and formatted_last:
-                if formatted_first == formatted_last:
-                    timestamp_display = formatted_first
-                else:
-                    timestamp_display = f"{formatted_first} → {formatted_last}"
-            elif formatted_first:
-                timestamp_display = formatted_first
-            elif formatted_last:
-                timestamp_display = formatted_last
+                    timestamp_display = str(raw_timestamp)
             else:
                 timestamp_display = "N/A"
 
@@ -1063,6 +1070,12 @@ def image_viewer_modal_file():
 
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
+
+        register_shortcuts(
+            file_modal_prev_button=["arrowleft"],
+            file_modal_next_button=["arrowright"],
+            file_modal_close_button=["escape"],
+        )
 
 def classification_selector_modal(nodes, all_leaf_values):
     """

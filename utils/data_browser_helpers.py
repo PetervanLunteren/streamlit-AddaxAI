@@ -5,7 +5,7 @@ Reusable utilities for the Data Browser views.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict
+from typing import Dict, List
 
 import pandas as pd
 import streamlit as st
@@ -16,6 +16,64 @@ from components import print_widget_label
 from collections import Counter
 
 from utils.common import update_vars, set_session_var, get_session_var
+
+
+def render_sort_popover(
+    sort_col,
+    *,
+    storage_key: str,
+    current_settings: Dict[str, str],
+    save_settings_fn,
+    sortable_columns: List[tuple[str, str]],
+    on_apply_fn=None,
+):
+    """Render a reusable sort popover for any data browser view."""
+
+    columns_lookup = {col_id: label for col_id, label in sortable_columns}
+    column_order = [col_id for col_id, _ in sortable_columns]
+    saved_sort_column = current_settings.get("column", column_order[0])
+    saved_sort_direction = current_settings.get("direction", "↓")
+
+    with sort_col:
+        with st.popover(":material/swap_vert:", help="Sort", width="stretch"):
+            with st.form(f"sort_form_{storage_key}", border=False):
+                with st.container(border=True):
+                    print_widget_label("Sort by")
+                    col_field, col_dir, col_btn = st.columns([3, 1, 1])
+
+                    with col_field:
+                        try:
+                            default_index = column_order.index(saved_sort_column)
+                        except ValueError:
+                            default_index = 0
+
+                        selected_column = st.selectbox(
+                            "Column to sort",
+                            options=column_order,
+                            format_func=lambda x: columns_lookup.get(x, x),
+                            index=default_index,
+                            label_visibility="collapsed",
+                        )
+
+                    with col_dir:
+                        selected_direction = st.segmented_control(
+                            "Sorting method",
+                            options=["↑", "↓"],
+                            default=saved_sort_direction,
+                            label_visibility="collapsed",
+                            width="stretch",
+                        )
+
+                    with col_btn:
+                        if st.form_submit_button("Apply", width="stretch", type="primary"):
+                            save_settings_fn(
+                                {
+                                    "column": selected_column,
+                                    "direction": selected_direction,
+                                }
+                            )
+                            if on_apply_fn:
+                                on_apply_fn()
 
 
 def parse_timestamps(timestamp_series: pd.Series) -> pd.Series:

@@ -154,7 +154,7 @@ def render_data_browser_page():
 
     if current_view == "Files":
         files_df = st.session_state.get("results_files")
-        files_view.render_files_view(files_df, filtered_detection_df, export_col)
+        files_view.render_files_view(files_df, filtered_detection_df, export_col, sort_col)
         return
 
     if current_view == "Events":
