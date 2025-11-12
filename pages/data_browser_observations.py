@@ -22,7 +22,7 @@ from components import print_widget_label
 
 # Local constants for the observation grid
 ROW_HEIGHT_OPTIONS = {"small": 30, "medium": 100, "large": 250}
-IMAGE_SIZE_RATIO = 1.5
+IMAGE_SIZE_RATIO = 4 / 3
 IMAGE_COLUMN_WIDTHS = {
     size: int(height * IMAGE_SIZE_RATIO) for size, height in ROW_HEIGHT_OPTIONS.items()
 }
@@ -168,7 +168,7 @@ def render_observations_view(
                     "width": row.get("bbox_width"),
                     "height": row.get("bbox_height"),
                 }
-                thumbnail_size = (current_row_height, current_row_height)
+                thumbnail_size = (current_image_width, current_row_height)
                 image_url = image_to_base64_url(
                     row.get("absolute_path"), bbox_data, max_size=thumbnail_size
                 )
@@ -219,7 +219,7 @@ def render_observations_view(
                 const img = document.createElement('img');
                 if (params.value) {{
                     img.src = params.value;
-                    img.style.width = '{current_row_height}px';
+                    img.style.width = '{current_image_width}px';
                     img.style.height = '{current_row_height}px';
                     img.style.objectFit = 'contain';
                     img.style.border = 'none';
@@ -245,7 +245,7 @@ def render_observations_view(
         headerName="",
         cellRenderer=image_jscode,
         width=current_image_width + 20,
-        autoHeight=True,
+        autoHeight=False,
     )
 
     flex_columns = [

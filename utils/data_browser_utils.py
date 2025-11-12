@@ -187,10 +187,9 @@ def image_to_base64_url(image_path, bbox_data, max_size):
             else:
                 crop_info = None
             
-            # Create thumbnail (cap height to keep processing fast)
+            # Create thumbnail while preserving aspect ratio
             max_width, max_height = max_size
-            max_height = max(60, min(max_height, 180))
-            img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            img = _fit_image_with_letterbox(img, max_width, max_height)
             thumbnail_size = img.size
             
             # Draw red border if we have crop info
@@ -496,7 +495,7 @@ def generate_modal_image(image_path, bbox_data, show_bbox=True, show_labels=True
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
 
 
-def image_to_base64_with_boxes(image_path, detection_details, max_height):
+def image_to_base64_with_boxes(image_path, detection_details, max_height, max_width=None):
     """
     Generate a scaled image with all detections drawn for table thumbnails.
 
@@ -517,14 +516,20 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height):
                 img = img.convert('RGB')
 
             orig_width, orig_height = img.size
-            max_height = max(60, min(max_height, 180))
+            aspect_ratio = 4 / 3
+            target_width = max_width if max_width else int(max_height * aspect_ratio)
+            target_height = max_height
+            target_height = max(60, min(target_height, 250))
+            target_width = (
+                max(80, int(target_height * aspect_ratio))
+                if not max_width
+                else target_width
+            )
 
-            if orig_height > max_height:
-                scale = max_height / float(orig_height)
-                new_width = int(orig_width * scale)
-                img = img.resize((new_width, max_height), Image.Resampling.LANCZOS)
-            else:
-                new_width, max_height = orig_width, orig_height
+            scale = min(target_width / orig_width, target_height / orig_height)
+            new_width = max(1, int(orig_width * scale))
+            new_height = max(1, int(orig_height * scale))
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
             draw = ImageDraw.Draw(img)
 
@@ -547,21 +552,7 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height):
                 line_width = max(1, int(min(new_width, max_height) * 0.003))
                 draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=line_width)
 
-            if IMAGE_CORNER_RADIUS > 0:
-                mask = Image.new('L', img.size, 0)
-                mask_draw = ImageDraw.Draw(mask)
-                scaled_radius = max(5, min(int(IMAGE_CORNER_RADIUS), min(new_width, max_height) // 4))
-                mask_draw.rounded_rectangle(
-                    [(0, 0), (new_width - 1, max_height - 1)],
-                    radius=scaled_radius,
-                    fill=255
-                )
-                output = Image.new('RGBA', img.size, (255, 255, 255, 0))
-                output.paste(img, (0, 0))
-                output.putalpha(mask)
-                final = Image.new('RGB', img.size, 'white')
-                final.paste(output, (0, 0), output)
-                img = final
+            img = _fit_image_with_letterbox(img, target_width, target_height)
 
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=IMAGE_QUALITY)
@@ -571,7 +562,7 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height):
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
 
 
-def build_event_collage_base64(event_files, max_grid=4, thumb_size=180):
+def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_width=None):
     if not event_files:
         return None
 
@@ -579,10 +570,17 @@ def build_event_collage_base64(event_files, max_grid=4, thumb_size=180):
 
     detections_df = st.session_state.get("observations_source_df", pd.DataFrame())
 
+    if thumb_width is None:
+        thumb_width = int(thumb_height * 4 / 3)
+
     total_files = len(event_files)
     grid_size = min(max_grid, max(1, math.ceil(math.sqrt(total_files))))
     slots = grid_size * grid_size
-    collage = Image.new("RGB", (grid_size * thumb_size, grid_size * thumb_size), color=(30, 30, 30))
+    collage = Image.new(
+        "RGB",
+        (grid_size * thumb_width, grid_size * thumb_height),
+        color=(30, 30, 30),
+    )
 
     for idx, file_info in enumerate(event_files[:slots]):
         abs_path = file_info.get("absolute_path")
@@ -594,36 +592,38 @@ def build_event_collage_base64(event_files, max_grid=4, thumb_size=180):
         thumb_b64 = image_to_base64_with_boxes(
             abs_path,
             detection_details=detection_details,
-            max_height=thumb_size,
+            max_height=thumb_height,
+            max_width=thumb_width,
         )
         thumb_img = _base64_to_image(thumb_b64)
         if thumb_img is None:
             continue
-
-        thumb_img = _fit_image_with_letterbox(thumb_img, thumb_size)
         row = idx // grid_size
         col = idx % grid_size
-        collage.paste(thumb_img, (col * thumb_size, row * thumb_size))
+        collage.paste(thumb_img, (col * thumb_width, row * thumb_height))
 
     return _image_to_base64(collage)
 
 
-def _fit_image_with_letterbox(image, box_size):
+def _fit_image_with_letterbox(image, box_width, box_height=None):
     if image is None:
         return None
+    if box_height is None:
+        box_height = box_width
+
     img = image.copy()
     img_width, img_height = img.size
     if img_width == 0 or img_height == 0:
         return None
 
-    scale = min(box_size / img_width, box_size / img_height)
+    scale = min(box_width / img_width, box_height / img_height)
     new_width = max(1, int(img_width * scale))
     new_height = max(1, int(img_height * scale))
     img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-    canvas = Image.new("RGB", (box_size, box_size), color=(30, 30, 30))
-    offset_x = (box_size - new_width) // 2
-    offset_y = (box_size - new_height) // 2
+    canvas = Image.new("RGB", (box_width, box_height), color=(30, 30, 30))
+    offset_x = (box_width - new_width) // 2
+    offset_y = (box_height - new_height) // 2
     canvas.paste(img, (offset_x, offset_y))
     return canvas
 

@@ -85,7 +85,7 @@ def render_events_view(events_df: pd.DataFrame, export_col, sort_col):
     )
     row_height_options = {"small": 30, "medium": 100, "large": 250}
     thumb_height_options = row_height_options
-    thumb_width_options = {size: int(height * 1.5) for size, height in row_height_options.items()}
+    thumb_width_options = {size: int(height * 4 / 3) for size, height in row_height_options.items()}
 
     current_row_height = row_height_options.get(image_size_setting, row_height_options["medium"])
     current_thumb_height = thumb_height_options.get(image_size_setting, thumb_height_options["medium"])
@@ -200,6 +200,7 @@ def render_event_table(
             row.get("event_id"),
             row.get("event_files") or [],
             thumb_height,
+            thumb_width,
         ),
         axis=1,
     )
@@ -348,7 +349,7 @@ def show_event_modal():
             current_row.get("event_id"),
             event_files,
             thumb_height=240,
-            thumb_width=360,
+            thumb_width=320,
         )
 
         col_image, col_meta = st.columns([2, 1])
@@ -411,7 +412,11 @@ def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=No
     cache_key = f"{identifier}_{thumb_height}_{thumb_width or thumb_height}"
     if cache_key not in cache:
         cache[cache_key] = (
-            build_event_collage_base64(event_files, thumb_size=thumb_height)
+            build_event_collage_base64(
+                event_files,
+                thumb_height=thumb_height,
+                thumb_width=thumb_width,
+            )
             or PLACEHOLDER_IMAGE
         )
     return cache[cache_key]

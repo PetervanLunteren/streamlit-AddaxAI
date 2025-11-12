@@ -131,11 +131,12 @@ def render_file_level_browser(files_df: pd.DataFrame):
     )
     row_height_options = {"small": 30, "medium": 100, "large": 250}
     image_size_options = {
-        size: {"height": height, "width": int(height * 1.5)}
+        size: {"height": height, "width": int(height * 4 / 3)}
         for size, height in row_height_options.items()
     }
     size_config = image_size_options.get(image_size_setting, image_size_options["medium"])
     file_row_height = size_config["height"]
+    file_image_width = size_config["width"]
 
     if "files_page_size" not in st.session_state:
         st.session_state.files_page_size = DEFAULT_PAGE_SIZE
@@ -177,6 +178,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
                 row.get("absolute_path"),
                 detection_details=detection_details,
                 max_height=file_row_height,
+                max_width=file_image_width,
             )
             thumbnails.append(image_url)
         st.session_state.files_thumbnail_cache.clear()
@@ -227,8 +229,8 @@ def render_file_level_browser(files_df: pd.DataFrame):
     gb.configure_column(
         "image",
         headerName="",
-        width=file_row_height + 40,
-        minWidth=file_row_height + 40,
+        width=file_image_width + 20,
+        minWidth=file_image_width + 20,
         autoHeight=True,
         cellRenderer=JsCode(
             f"""
@@ -237,7 +239,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
                     const img = document.createElement('img');
                     if (params.value) {{
                         img.src = params.value;
-                        img.style.width = '{file_row_height}px';
+                        img.style.width = '{file_image_width}px';
                         img.style.height = '{file_row_height}px';
                         img.style.objectFit = 'contain';
                         img.style.border = 'none';
