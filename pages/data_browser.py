@@ -26,6 +26,7 @@ from components import print_widget_label
 
 from pages import data_browser_observations as observations_view
 from pages import data_browser_files as files_view
+from pages import data_browser_events as events_view
 
 st.set_page_config(layout="wide")
 
@@ -158,8 +159,8 @@ def render_data_browser_page():
         return
 
     if current_view == "Events":
-        st.info("Event-level browser coming soon.")
-        render_export_popover(export_col, st.session_state.get("results_events"), "Events")
+        events_df = st.session_state.get("events_source_df")
+        events_view.render_events_view(events_df, export_col, sort_col)
         return
 
     observations_view.render_observations_view(

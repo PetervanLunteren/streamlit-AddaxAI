@@ -21,7 +21,8 @@ How to pip install into an environment:
 TODOs FOR NOW:
 - WAARWASIK: verder gaan met de even table: codex resume 019a774d-0e50-7670-801d-222554641fcc
 
-
+# IMPORTANT TODOS:
+- get rid of the runID, and make it a deploymentID. FDorce users to do single deployments per run. That means renaming the run_id to deployment_id everywhere, and getting rid of the runID code around "Is this a single deployment?" widget.
 
 - make the detections page for full images too. 
 - try out my new PyPi package: https://pypi.org/project/st-segmented-buttons/
@@ -55,6 +56,7 @@ import pandas as pd
 
 # Local imports - global config must be imported before anything else
 from utils.config import *
+from utils.common import load_app_settings
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GLOBAL CONFIGURATION & SETUP (runs on every request)
@@ -249,7 +251,10 @@ if st.session_state == {}:
         from utils.data_loading import (
             load_detection_results_dataframe,
             aggregate_detections_to_files,
+            aggregate_detections_to_events,
         )
+        app_settings = load_app_settings()
+
         results_df = load_detection_results_dataframe()
         st.session_state["observations_source_df"] = results_df
 
@@ -263,6 +268,11 @@ if st.session_state == {}:
         results_files_df = aggregate_detections_to_files(results_df)
         st.session_state["files_source_df"] = results_files_df
 
+        events_settings = app_settings.get("events", {}) if app_settings else {}
+        time_gap_seconds = int(events_settings.get("time_gap_seconds", 60))
+        events_df = aggregate_detections_to_events(results_df, time_gap_seconds=time_gap_seconds)
+        st.session_state["events_source_df"] = events_df
+
         log(
             "Aggregated detection results into "
             f"{len(results_files_df)} unique files"
@@ -274,6 +284,8 @@ if st.session_state == {}:
         st.warning(error_msg)
         # Create empty dataframe as fallback
         st.session_state["observations_source_df"] = pd.DataFrame()
+        st.session_state["files_source_df"] = pd.DataFrame()
+        st.session_state["events_source_df"] = pd.DataFrame()
         # Propagate failure for file aggregation by re-raising
         raise
 

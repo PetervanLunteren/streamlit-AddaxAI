@@ -302,14 +302,15 @@ def render_file_level_browser(files_df: pd.DataFrame):
     grid_options = gb.build()
     grid_height = (len(display_df) * (file_row_height + 10)) + 55
 
-    grid_response = AgGrid(
-        display_df,
-        gridOptions=grid_options,
-        height=grid_height,
-        allow_unsafe_jscode=True,
-        theme="streamlit",
-        update_on=['selectionChanged'],
-    )
+    with st.spinner("Rendering files..."):
+        grid_response = AgGrid(
+            display_df,
+            gridOptions=grid_options,
+            height=grid_height,
+            allow_unsafe_jscode=True,
+            theme="streamlit",
+            update_on=['selectionChanged'],
+        )
 
     bottom_menu = st.columns((4, 1, 1))
     with bottom_menu[0]:

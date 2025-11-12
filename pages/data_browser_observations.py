@@ -313,14 +313,15 @@ def render_observations_view(
     buffer_height = 20
     grid_height = (len(display_df) * row_height) + header_height + buffer_height
 
-    grid_response = AgGrid(
-        display_df,
-        gridOptions=grid_options,
-        height=grid_height,
-        allow_unsafe_jscode=True,
-        theme="streamlit",
-        update_on=["selectionChanged"],
-    )
+    with st.spinner("Rendering detections..."):
+        grid_response = AgGrid(
+            display_df,
+            gridOptions=grid_options,
+            height=grid_height,
+            allow_unsafe_jscode=True,
+            theme="streamlit",
+            update_on=["selectionChanged"],
+        )
 
     if grid_response["selected_rows"] is not None and len(grid_response["selected_rows"]) > 0:
         selected_row = grid_response["selected_rows"].iloc[0]

@@ -59,6 +59,34 @@ with st.form("data_import_settings_form"):
         st.rerun()
 
 
+# EVENTS
+events_settings = app_settings.get("events", {})
+time_gap_default = int(events_settings.get("time_gap_seconds", 60))
+
+st.subheader(":material/event: Event grouping", divider="grey")
+st.caption(
+    "Define how detections are grouped into events. AddaxAI treats a new event when the gap between detections exceeds this threshold."
+)
+
+with st.form("event_settings_form"):
+    time_gap_value = st.number_input(
+        "Maximum gap between detections (seconds)",
+        min_value=10,
+        max_value=600,
+        step=10,
+        value=time_gap_default,
+        help="A new event starts when the time between detections exceeds this threshold. 60 seconds matches Wildlife Insights' default.",
+    )
+
+    submitted_events = st.form_submit_button("Save and reload app", type="primary", width="stretch")
+
+    if submitted_events:
+        app_settings.setdefault("events", {})["time_gap_seconds"] = int(time_gap_value)
+        save_app_settings(app_settings)
+        st.session_state["_force_reset"] = True
+        st.rerun()
+
+
 # LANGUAGE
 txts = load_lang_txts()
 general_settings_vars = load_vars(section="general_settings")

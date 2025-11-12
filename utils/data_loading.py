@@ -9,6 +9,8 @@ Functions for loading and processing data from completed runs including:
 
 import os
 import json
+import math
+from datetime import datetime
 from collections import Counter
 import pandas as pd
 import streamlit as st
@@ -766,3 +768,166 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
         )
 
     return pd.DataFrame(aggregated_files, columns=FILE_AGGREGATION_COLUMNS)
+
+
+def aggregate_detections_to_events(
+    detections_df: pd.DataFrame,
+    time_gap_seconds: int = 60,
+) -> pd.DataFrame:
+    """
+    Aggregate detection-level records into event-level summaries based on a time gap threshold.
+
+    Each event represents a burst of detections captured within `time_gap_seconds` of each other
+    for the same project/location/run combination.
+    """
+    if detections_df is None or detections_df.empty:
+        return pd.DataFrame(
+            columns=[
+                "event_id",
+                "project_id",
+                "location_id",
+                "run_id",
+                "start_timestamp",
+                "end_timestamp",
+                "duration_seconds",
+                "image_count",
+                "detections_count",
+                "classifications_count",
+                "species_list",
+                "dominant_species",
+                "max_detection_conf",
+                "max_classification_conf",
+                "latitude",
+                "longitude",
+                "file_paths",
+            ]
+        )
+
+    detections_df = detections_df.copy()
+    detections_df["_timestamp_dt"] = detections_df["timestamp"].apply(_parse_detection_timestamp)
+    detections_df = detections_df.sort_values(by=["project_id", "location_id", "run_id", "_timestamp_dt"])
+    grouped = detections_df.groupby(["project_id", "location_id", "run_id"], dropna=False, sort=False)
+
+    events = []
+
+    for (project_id, location_id, run_id), group in grouped:
+        group = group.sort_values("_timestamp_dt").reset_index(drop=True)
+        current_event_rows = []
+        last_timestamp = None
+        last_species = None
+
+        for _, row in group.iterrows():
+            timestamp_dt = row.get("_timestamp_dt")
+            species_label = _normalize_species_label(row.get("classification_label"))
+
+            if not current_event_rows:
+                current_event_rows.append(row)
+                last_timestamp = timestamp_dt
+                last_species = species_label
+                continue
+
+            gap_seconds = None
+            if timestamp_dt is not None and last_timestamp is not None:
+                gap_seconds = (timestamp_dt - last_timestamp).total_seconds()
+
+            gap_exceeded = gap_seconds is not None and gap_seconds > time_gap_seconds
+            species_changed = species_label != last_species
+
+            if gap_exceeded or species_changed:
+                events.append(_finalize_event(current_event_rows, project_id, location_id, run_id))
+                current_event_rows = [row]
+            else:
+                current_event_rows.append(row)
+
+            last_timestamp = timestamp_dt
+            last_species = species_label
+
+        if current_event_rows:
+            events.append(_finalize_event(current_event_rows, project_id, location_id, run_id))
+
+    events_df = pd.DataFrame(events)
+    return events_df
+
+
+def _finalize_event(rows, project_id, location_id, run_id):
+    """Helper to summarize a list of detection rows into a single event record."""
+    df_event = pd.DataFrame(rows)
+    timestamps = pd.to_datetime(df_event.get("_timestamp_dt"), errors="coerce").dropna()
+    start_ts = timestamps.min() if not timestamps.empty else None
+    end_ts = timestamps.max() if not timestamps.empty else start_ts
+    duration_seconds = (
+        (end_ts - start_ts).total_seconds() if start_ts is not None and end_ts is not None else 0
+    )
+
+    species_series = df_event["classification_label"].dropna().astype(str).str.strip()
+    species_list = sorted(species_series.unique()) if not species_series.empty else []
+    dominant_species = species_series.mode().iloc[0] if not species_series.empty else None
+
+    relative_series = df_event.get("relative_path")
+    absolute_series = df_event.get("absolute_path")
+    relative_paths = relative_series.dropna().astype(str).tolist() if relative_series is not None else []
+
+    path_map = {}
+    if relative_series is not None and absolute_series is not None:
+        for rel, abs_path in zip(relative_series.tolist(), absolute_series.tolist()):
+            rel = str(rel) if rel is not None else None
+            if rel and rel not in path_map:
+                path_map[rel] = abs_path
+    unique_relative_paths = []
+    seen = set()
+    for rel in relative_paths:
+        if rel and rel not in seen:
+            seen.add(rel)
+            unique_relative_paths.append(rel)
+    event_files = [
+        {
+            "relative_path": rel,
+            "absolute_path": path_map.get(rel),
+        }
+        for rel in unique_relative_paths
+    ]
+
+    return {
+        "event_id": f"{run_id}_{start_ts.strftime('%Y%m%dT%H%M%S')}" if start_ts is not None else f"{run_id}_event",
+        "project_id": project_id,
+        "location_id": location_id,
+        "run_id": run_id,
+        "start_timestamp": start_ts.isoformat() if start_ts is not None else None,
+        "end_timestamp": end_ts.isoformat() if end_ts is not None else None,
+        "duration_seconds": duration_seconds,
+        "image_count": len(df_event),
+        "detections_count": len(df_event),
+        "classifications_count": df_event["classification_label"].notna().sum(),
+        "species_list": species_list,
+        "dominant_species": dominant_species,
+        "max_detection_conf": df_event["detection_confidence"].max(skipna=True),
+        "max_classification_conf": df_event["classification_confidence"].max(skipna=True),
+        "latitude": df_event["latitude"].dropna().iloc[0] if "latitude" in df_event and not df_event["latitude"].dropna().empty else None,
+        "longitude": df_event["longitude"].dropna().iloc[0] if "longitude" in df_event and not df_event["longitude"].dropna().empty else None,
+        "file_paths": unique_relative_paths,
+        "event_files": event_files,
+    }
+
+
+def _parse_detection_timestamp(value):
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return None
+
+    value_str = str(value).strip()
+    if not value_str:
+        return None
+
+    for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(value_str, fmt)
+        except ValueError:
+            continue
+
+    return pd.to_datetime(value_str, errors="coerce")
+
+
+def _normalize_species_label(label):
+    if label is None or (isinstance(label, float) and math.isnan(label)):
+        return "unclassified"
+    label_str = str(label).strip()
+    return label_str.lower() if label_str else "unclassified"

@@ -9,6 +9,7 @@ import json
 import os
 import base64
 import io
+import math
 from PIL import Image, ImageDraw, ImageFilter
 import pandas as pd
 from utils.config import ADDAXAI_ROOT, log
@@ -568,6 +569,86 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height):
             return f"data:image/jpeg;base64,{img_data}"
     except Exception:
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
+
+
+def build_event_collage_base64(event_files, max_grid=4, thumb_size=180):
+    if not event_files:
+        return None
+
+    import streamlit as st
+
+    detections_df = st.session_state.get("observations_source_df", pd.DataFrame())
+
+    total_files = len(event_files)
+    grid_size = min(max_grid, max(1, math.ceil(math.sqrt(total_files))))
+    slots = grid_size * grid_size
+    collage = Image.new("RGB", (grid_size * thumb_size, grid_size * thumb_size), color=(30, 30, 30))
+
+    for idx, file_info in enumerate(event_files[:slots]):
+        abs_path = file_info.get("absolute_path")
+        rel_path = file_info.get("relative_path")
+        if not abs_path or not os.path.exists(abs_path):
+            continue
+
+        detection_details = _lookup_detection_details(rel_path, detections_df)
+        thumb_b64 = image_to_base64_with_boxes(
+            abs_path,
+            detection_details=detection_details,
+            max_height=thumb_size,
+        )
+        thumb_img = _base64_to_image(thumb_b64)
+        if thumb_img is None:
+            continue
+        thumb_img = thumb_img.resize((thumb_size, thumb_size))
+        row = idx // grid_size
+        col = idx % grid_size
+        collage.paste(thumb_img, (col * thumb_size, row * thumb_size))
+
+    return _image_to_base64(collage)
+
+
+def _lookup_detection_details(relative_path, detections_df):
+    if relative_path is None or detections_df is None or detections_df.empty:
+        return []
+
+    matched = detections_df[detections_df["relative_path"] == relative_path]
+    if matched.empty:
+        return []
+
+    details = []
+    for _, det in matched.iterrows():
+        bbox = {
+            "x": det.get("bbox_x"),
+            "y": det.get("bbox_y"),
+            "width": det.get("bbox_width"),
+            "height": det.get("bbox_height"),
+        }
+        if any(pd.isna(v) for v in bbox.values()):
+            continue
+        details.append({"bbox": bbox})
+
+    return details
+
+
+def _base64_to_image(b64_string):
+    if not b64_string:
+        return None
+    if "," in b64_string:
+        _, encoded = b64_string.split(",", 1)
+    else:
+        encoded = b64_string
+    try:
+        return Image.open(io.BytesIO(base64.b64decode(encoded)))
+    except Exception:
+        return None
+
+
+def _image_to_base64(image):
+    if image is None:
+        return None
+    buffer = io.BytesIO()
+    image.save(buffer, format='JPEG', quality=IMAGE_QUALITY)
+    return f"data:image/jpeg;base64,{base64.b64encode(buffer.getvalue()).decode()}"
 
 def generate_file_modal_image(image_path, detection_details, show_bbox=True, show_labels=True):
     """

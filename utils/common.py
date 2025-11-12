@@ -58,7 +58,7 @@ def unique_animal_string():
     ]
     
     # 5-letter animals
-    animals = ["horse", "tiger", "sheep", "mouse", "zebra", "whale", "genet", "stoat"
+    animals = ["horse", "tiger", "sheep", "mouse", "zebra", "whale", "genet", "stoat",
                "panda", "rhino", "hippo", "llama", "koala", "skunk", "civet", "camel", 
                "otter", "moose", "hyena", "sloth", "chimp", "bison", "swine", "puppy",
     ]
@@ -212,6 +212,9 @@ APP_SETTINGS_FILE = os.path.join(ADDAXAI_ROOT, "config", "settings.json")
 DEFAULT_APP_SETTINGS = {
     "data_import": {
         "detection_conf_threshold": 0.5
+    },
+    "events": {
+        "time_gap_seconds": 60
     }
 }
 
