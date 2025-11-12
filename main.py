@@ -19,7 +19,7 @@ How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit-shortcuts
 
 TODOs FOR NOW:
-- WAARWASIK: opschonen van de file browser code
+- WAARWASIK: verder gaan met de even table: codex resume 019a774d-0e50-7670-801d-222554641fcc
 
 
 
