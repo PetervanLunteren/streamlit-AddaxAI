@@ -17,7 +17,6 @@ import numpy as np
 
 # exmaple images and detections can be found here: assets/test_images
 # Detections-level results: assets/test_images/results_detections.csv
-# file-level results: assets/test_images/results_files.csv
 
 
 # It would be great if we could have these features:
