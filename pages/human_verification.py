@@ -1,12 +1,3 @@
-import streamlit as st
-import pandas as pd
-from PIL import Image
-import os
-import numpy as np
-
-
-
-
 ## This would be where the users can verify their predictions. It bascially gives the user to select certain labels and confidence ranges to double check the predicitons and adjust if needed
 
 # Example, user is specifically intersted in wolf detections for his study. He want to verify all wolf predictions with a confidence between 0.4 and 0.8. 
@@ -37,15 +28,21 @@ import numpy as np
 # - burst mode (see all images in a sequence and verify them together)
 # - video frames verification
 
+import streamlit as st
+import pandas as pd
+from PIL import Image
+import os
+import numpy as np
 
+st.title("Human verification mockup")
 
 # load data
 detections = pd.read_csv('./assets/test_images/results_detections.csv')
 
 # this is the test data
-st.markdown("## Example detections")
+st.markdown("#### Example detections")
 st.write(detections)
 
 # example UI
-st.markdown("## Example UI")
+st.markdown("#### Example UI")
 st.image('./assets/images/mockup.png')
