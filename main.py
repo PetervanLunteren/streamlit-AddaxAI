@@ -4,12 +4,15 @@ AddaxAI Streamlit Application - Main Entry Point
 This is the main entry point for the AddaxAI wildlife camera trap analysis platform.
 The application uses an optimized startup/rerun pattern to minimize I/O operations:
 - On startup (empty session_state): Load all files, initialize caches  
-- On reruns: Use cached data from session_state for maximum performance
+- On reruns: Use cached data from session_state
 
 Architecture:
 - Three-tier variable storage: session_state (temp) → vars/*.json (persistent) → ~/.config/AddaxAI/map.json (global)
 - Write-through caching: Changes update both persistent storage and session_state 
 - Startup detection: if st.session_state == {} triggers initialization
+
+Test images:
+https://drive.google.com/uc?export=download&id=1secwdgHOo7dxWywabdW3ehyVb9t3_89k
 
 Run with micromamba:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
