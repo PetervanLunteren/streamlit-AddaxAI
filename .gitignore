@@ -31,3 +31,6 @@ config/*
 # anything in temp is not relevant
 assets/temp/*
 tmp/*
+
+# Do not check in micromamba binary on Linux
+bin/linux/
