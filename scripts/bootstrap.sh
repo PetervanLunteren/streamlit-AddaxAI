@@ -1,14 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Tested on Fedora Linux
-# Not tested on macOS
+# ==============================================================================
+# Description: Sets up the local development environment for AddaxAI by
+#              installing micromamba, creating the base Python environment, and
+#              configuring platform-specific dependencies. Does not install
+#              model-specific Python environments, the user will be prompted to
+#              install these as required when using AddaxAI.
+#              Designed for both Linux and macOS, TODO: not yet tested on macOS.
+#
+# Usage:       ./bootstrap.sh
+#
+# System requirements:
+#   - curl
+#   - tar
+#
+# Notes:
+#   - Installs micromamba under ./bin/<os>/
+#   - Creates local envs under ./envs/
+#   - Uses local temp folder for Python caching, not the default /tmp
+#
+# ==============================================================================
+
+require() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Error: '$1' is required but not installed." >&2
+        exit 1
+    fi
+}
+
+require curl
+require tar
 
 echo "Installing AddaxAI dependencies and configuring local environment"
 
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
 ARCH=$(uname -m)
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -55,7 +82,8 @@ export PIP_CACHE_DIR="$TMP_LOCAL/pip_cache"
 
 echo "Creating Python environment..."
 ENV_PREFIX="$PROJECT_ROOT/envs/env-addaxai-base"
-$MICROMAMBA_BIN env create -f "$PROJECT_ROOT/envs/ymls/addaxai-base/macos/environment.yml" --prefix $ENV_PREFIX -y
+ENV_PATH_OS="${OS/darwin/macos}"
+$MICROMAMBA_BIN env create -f "$PROJECT_ROOT/envs/ymls/addaxai-base/$ENV_PATH_OS/environment.yml" --prefix $ENV_PREFIX -y
 
 SPECIESNET="speciesnet==5.0.2"
 
