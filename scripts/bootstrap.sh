@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Tested on Fedora Linux
+# Not tested on macOS
+
 echo "Installing AddaxAI dependencies and configuring local environment"
 
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
