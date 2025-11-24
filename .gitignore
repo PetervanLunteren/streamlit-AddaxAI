@@ -32,5 +32,6 @@ config/*
 assets/temp/*
 tmp/*
 
-# Do not check in micromamba binary on Linux
+# Do not check in micromamba binaries
 bin/linux/
+bin/darwin/

@@ -96,4 +96,6 @@ else
 fi
 
 echo "Done. You can now run AddaxAI with the following command:"
-echo "$MICROMAMBA_BIN run -p $ENV_PREFIX streamlit run main.py"
+echo ""
+echo ""
+echo "cd $PROJECT_ROOT && ./bin/$OS/micromamba run -p ./envs/env-addaxai-base streamlit run main.py"
