@@ -4,9 +4,9 @@ A temporary repository to buid a new AddaxAI version. Completely separate from i
 
 ## Prerequisites
 
-**macOS Only**: This application is currently designed for macOS systems only.
+This application is will be available for macOS, Windows, and Linux. But is currently tested for macOS and Linux only. If you want to contribute and are on Windows, we need to fix that first. Shouldn't be too hard, just something that needs to be done. 
 
-No external dependencies required! The application includes its own micromamba binary for managing Python environments.
+The application includes its own micromamba binary for managing Python environments.
 
 ## Installation
 
@@ -19,14 +19,11 @@ cd streamlit-AddaxAI
 
 ### 2. Create Environment and Install Packages
 
-Create environment using included micromamba (installs in ./envs/env-addaxai-base)
+Create environment using `bootstrap.sh`
 
 ```bash
-./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
-```
-Install SpeciesNet with the required flag for macOS (ignore package conflict about `protobuf`)
-```bash 
-./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install --use-pep517 speciesnet==5.0.2
+cd scripts
+./bootstrap.sh
 ```
 
 ### 3. Launch Application
