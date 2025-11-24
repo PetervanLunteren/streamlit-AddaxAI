@@ -1,4 +1,4 @@
-# AddaxAI Streamlit Application
+# AddaxAI Streamlit version
 
 A temporary repository to buid a new AddaxAI version. Completely separate from its original repo https://github.com/PetervanLunteren/addaxai so that we can mess around and dont have to be gentle. 
 
@@ -10,24 +10,19 @@ The application includes its own micromamba binary for managing Python environme
 
 ## Installation
 
-### 1. Clone Repository
-Clone this repository to your desired location
+1. Clone this repository to your desired location
 ```bash
 git clone https://github.com/PetervanLunteren/streamlit-AddaxAI.git
 cd streamlit-AddaxAI
 ```
 
-### 2. Create Environment and Install Packages
-
-Create environment using `bootstrap.sh`
-
+2. Create environment using `bootstrap.sh`
 ```bash
 cd scripts
 ./bootstrap.sh
 ```
 
-### 3. Launch Application
-Run the application using the created environment
+3. Run the application using the created environment
 ```bash
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 ```
