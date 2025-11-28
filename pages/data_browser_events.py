@@ -360,72 +360,172 @@ def show_event_modal():
 
     with modal.container():
         event_files = current_row.get("event_files") or []
+        show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
+
         collage_b64 = get_cached_event_collage(
             current_row.get("event_id"),
             event_files,
             thumb_height=240,
             thumb_width=320,
-            event_data={"event_id": current_row.get("event_id")},  # Now we only need event_id!
+            event_data={"event_id": current_row.get("event_id")},
+            show_bbox=show_bbox,
         )
 
-        col_image, col_meta = st.columns([2, 1])
-        with col_image:
-            if collage_b64:
-                st.markdown(
-                    f'<img src="{collage_b64}" style="width: 480px; height: auto;">',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.info("No images available for this event.")
+        img_col, meta_col = st.columns([1, 1])
 
-        with col_meta:
-            st.markdown(f"**Start:** {current_row.get('start_timestamp', 'N/A')}")
-            st.markdown(f"**Location:** {current_row.get('location_id', 'N/A')}")
-            st.markdown(f"**Detections:** {current_row.get('detections_count', 0)}")
-            individual_count = current_row.get('individual_count')
-            individual_display = individual_count if individual_count is not None else 'N/A'
-            st.markdown(f"**Individuals:** {individual_display}")
-            st.markdown(f"**Detection:** {current_row.get('detection_label', 'N/A')}")
-            classification = current_row.get('classification_label') or 'N/A'
-            st.markdown(f"**Classification:** {classification}")
+        with img_col:
+            with st.container(border=True):
+                if collage_b64:
+                    st.markdown(
+                        f'<img src="{collage_b64}" style="width: 480px; height: auto;">',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.error("Could not load collage")
+                st.write("")
 
-        col_prev, col_close, col_next = st.columns([1, 1, 1])
-        with col_prev:
-            if st.button(
-                ":material/chevron_left:",
-                key="event_modal_prev",
-                disabled=current_index <= 0,
-                use_container_width=True,
-            ):
-                set_session_var("explore_results", "modal_current_event_index", current_index - 1)
+            st.caption("Use shortcuts `←` `→` to navigate and `Esc` to close")
+
+        with meta_col:
+            top_col_export, top_col_close = st.columns([1, 1])
+
+            with top_col_export:
+                # Generate high-res collage on-demand and provide download
+                with st.spinner("Generating high-resolution collage..."):
+                    # Generate fresh collage at export resolution (480px)
+                    high_res_collage = build_event_collage_base64(
+                        event_files,
+                        thumb_height=480,  # 2x modal display resolution
+                        thumb_width=640,   # Maintain 4:3 ratio
+                        event_data={"event_id": current_row.get("event_id")},
+                        show_bbox=show_bbox,
+                    )
+
+                    if high_res_collage and high_res_collage.startswith("data:image/"):
+                        import base64
+                        from datetime import datetime
+
+                        base64_data = high_res_collage.split(",")[1]
+                        image_bytes = base64.b64decode(base64_data)
+
+                        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                        download_filename = f"addaxai-event-{timestamp}.png"
+
+                        st.download_button(
+                            label=":material/download: Export",
+                            data=image_bytes,
+                            file_name=download_filename,
+                            mime="image/png",
+                            type="secondary",
+                            key="event_modal_export_button",
+                            width="stretch",
+                        )
+
+            with top_col_close:
+                if st.button(
+                    ":material/close: Close",
+                    type="secondary",
+                    width="stretch",
+                    key="event_modal_close_button",
+                ):
+                    set_session_var("explore_results", "modal_source", None)
+                    set_session_var("explore_results", "show_modal_event_viewer", False)
+                    st.rerun()
+
+            nav_col_prev, nav_col_next = st.columns([1, 1])
+
+            with nav_col_prev:
+                if st.button(
+                    ":material/chevron_left: Previous",
+                    disabled=(current_index <= 0),
+                    width="stretch",
+                    type="secondary",
+                    key="event_modal_prev_button",
+                ):
+                    set_session_var("explore_results", "modal_current_event_index", current_index - 1)
+                    st.rerun()
+
+            with nav_col_next:
+                if st.button(
+                    "Next :material/chevron_right:",
+                    disabled=(current_index >= len(events_df) - 1),
+                    width="stretch",
+                    type="secondary",
+                    key="event_modal_next_button",
+                ):
+                    set_session_var("explore_results", "modal_current_event_index", current_index + 1)
+                    st.rerun()
+
+            # Show/Hide bboxes toggle
+            show_bbox = get_session_var("explore_results", "modal_show_bbox", True)
+            bbox_options = ["hide", "show"]
+            option_labels = {
+                "hide": ":material/visibility_off: Hide",
+                "show": ":material/visibility: Show",
+            }
+
+            selected_option = st.segmented_control(
+                "Show boxes",
+                options=bbox_options,
+                default="show" if show_bbox else "hide",
+                format_func=lambda opt: option_labels.get(opt, opt.title()),
+                key="event_bbox_toggle",
+                label_visibility="collapsed",
+                width="stretch",
+            )
+
+            new_show_bbox = selected_option == "show"
+            if new_show_bbox != show_bbox:
+                set_session_var("explore_results", "modal_show_bbox", new_show_bbox)
                 st.rerun()
 
-        with col_close:
-            if st.button(
-                ":material/close: Close",
-                key="event_modal_close",
-                type="secondary",
-                use_container_width=True,
-            ):
-                set_session_var("explore_results", "modal_source", None)
-                set_session_var("explore_results", "show_modal_event_viewer", False)
-                st.rerun()
+            with st.container(border=True):
+                from components.ui_helpers import code_span
 
-        with col_next:
-            if st.button(
-                ":material/chevron_right:",
-                key="event_modal_next",
-                disabled=current_index >= len(events_df) - 1,
-                use_container_width=True,
-            ):
-                set_session_var("explore_results", "modal_current_event_index", current_index + 1)
-                st.rerun()
+                # Format timestamp
+                raw_timestamp = current_row.get("start_timestamp")
+                if raw_timestamp:
+                    try:
+                        timestamp_display = pd.to_datetime(raw_timestamp).strftime("%Y-%m-%d %H:%M:%S")
+                    except Exception:
+                        timestamp_display = str(raw_timestamp)
+                else:
+                    timestamp_display = "N/A"
+
+                # Format individual count
+                individual_count = current_row.get('individual_count')
+                individual_display = str(individual_count) if individual_count is not None else 'N/A'
+
+                # Format duration
+                duration = current_row.get('duration_seconds')
+                duration_display = f"{duration}s" if duration is not None else 'N/A'
+
+                metadata_rows = [
+                    ("Individuals", individual_display),
+                    ("Detection", current_row.get("detection_label", "N/A")),
+                    ("Classification", current_row.get("classification_label", "N/A")),
+                    ("Timestamp", timestamp_display),
+                    ("Duration", duration_display),
+                    ("Location", current_row.get("location_id", "N/A")),
+                    ("Row", f"{current_index + 1} of {len(events_df)}"),
+                ]
+
+                for label, value in metadata_rows:
+                    st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
+
+        # Register keyboard shortcuts
+        from components.shortcut_utils import register_shortcuts
+        register_shortcuts(
+            event_modal_prev_button=["arrowleft"],
+            event_modal_next_button=["arrowright"],
+            event_modal_close_button=["escape"],
+        )
 
 
-def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=None, event_data=None):
+def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=None, event_data=None, show_bbox=True):
     cache = st.session_state.setdefault("events_collage_cache", {})
     identifier = event_id or "unknown"
-    cache_key = f"{identifier}_{thumb_height}_{thumb_width or thumb_height}"
+    cache_key = f"{identifier}_{thumb_height}_{thumb_width or thumb_height}_bbox{show_bbox}"
     if cache_key not in cache:
         cache[cache_key] = (
             build_event_collage_base64(
@@ -433,6 +533,7 @@ def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=No
                 thumb_height=thumb_height,
                 thumb_width=thumb_width,
                 event_data=event_data,
+                show_bbox=show_bbox,
             )
             or PLACEHOLDER_IMAGE
         )

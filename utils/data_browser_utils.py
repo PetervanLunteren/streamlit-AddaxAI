@@ -477,12 +477,14 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height, max_wi
             aspect_ratio = 4 / 3
             target_width = max_width if max_width else int(max_height * aspect_ratio)
             target_height = max_height
-            target_height = max(60, min(target_height, 250))
-            target_width = (
-                max(80, int(target_height * aspect_ratio))
-                if not max_width
-                else target_width
-            )
+            # Only cap height for table thumbnails, not for high-res exports
+            if max_height <= 250:
+                target_height = max(60, min(target_height, 250))
+                target_width = (
+                    max(80, int(target_height * aspect_ratio))
+                    if not max_width
+                    else target_width
+                )
 
             scale = min(target_width / orig_width, target_height / orig_height)
             new_width = max(1, int(orig_width * scale))
@@ -503,9 +505,9 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height, max_wi
                     continue
 
                 x1 = int(x_norm * new_width)
-                y1 = int(y_norm * max_height)
+                y1 = int(y_norm * new_height)  # Fixed: use new_height instead of max_height
                 x2 = int((x_norm + w_norm) * new_width)
-                y2 = int((y_norm + h_norm) * max_height)
+                y2 = int((y_norm + h_norm) * new_height)  # Fixed: use new_height instead of max_height
 
                 line_width = max(1, int(min(new_width, max_height) * 0.003))
                 draw.rectangle([x1, y1, x2, y2], outline=IMAGE_BBOX_COLOR, width=line_width)
@@ -521,7 +523,7 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height, max_wi
 
 
 def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_width=None,
-                                event_data=None):
+                                event_data=None, show_bbox=True):
     """
     Build a collage of event images with bounding boxes for event-specific detections only.
 
@@ -560,8 +562,13 @@ def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_
         thumb_width = int(thumb_height * 4 / 3)
 
     total_files = len(event_files)
+    if total_files == 0:
+        return None
+
+    # Use square grids (1x1, 2x2, 3x3, 4x4) for consistent aspect ratio
     grid_size = min(max_grid, max(1, math.ceil(math.sqrt(total_files))))
     slots = grid_size * grid_size
+
     collage = Image.new(
         "RGB",
         (grid_size * thumb_width, grid_size * thumb_height),
@@ -574,7 +581,7 @@ def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_
         if not abs_path or not os.path.exists(abs_path):
             continue
 
-        detection_details = _lookup_detection_details(rel_path, detections_df)
+        detection_details = _lookup_detection_details(rel_path, detections_df) if show_bbox else []
         thumb_b64 = image_to_base64_with_boxes(
             abs_path,
             detection_details=detection_details,
