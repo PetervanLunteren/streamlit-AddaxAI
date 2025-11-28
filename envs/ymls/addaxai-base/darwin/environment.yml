@@ -31,6 +31,7 @@ dependencies:
     - pillow
     - tqdm
     - huggingface_hub
+    - anyio<4.0  # Pin to v3.x for Python 3.11 typing compatibility
     - st-modal
     - openpyxl
     

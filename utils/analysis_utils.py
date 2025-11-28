@@ -299,12 +299,15 @@ def run_process_queue(
                 break
 
             video_detection_success = run_md_video(
-                selected_det_modelID, model_meta["det"][selected_det_modelID], 
+                selected_det_modelID, model_meta["det"][selected_det_modelID],
                 selected_folder, video_json_path, pbars, detection_threshold)
 
             if video_detection_success is False:
                 continue
-            
+
+            # Add UUIDs to video detection JSON immediately after MegaDetector completes
+            inject_uuids_into_json(video_json_path)
+
             # Inject datetime information into video JSON
             inject_datetime_into_video_json(video_json_path, deployment.get('filename_datetime_dict', {}))
 
@@ -329,11 +332,14 @@ def run_process_queue(
                 break
 
             image_detection_success = run_md(
-                selected_det_modelID, model_meta["det"][selected_det_modelID], 
+                selected_det_modelID, model_meta["det"][selected_det_modelID],
                 selected_folder, image_json_path, pbars, media_type="image", confidence_threshold=detection_threshold)
 
             if image_detection_success is False:
                 continue
+
+            # Add UUIDs to detection JSON immediately after MegaDetector completes
+            inject_uuids_into_json(image_json_path)
 
             # Image classification
             if selected_cls_modelID and selected_cls_modelID != "NONE":
@@ -356,7 +362,10 @@ def run_process_queue(
                 st.error("Failed to merge video and image results")
                 continue
 
-        # if all processes are done, update the map file 
+            # Ensure UUIDs exist in merged JSON (in case any were missed)
+            inject_uuids_into_json(final_json_path)
+
+        # if all processes are done, update the map file
         if os.path.exists(final_json_path):
 
             # first add the run info to the map file
@@ -649,10 +658,48 @@ def run_cls_video(cls_modelID, json_fpath, pbars, country=None, state=None):
     return run_cls(cls_modelID, json_fpath, pbars, country, state, media_type="video")
 
 
+def inject_uuids_into_json(json_path):
+    """
+    Inject UUIDs into detection JSON file for images and detections.
+    Adds file_id to each image and detection_id to each detection if missing.
+
+    Args:
+        json_path (str): Path to the detection JSON file
+    """
+    import uuid
+
+    try:
+        # Read the JSON file
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+
+        # Ensure all images and detections have UUIDs
+        if 'images' in data:
+            for image in data['images']:
+                # Add file_id if missing
+                if 'file_id' not in image:
+                    image['file_id'] = str(uuid.uuid4())
+
+                # Add detection_id to each detection if missing
+                if 'detections' in image:
+                    for detection in image['detections']:
+                        if 'detection_id' not in detection:
+                            detection['detection_id'] = str(uuid.uuid4())
+
+        # Write back the modified JSON
+        with open(json_path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+        log(f"Injected UUIDs into {json_path}")
+
+    except Exception as e:
+        log(f"Error injecting UUIDs into {json_path}: {e}")
+
+
 def inject_datetime_into_video_json(video_json_path, filename_datetime_dict):
     """
     Inject datetime information into video JSON entries.
-    
+
     Args:
         video_json_path (str): Path to the video detection JSON file
         filename_datetime_dict (dict): Mapping of filenames to ISO datetime strings
@@ -1408,6 +1455,14 @@ def download_model(
                 f"Download failed! Please try again later.")
             st.session_state[download_key] = False
             return
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        status_placeholder.error(f"Download failed with error:\n```\n{error_details}\n```")
+        st.session_state[download_key] = False
+        return
+
+    try:
 
         # Save model metadata to JSON in temp directory first
         variables_path = os.path.join(temp_dir, "variables.json")

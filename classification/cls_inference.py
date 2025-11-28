@@ -16,6 +16,7 @@ Latest edit by Peter van Lunteren on 19 May 2025
 # import io
 import os
 import json
+import uuid
 # import datetime
 # import contextlib
 # import pandas as pd
@@ -74,6 +75,34 @@ def clear_frame_cache():
     print("Cleared video frame cache from memory")
 
 
+def ensure_uuids_in_json(data):
+    """
+    Ensure all images and detections have UUIDs in the JSON data structure.
+    Adds file_id to images and detection_id to detections if missing.
+
+    Args:
+        data (dict): JSON data dictionary with 'images' key
+
+    Returns:
+        dict: Modified data with UUIDs added
+    """
+    if 'images' not in data:
+        return data
+
+    for image in data['images']:
+        # Add file_id if missing
+        if 'file_id' not in image:
+            image['file_id'] = str(uuid.uuid4())
+
+        # Add detection_id to each detection if missing
+        if 'detections' in image:
+            for detection in image['detections']:
+                if 'detection_id' not in detection:
+                    detection['detection_id'] = str(uuid.uuid4())
+
+    return data
+
+
 def _extract_taxon_component(value, prefix):
     """
     Normalize a taxonomy CSV value by removing the expected prefix and lowercasing.
@@ -122,11 +151,14 @@ def create_raw_classifications(json_path,
     
     # Get directory containing images from JSON path
     img_dir = os.path.dirname(json_path)
-    
+
     # Load JSON data and label mapping once to avoid repeated file I/O
     with open(json_path) as image_recognition_file_content:
         data = json.load(image_recognition_file_content)
         label_map = fetch_label_map_from_json(json_path)
+
+    # Ensure all images and detections have UUIDs
+    data = ensure_uuids_in_json(data)
     
     # First pass: count animal crops and group by video files
     # Note: No filtering applied - all detections in JSON are processed

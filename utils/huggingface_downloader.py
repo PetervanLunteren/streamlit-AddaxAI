@@ -16,6 +16,11 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor  # as_completed - UNUSED: Vulture detected unused import
 # from urllib.parse import urlparse  # UNUSED: Vulture detected unused import
 from tqdm import tqdm
+
+# Suppress Protocol typing errors in huggingface_hub with older typing-extensions
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="huggingface_hub")
+
 from huggingface_hub import HfApi  # hf_hub_download - UNUSED: Vulture detected unused import
 from huggingface_hub.utils import RepositoryNotFoundError, RevisionNotFoundError
 
@@ -319,4 +324,7 @@ class HuggingFaceRepoDownloader:
             if ui_pbars and pbar_id and self.pbar:
                 ui_pbars.update_from_tqdm_object(pbar_id, self.pbar)
             print(f"💥 Download failed: {e}")
+            # Print full traceback for debugging
+            import traceback
+            traceback.print_exc()
             return False

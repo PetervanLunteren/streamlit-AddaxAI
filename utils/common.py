@@ -39,37 +39,15 @@ with open(os.path.join(ADDAXAI_ROOT, 'assets', 'version.txt'), 'r') as file:
 
 def unique_animal_string():
     """
-    Generate a unique animal-themed identifier string.
-    
+    Generate a unique identifier string using UUID.
+
     Returns:
-        str: Random combination of adverb + adjective + animal name (e.g., "quite_sharp_jaguar")
-    
-    Used for creating unique deployment IDs and temporary identifiers.
+        str: UUID string (e.g., "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+
+    Used for creating unique run IDs and deployment identifiers.
     """
-    
-    # 5-letter adjectives  
-    adjectives = [
-        "quick", "brave", "smart", "happy", "clean", "clear", "fresh", "young", "light",
-        "green", "heavy", "tough", "loyal", "proud", "quiet", "sharp", "sweet", "funny",
-        "silly", "noisy", "dirty", "crazy", "salty", "cheap", "solid", "crisp", "lucky",
-        "rough", "sunny", "rainy", "giant", "spicy", "moody", "noble", "exact", "still",
-        "tired", "messy", "weird", "eager", "magic", "super", "plain", "tight", "loose", 
-        "windy", "snowy", "muddy", "rocky", "dusty", "leafy", "woody", "furry", "shiny"
-    ]
-    
-    # 5-letter animals
-    animals = ["horse", "tiger", "sheep", "mouse", "zebra", "whale", "genet", "stoat",
-               "panda", "rhino", "hippo", "llama", "koala", "skunk", "civet", "camel", 
-               "otter", "moose", "hyena", "sloth", "chimp", "bison", "swine", "puppy",
-    ]
-    
-    # Randomly select one from each list
-    animal = random.choice(animals)
-    adjective = random.choice(adjectives)
-    
-    # random suffix of letters and numbers in captial letters
-    suffix = ''.join([random.choice(string.ascii_uppercase + string.digits) for _ in range(5)])
-    return f"{adjective}-{animal}-{suffix}"
+    import uuid
+    return str(uuid.uuid4())
 
 
 
