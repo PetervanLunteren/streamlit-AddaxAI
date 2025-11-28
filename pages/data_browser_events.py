@@ -392,11 +392,11 @@ def show_event_modal():
             with top_col_export:
                 # Generate high-res collage on-demand and provide download
                 with st.spinner("Generating high-resolution collage..."):
-                    # Generate fresh collage at export resolution (480px)
+                    # Generate fresh collage at export resolution (1280×960)
                     high_res_collage = build_event_collage_base64(
                         event_files,
-                        thumb_height=480,  # 2x modal display resolution
-                        thumb_width=640,   # Maintain 4:3 ratio
+                        thumb_height=960,   # 4x modal display resolution
+                        thumb_width=1280,   # Maintain 4:3 ratio
                         event_data={"event_id": current_row.get("event_id")},
                         show_bbox=show_bbox,
                     )

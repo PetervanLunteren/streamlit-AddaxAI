@@ -17,7 +17,7 @@ from utils.common import load_vars, update_vars
 from components.shortcut_utils import register_shortcuts, clear_shortcut_listeners
 
 # Thumbnail generation constants
-MODAL_IMAGE_SIZE = 1000  # High-resolution modal images (pixels) used for export/zoom
+MODAL_IMAGE_SIZE = 1280  # High-resolution modal images (pixels) used for export/zoom
 IMAGE_BACKGROUND_COLOR = (220, 227, 232)
 IMAGE_PADDING_PIXELS = 100  # Padding around bbox in pixels (new padding system)
 IMAGE_BLUR_RADIUS = 15  # Blur radius for background extension
