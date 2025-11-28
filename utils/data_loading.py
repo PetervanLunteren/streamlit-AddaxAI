@@ -338,8 +338,11 @@ def load_detection_results_dataframe():
                             image_datetime = image_data.get("datetime")
                             image_width = image_data.get("width")
                             image_height = image_data.get("height")
-                            
+
                             absolute_path = os.path.join(run_folder, image_filename) if image_filename else None
+
+                            # Read file_id from JSON (required - no fallback)
+                            file_id = image_data.get("file_id")
                             
                             # For non-deployments, try to get GPS from image EXIF data
                             if location_id == "NONE":
@@ -359,13 +362,16 @@ def load_detection_results_dataframe():
                             
                             # Process each detection in the image
                             for detection in image_data.get("detections", []):
-                                
+
                                 # Extract detection data - no defaults, should always be present
                                 detection_category_id = detection["category"]
                                 detection_conf = detection["conf"]
                                 if detection_conf < detection_threshold:
                                     continue
                                 bbox = detection["bbox"]
+
+                                # Read detection_id from JSON (required - no fallback)
+                                detection_id = detection.get("detection_id")
                                 
                                 # Map detection category ID to actual label
                                 detection_label = detection_categories[detection_category_id]
@@ -386,6 +392,8 @@ def load_detection_results_dataframe():
                                 
                                 # Create row data
                                 row = {
+                                    'detection_id': detection_id,  # NEW: Unique detection ID
+                                    'file_id': file_id,  # NEW: Unique file ID
                                     'project_id': project_id,
                                     'location_id': location_id,
                                     'run_id': run_id,
@@ -416,6 +424,8 @@ def load_detection_results_dataframe():
 
                             if not valid_detection_found:
                                 results_list.append({
+                                    'detection_id': None,  # No detection for empty files
+                                    'file_id': file_id,  # File still has an ID
                                     'project_id': project_id,
                                     'location_id': location_id,
                                     'run_id': run_id,
@@ -453,6 +463,8 @@ def load_detection_results_dataframe():
         df = pd.DataFrame(results_list)
         if df.empty:
             expected_columns = [
+                "detection_id",
+                "file_id",
                 "project_id",
                 "location_id",
                 "run_id",
@@ -773,15 +785,22 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
 def aggregate_detections_to_events(
     detections_df: pd.DataFrame,
     time_gap_seconds: int = 60,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Aggregate detection-level records into event-level summaries based on a time gap threshold.
 
     Each event represents a burst of detections captured within `time_gap_seconds` of each other
     for the same project/location/run combination.
+
+    Also assigns event_id to each detection in the input detections_df.
+
+    Returns:
+        tuple: (events_df, detections_df_with_event_ids)
+            - events_df: Event-level aggregations
+            - detections_df_with_event_ids: Original detections with event_id column added
     """
     if detections_df is None or detections_df.empty:
-        return pd.DataFrame(
+        empty_events = pd.DataFrame(
             columns=[
                 "event_id",
                 "project_id",
@@ -802,26 +821,37 @@ def aggregate_detections_to_events(
                 "file_paths",
             ]
         )
+        empty_detections = detections_df.copy() if detections_df is not None else pd.DataFrame()
+        if not empty_detections.empty:
+            empty_detections["event_id"] = None
+        return empty_events, empty_detections
 
     detections_df = detections_df.copy()
     detections_df["_timestamp_dt"] = detections_df["timestamp"].apply(_parse_detection_timestamp)
     detections_df = detections_df.sort_values(by=["project_id", "location_id", "run_id", "_timestamp_dt"])
+
+    # Initialize event_id column (will be filled as we create events)
+    detections_df["event_id"] = None
+
     grouped = detections_df.groupby(["project_id", "location_id", "run_id"], dropna=False, sort=False)
 
     events = []
+    event_detection_mapping = []  # Track which detections belong to which event
 
     for (project_id, location_id, run_id), group in grouped:
         group = group.sort_values("_timestamp_dt").reset_index(drop=True)
         current_event_rows = []
+        current_event_indices = []  # Track dataframe indices for this event
         last_timestamp = None
         last_species = None
 
-        for _, row in group.iterrows():
+        for idx, row in group.iterrows():
             timestamp_dt = row.get("_timestamp_dt")
             species_label = _normalize_species_label(row.get("classification_label"))
 
             if not current_event_rows:
                 current_event_rows.append(row)
+                current_event_indices.append(idx)
                 last_timestamp = timestamp_dt
                 last_species = species_label
                 continue
@@ -834,19 +864,39 @@ def aggregate_detections_to_events(
             species_changed = species_label != last_species
 
             if gap_exceeded or species_changed:
-                events.append(_finalize_event(current_event_rows, project_id, location_id, run_id))
+                # Finalize current event
+                event_record = _finalize_event(current_event_rows, project_id, location_id, run_id)
+                event_id = event_record["event_id"]
+
+                # Tag all detections in this event with the event_id
+                for det_idx in current_event_indices:
+                    detections_df.at[det_idx, "event_id"] = event_id
+
+                events.append(event_record)
                 current_event_rows = [row]
+                current_event_indices = [idx]
             else:
                 current_event_rows.append(row)
+                current_event_indices.append(idx)
 
             last_timestamp = timestamp_dt
             last_species = species_label
 
         if current_event_rows:
-            events.append(_finalize_event(current_event_rows, project_id, location_id, run_id))
+            # Finalize last event
+            event_record = _finalize_event(current_event_rows, project_id, location_id, run_id)
+            event_id = event_record["event_id"]
+
+            # Tag all detections in this event with the event_id
+            for det_idx in current_event_indices:
+                detections_df.at[det_idx, "event_id"] = event_id
+
+            events.append(event_record)
 
     events_df = pd.DataFrame(events)
-    return events_df
+
+    # Return both events and detections (now with event_id column)
+    return events_df, detections_df
 
 
 def _finalize_event(rows, project_id, location_id, run_id):

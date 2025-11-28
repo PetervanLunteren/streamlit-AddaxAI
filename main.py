@@ -21,8 +21,8 @@ Start app for Linux:
 ./bin/linux/micromamba run -p ./envs/env-addaxai-base stream
 
 How to pip install into an environment:
-./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install [package-name]
-./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install streamlit-shortcuts
+./bin/darwin/micromamba run -p ./envs/env-addaxai-base pip install [package-name]
+./bin/darwin/micromamba run -p ./envs/env-addaxai-base pip install streamlit-shortcuts
 
 TODOs FOR NOW:
 - WAARWASIK: verder gaan met de event table: codex resume 019a78ab-fedb-7230-838b-8c507ccc2a31
@@ -276,8 +276,10 @@ if st.session_state == {}:
 
         events_settings = app_settings.get("events", {}) if app_settings else {}
         time_gap_seconds = int(events_settings.get("time_gap_seconds", 60))
-        events_df = aggregate_detections_to_events(results_df, time_gap_seconds=time_gap_seconds)
+        events_df, results_df_with_event_ids = aggregate_detections_to_events(results_df, time_gap_seconds=time_gap_seconds)
         st.session_state["events_source_df"] = events_df
+        # Update observations with event_id column
+        st.session_state["observations_source_df"] = results_df_with_event_ids
 
         log(
             "Aggregated detection results into "

@@ -200,14 +200,7 @@ def render_event_table(
             row.get("event_files") or [],
             thumb_height,
             thumb_width,
-            event_data={
-                "run_id": row.get("run_id"),
-                "project_id": row.get("project_id"),
-                "location_id": row.get("location_id"),
-                "start_timestamp": row.get("start_timestamp"),
-                "end_timestamp": row.get("end_timestamp"),
-                "dominant_species": row.get("dominant_species"),
-            },
+            event_data={"event_id": row.get("event_id")},  # Now we only need event_id!
         ),
         axis=1,
     )
@@ -370,14 +363,7 @@ def show_event_modal():
             event_files,
             thumb_height=240,
             thumb_width=320,
-            event_data={
-                "run_id": current_row.get("run_id"),
-                "project_id": current_row.get("project_id"),
-                "location_id": current_row.get("location_id"),
-                "start_timestamp": current_row.get("start_timestamp"),
-                "end_timestamp": current_row.get("end_timestamp"),
-                "dominant_species": current_row.get("dominant_species"),
-            },
+            event_data={"event_id": current_row.get("event_id")},  # Now we only need event_id!
         )
 
         col_image, col_meta = st.columns([2, 1])

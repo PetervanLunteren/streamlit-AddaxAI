@@ -67,9 +67,10 @@ models/cls/[MODEL-ID]/
 ## Environment Management
 
 **Built-in Micromamba System**:
-- MacOS: `./bin/macos/micromamba`
-- Windows: `./bin/macos/micromamba.exe` (note: still macos path)
-- Environment files: `envs/ymls/[env-name]/macos/environment.yml`
+- MacOS: `./bin/darwin/micromamba`
+- Linux: `./bin/linux/micromamba`
+- Windows: `./bin/windows/micromamba.exe`
+- Environment files: `envs/ymls/[env-name]/darwin/environment.yml` (macOS) or `envs/ymls/[env-name]/linux/environment.yml` (Linux)
 - Environment names always start with "env-"
 
 **Key Environments**:
@@ -80,14 +81,14 @@ models/cls/[MODEL-ID]/
 **Common Commands**:
 ```bash
 # Create environment
-./bin/macos/micromamba env create -f envs/ymls/addaxai-base/macos/environment.yml --prefix ./envs/env-addaxai-base -y
+./bin/darwin/micromamba env create -f envs/ymls/addaxai-base/darwin/environment.yml --prefix ./envs/env-addaxai-base -y
 
 # Install SpeciesNet (requires special flag on macOS)
-./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install --use-pep517 speciesnet==5.0.1
+./bin/darwin/micromamba run -p ./envs/env-addaxai-base pip install --use-pep517 speciesnet==5.0.1
 
 # Run in environment
-./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
-./bin/macos/micromamba run -p ./envs/env-addaxai-base python -m py_compile utils/analysis_utils.py
+./bin/darwin/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
+./bin/darwin/micromamba run -p ./envs/env-addaxai-base python -m py_compile utils/analysis_utils.py
 ```
 
 ## Key Files & Components

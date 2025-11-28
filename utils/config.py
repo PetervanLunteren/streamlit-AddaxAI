@@ -30,10 +30,10 @@ import platform
 def get_os_name():
     """
     Detect the operating system and return a standardized name.
-    
+
     Returns:
-        str: 'windows', 'linux', or 'macos'
-    
+        str: 'windows', 'linux', or 'darwin'
+
     Used for:
         - Selecting platform-specific binaries (micromamba)
         - OS-specific path handling
@@ -45,7 +45,7 @@ def get_os_name():
     elif system == "Linux":
         return "linux"
     elif system == "Darwin":  # macOS
-        return "macos"
+        return "darwin"
     else:
         # Fallback for unknown platforms
         return "linux"

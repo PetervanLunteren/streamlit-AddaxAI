@@ -24,7 +24,7 @@ cd scripts
 
 3. Run the application using the created environment
 ```bash
-./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
+./bin/darwin/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
 ```
 
 The application will open in your default web browser at `http://localhost:8501`.

@@ -470,7 +470,7 @@ def run_cls(cls_modelID, json_fpath, pbars, country=None, state=None, media_type
     env['PYTHONPATH'] = ADDAXAI_ROOT
     
     # Fix MPS device issue on macOS by enabling CPU fallback
-    if OS_NAME == 'macos':
+    if OS_NAME == 'darwin':
         env['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
 
     # Log the command for debugging/audit purposes

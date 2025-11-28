@@ -549,47 +549,12 @@ def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_
     detections_df = st.session_state.get("observations_source_df", pd.DataFrame())
 
     # Filter detections to only those belonging to this specific event
+    # Now we can use event_id for a simple, fast, accurate filter!
     if event_data and not detections_df.empty:
-        from datetime import datetime
-
-        # Start with run_id filter
-        run_id = event_data.get("run_id")
-        if run_id:
-            detections_df = detections_df[detections_df["run_id"] == run_id].copy()
-
-        # Apply timestamp + species filters to match how events were created
-        start_ts = event_data.get("start_timestamp")
-        end_ts = event_data.get("end_timestamp")
-        dominant_species = event_data.get("dominant_species")
-
-        if start_ts and end_ts:
-            try:
-                # Convert event timestamps from ISO format
-                start_dt = pd.to_datetime(start_ts)
-                end_dt = pd.to_datetime(end_ts)
-
-                # Convert detection timestamps (they're in "YYYY:MM:DD HH:MM:SS" or similar format)
-                detections_df["_parsed_dt"] = pd.to_datetime(detections_df["timestamp"], errors="coerce")
-
-                # Filter by timestamp range
-                detections_df = detections_df[
-                    (detections_df["_parsed_dt"] >= start_dt) &
-                    (detections_df["_parsed_dt"] <= end_dt)
-                ]
-
-                # Clean up temp column
-                if "_parsed_dt" in detections_df.columns:
-                    detections_df = detections_df.drop(columns=["_parsed_dt"])
-
-            except Exception:
-                # If timestamp filtering fails, continue with run_id filter only
-                pass
-
-        # Filter by species if present (events are species-aware)
-        if dominant_species:
-            detections_df = detections_df[
-                detections_df["classification_label"] == dominant_species
-            ]
+        event_id = event_data.get("event_id")
+        if event_id and "event_id" in detections_df.columns:
+            # Simple index-based lookup - much faster than complex filtering
+            detections_df = detections_df[detections_df["event_id"] == event_id]
 
     if thumb_width is None:
         thumb_width = int(thumb_height * 4 / 3)

@@ -82,8 +82,7 @@ export PIP_CACHE_DIR="$TMP_LOCAL/pip_cache"
 
 echo "Creating Python environment..."
 ENV_PREFIX="$PROJECT_ROOT/envs/env-addaxai-base"
-ENV_PATH_OS="${OS/darwin/macos}"
-$MICROMAMBA_BIN env create -f "$PROJECT_ROOT/envs/ymls/addaxai-base/$ENV_PATH_OS/environment.yml" --prefix $ENV_PREFIX -y
+$MICROMAMBA_BIN env create -f "$PROJECT_ROOT/envs/ymls/addaxai-base/$OS/environment.yml" --prefix $ENV_PREFIX -y
 
 SPECIESNET="speciesnet==5.0.2"
 
