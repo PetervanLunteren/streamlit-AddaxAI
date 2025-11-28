@@ -189,7 +189,7 @@ def render_observations_view(
                 {
                     "_df_index": idx,
                     "image": image_url,
-                    "relative_path": row.get("relative_path") or "",
+                    "file_path": row.get("absolute_path") or "",
                     "detection_label": row.get("detection_label") or "",
                     "detection_confidence": round(
                         float(row.get("detection_confidence")), 2
@@ -250,6 +250,7 @@ def render_observations_view(
     )
 
     flex_columns = [
+        ("file_path", "File"),
         ("detection_label", "Detection"),
         ("classification_label", "Classification"),
         ("timestamp", "Timestamp"),
@@ -263,12 +264,6 @@ def render_observations_view(
             filter=False,
             sortable=False,
         )
-
-    gb.configure_column(
-        "relative_path",
-        headerName="File",
-        hide=True,
-    )
 
     for col_id, header in [
         ("detection_confidence", "Detection confidence"),

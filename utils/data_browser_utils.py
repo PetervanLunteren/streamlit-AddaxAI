@@ -866,6 +866,8 @@ def image_viewer_modal():
                 st.error("Could not load image")
             st.write("")
 
+        st.caption("Use shortcuts `←` `→` to navigate and `Esc` to close")
+
     with meta_col:
         top_col_export, top_col_close = st.columns([1, 1])
 
@@ -895,12 +897,11 @@ def image_viewer_modal():
                 type="secondary",
                 width="stretch",
                 key="modal_close_button",
-                help="Closes the window (shortcut `Esc`)",
             ):
                 clear_shortcut_listeners()
                 set_session_var("explore_results", "show_modal_image_viewer", False)
                 st.rerun()
-        
+
         nav_col_prev, nav_col_next = st.columns([1, 1])
 
         with nav_col_prev:
@@ -910,7 +911,6 @@ def image_viewer_modal():
                 width="stretch",
                 type="secondary",
                 key="observation_modal_prev_button",
-                help="Show previous row (shortcut `←`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index - 1)
                 st.rerun()
@@ -922,7 +922,6 @@ def image_viewer_modal():
                 width="stretch",
                 type="secondary",
                 key="observation_modal_next_button",
-                help="Show next row (shortcut `→`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index + 1)
                 st.rerun()
@@ -965,24 +964,19 @@ def image_viewer_modal():
                 timestamp_display = timestamp
 
             metadata_rows = []
+
+            # File
+            abs_path = current_row.get('absolute_path', 'N/A')
+            metadata_rows.append(("File", abs_path))
+
+            # Location
+            location_id = current_row.get('location_id', 'N/A')
+            metadata_rows.append(("Location", location_id))
+
+            # Timestamp
             metadata_rows.append(("Timestamp", timestamp_display))
 
-            location_id = current_row.get('location_id', 'N/A')
-            metadata_rows.append(("Location ID", location_id))
-
-            rel_path = current_row.get('relative_path', 'N/A')
-            if rel_path != 'N/A':
-                filename = os.path.basename(rel_path)
-                if len(filename) > 20:
-                    display_filename = "..." + filename[-20:]
-                else:
-                    display_filename = filename
-            else:
-                display_filename = 'N/A'
-            metadata_rows.append(("File", display_filename))
-
-            metadata_rows.append(("Row", f"{current_index + 1} of {len(df_filtered)}"))
-
+            # Detection
             det_label = current_row.get("detection_label") or "N/A"
             det_conf = current_row.get("detection_confidence")
             detection_display = det_label
@@ -990,12 +984,16 @@ def image_viewer_modal():
                 detection_display = f"{det_label} {float(det_conf):.2f}"
             metadata_rows.append(("Detection", detection_display))
 
+            # Classification
             cls_label = current_row.get("classification_label") or "N/A"
             cls_conf = current_row.get("classification_confidence")
             classification_display = cls_label
             if cls_conf is not None and not pd.isna(cls_conf):
                 classification_display = f"{cls_label} {float(cls_conf):.2f}"
             metadata_rows.append(("Classification", classification_display))
+
+            # Row
+            metadata_rows.append(("Row", f"{current_index + 1} of {len(df_filtered)}"))
 
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
@@ -1051,6 +1049,8 @@ def image_viewer_modal_file():
                 st.error("Could not load image")
             st.write("")
 
+        st.caption("Use shortcuts `←` `→` to navigate and `Esc` to close")
+
     with meta_col:
         top_col_export, top_col_close = st.columns([1, 1])
 
@@ -1081,7 +1081,6 @@ def image_viewer_modal_file():
                 type="secondary",
                 width="stretch",
                 key="file_modal_close_button",
-                help="Closes the window (shortcut `Esc`)",
             ):
                 clear_shortcut_listeners()
                 set_session_var("explore_results", "show_modal_image_viewer", False)
@@ -1095,7 +1094,6 @@ def image_viewer_modal_file():
                 width="stretch",
                 type="secondary",
                 key="file_modal_prev_button",
-                help="Show previous row (shortcut `←`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index - 1)
                 st.rerun()
@@ -1107,7 +1105,6 @@ def image_viewer_modal_file():
                 width="stretch",
                 type="secondary",
                 key="file_modal_next_button",
-                help="Show next row (shortcut `→`)",
             ):
                 set_session_var("explore_results", "modal_current_image_index", current_index + 1)
                 st.rerun()
@@ -1148,12 +1145,12 @@ def image_viewer_modal_file():
             detections_summary = current_row.get("detections_summary", "N/A")
             classifications_summary = current_row.get("classifications_summary", "N/A")
             metadata_rows = [
+                ("File", current_row.get("absolute_path", "N/A")),
+                ("Location", current_row.get("location_id", "N/A")),
                 ("Timestamp", timestamp_display),
-                ("Location ID", current_row.get("location_id", "N/A")),
-                ("File", os.path.basename(current_row.get("relative_path", "")) or "N/A"),
-                ("Row", f"{current_index + 1} of {len(df_files)}"),
                 ("Detections", detections_summary),
                 ("Classifications", classifications_summary),
+                ("Row", f"{current_index + 1} of {len(df_files)}"),
             ]
 
             for label, value in metadata_rows:

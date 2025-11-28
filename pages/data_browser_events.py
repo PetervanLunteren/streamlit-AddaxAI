@@ -39,8 +39,8 @@ def render_events_view(events_df: pd.DataFrame, export_col, sort_col):
         st.stop()
 
     sortable_columns = [
-        ("dominant_species", "Dominant species"),
-        ("species_list_display", "Species"),
+        ("detection_label", "Detection"),
+        ("classification_label", "Classification"),
         ("start_timestamp", "Timestamp"),
         ("duration_seconds", "Duration"),
         ("image_count", "Images"),
@@ -188,9 +188,6 @@ def render_event_table(
         st.stop()
 
     display_df = df_page.copy()
-    display_df["species_list_display"] = display_df["species_list"].apply(
-        lambda values: ", ".join(values) if isinstance(values, list) else ""
-    )
     if reset_cache:
         st.session_state.pop("events_collage_cache", None)
 
@@ -207,8 +204,8 @@ def render_event_table(
 
     preferred_order = [
         "collage_image",
-        "dominant_species",
-        "species_list_display",
+        "detection_label",
+        "classification_label",
         "start_timestamp",
         "end_timestamp",
         "duration_seconds",
@@ -226,12 +223,13 @@ def render_event_table(
     gb.configure_column("_df_index", hide=True)
     gb.configure_column("file_paths", hide=True)
     gb.configure_column("event_files", hide=True)
-    gb.configure_column("species_list", hide=True)
 
     # Hide technical/detailed columns (user-requested)
     gb.configure_column("event_id", hide=True)
     gb.configure_column("project_id", hide=True)
     gb.configure_column("run_id", hide=True)
+    gb.configure_column("detection_ids", hide=True)
+    gb.configure_column("file_ids", hide=True)
     gb.configure_column("max_detection_conf", hide=True)
     gb.configure_column("max_classification_conf", hide=True)
     gb.configure_column("latitude", hide=True)
@@ -279,13 +277,13 @@ def render_event_table(
         suppressNavigable=True,
     )
 
-    gb.configure_column("species_list_display", headerName="Species", flex=2)
+    gb.configure_column("detection_label", headerName="Detection", flex=1)
+    gb.configure_column("classification_label", headerName="Classification", flex=1)
     gb.configure_column("start_timestamp", headerName="Timestamp", flex=1)
     gb.configure_column("duration_seconds", headerName="Duration (s)", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
     gb.configure_column("image_count", headerName="Images", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
     gb.configure_column("detections_count", headerName="Detections", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
     gb.configure_column("classifications_count", headerName="Classifications", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
-    gb.configure_column("dominant_species", headerName="Dominant species", flex=1)
     gb.configure_column("location_id", headerName="Location", flex=1)
 
     gb.configure_default_column(
@@ -380,7 +378,9 @@ def show_event_modal():
             st.markdown(f"**Start:** {current_row.get('start_timestamp', 'N/A')}")
             st.markdown(f"**Location:** {current_row.get('location_id', 'N/A')}")
             st.markdown(f"**Detections:** {current_row.get('detections_count', 0)}")
-            st.markdown(f"**Species:** {', '.join(current_row.get('species_list', []))}")
+            st.markdown(f"**Detection:** {current_row.get('detection_label', 'N/A')}")
+            classification = current_row.get('classification_label') or 'N/A'
+            st.markdown(f"**Classification:** {classification}")
 
         col_prev, col_close, col_next = st.columns([1, 1, 1])
         with col_prev:

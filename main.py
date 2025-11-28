@@ -269,10 +269,7 @@ if st.session_state == {}:
         else:
             log("No detection results found in completed runs")
 
-        loader.update_text("Aggregating file-level data...")
-
-        results_files_df = aggregate_detections_to_files(results_df)
-        st.session_state["files_source_df"] = results_files_df
+        loader.update_text("Aggregating event-level data...")
 
         events_settings = app_settings.get("events", {}) if app_settings else {}
         time_gap_seconds = int(events_settings.get("time_gap_seconds", 60))
@@ -280,6 +277,12 @@ if st.session_state == {}:
         st.session_state["events_source_df"] = events_df
         # Update observations with event_id column
         st.session_state["observations_source_df"] = results_df_with_event_ids
+
+        loader.update_text("Aggregating file-level data...")
+
+        # Aggregate files AFTER events so event_ids can be included
+        results_files_df = aggregate_detections_to_files(results_df_with_event_ids)
+        st.session_state["files_source_df"] = results_files_df
 
         log(
             "Aggregated detection results into "

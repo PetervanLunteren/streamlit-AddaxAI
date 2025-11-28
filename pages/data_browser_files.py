@@ -211,7 +211,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
             {
                 "_df_index": idx,
                 "image": image_url,
-                "relative_path": row.get("relative_path") or "",
+                "file_path": row.get("absolute_path") or "",
                 "detections": row.get("detections_summary") or "",
                 "classifications": row.get("classifications_summary") or "",
                 "count": detections_count,
@@ -261,7 +261,7 @@ def render_file_level_browser(files_df: pd.DataFrame):
     )
 
     flex_columns = [
-        ("relative_path", "File"),
+        ("file_path", "File"),
         ("detections", "Detections"),
         ("classifications", "Classifications"),
         ("timestamp", "Timestamp"),

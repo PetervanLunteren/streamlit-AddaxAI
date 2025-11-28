@@ -582,6 +582,46 @@ def render_observation_export_popover(export_col, df_to_export: pd.DataFrame):
     if df_to_export is None or df_to_export.empty:
         return
 
+    # Define desired column order for observations export
+    # Pattern: Identity → Hierarchy → Links → Content → Temporal → Spatial
+    observation_export_columns = [
+        # Identity
+        "detection_id",
+        # Hierarchy
+        "project_id",
+        "location_id",
+        "run_id",
+        # Links
+        "file_id",
+        "event_id",
+        # Content
+        "absolute_path",
+        "detection_label",
+        "detection_confidence",
+        "classification_label",
+        "classification_confidence",
+        "bbox_x",
+        "bbox_y",
+        "bbox_width",
+        "bbox_height",
+        "image_width",
+        "image_height",
+        # Temporal
+        "timestamp",
+        # Spatial
+        "latitude",
+        "longitude",
+    ]
+
+    # Filter out internal columns
+    internal_columns = ["relative_path", "run_json_path", "is_empty_file", "_timestamp_dt", "detection_model_id", "classification_model_id"]
+    export_df = df_to_export.drop(columns=[col for col in internal_columns if col in df_to_export.columns])
+
+    # Reorder columns to match specified order (keeping any extra columns at the end)
+    available_export_columns = [col for col in observation_export_columns if col in export_df.columns]
+    other_columns = [col for col in export_df.columns if col not in observation_export_columns]
+    export_df = export_df[available_export_columns + other_columns]
+
     with export_col:
         with st.popover(":material/download:", help="Export", width="stretch"):
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -597,7 +637,7 @@ def render_observation_export_popover(export_col, df_to_export: pd.DataFrame):
 
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    df_to_export.to_excel(writer, index=False, sheet_name="Filtered_Data")
+                    export_df.to_excel(writer, index=False, sheet_name="Filtered_Data")
                 st.download_button(
                     label="XLSX",
                     data=output.getvalue(),
@@ -609,7 +649,7 @@ def render_observation_export_popover(export_col, df_to_export: pd.DataFrame):
             with download_col2:
                 st.download_button(
                     label="CSV",
-                    data=df_to_export.to_csv(index=False).encode("utf-8"),
+                    data=export_df.to_csv(index=False).encode("utf-8"),
                     file_name=f"addaxai-observations-{timestamp}.csv",
                     mime="text/csv",
                     width="stretch",
@@ -618,7 +658,7 @@ def render_observation_export_popover(export_col, df_to_export: pd.DataFrame):
             with download_col3:
                 st.download_button(
                     label="TSV",
-                    data=df_to_export.to_csv(index=False, sep="\t").encode("utf-8"),
+                    data=export_df.to_csv(index=False, sep="\t").encode("utf-8"),
                     file_name=f"addaxai-observations-{timestamp}.tsv",
                     mime="text/tab-separated-values",
                     width="stretch",
@@ -627,7 +667,7 @@ def render_observation_export_popover(export_col, df_to_export: pd.DataFrame):
             with download_col4:
                 st.download_button(
                     label="JSON",
-                    data=df_to_export.to_json(orient="records", indent=2).encode("utf-8"),
+                    data=export_df.to_json(orient="records", indent=2).encode("utf-8"),
                     file_name=f"addaxai-observations-{timestamp}.json",
                     mime="application/json",
                     width="stretch",
@@ -638,6 +678,14 @@ def render_export_popover(export_col, data_frame: pd.DataFrame, label_prefix: st
     """Generic export popover used by the files/events views."""
     if data_frame is None or data_frame.empty:
         return
+
+    # Filter out internal-use columns from export
+    internal_columns = ["relative_path", "run_json_path", "detection_details", "file_paths", "event_files", "species_list", "image_width", "image_height"]
+    export_df = data_frame.drop(columns=[col for col in internal_columns if col in data_frame.columns])
+
+    # Ensure column order is preserved from the original dataframe
+    # This maintains the order specified in FILE_AGGREGATION_COLUMNS or similar
+    export_df = export_df[export_df.columns]
 
     with export_col:
         with st.popover(":material/download:", help="Export", width="stretch"):
@@ -654,7 +702,7 @@ def render_export_popover(export_col, data_frame: pd.DataFrame, label_prefix: st
 
                 output = io.BytesIO()
                 with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    data_frame.to_excel(writer, index=False, sheet_name="Data")
+                    export_df.to_excel(writer, index=False, sheet_name="Data")
                 st.download_button(
                     label="XLSX",
                     data=output.getvalue(),
@@ -666,7 +714,7 @@ def render_export_popover(export_col, data_frame: pd.DataFrame, label_prefix: st
             with download_col2:
                 st.download_button(
                     label="CSV",
-                    data=data_frame.to_csv(index=False).encode("utf-8"),
+                    data=export_df.to_csv(index=False).encode("utf-8"),
                     file_name=f"addaxai-{label_prefix.lower()}-{timestamp}.csv",
                     mime="text/csv",
                     width="stretch",
@@ -675,7 +723,7 @@ def render_export_popover(export_col, data_frame: pd.DataFrame, label_prefix: st
             with download_col3:
                 st.download_button(
                     label="TSV",
-                    data=data_frame.to_csv(index=False, sep="\t").encode("utf-8"),
+                    data=export_df.to_csv(index=False, sep="\t").encode("utf-8"),
                     file_name=f"addaxai-{label_prefix.lower()}-{timestamp}.tsv",
                     mime="text/tab-separated-values",
                     width="stretch",
@@ -684,7 +732,7 @@ def render_export_popover(export_col, data_frame: pd.DataFrame, label_prefix: st
             with download_col4:
                 st.download_button(
                     label="JSON",
-                    data=data_frame.to_json(orient="records", indent=2).encode("utf-8"),
+                    data=export_df.to_json(orient="records", indent=2).encode("utf-8"),
                     file_name=f"addaxai-{label_prefix.lower()}-{timestamp}.json",
                     mime="application/json",
                     width="stretch",

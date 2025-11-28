@@ -581,21 +581,32 @@ def load_detection_results_dataframe():
 
 
 FILE_AGGREGATION_COLUMNS = [
+    # Identity
+    "file_id",
+    # Hierarchy
     "project_id",
     "location_id",
     "run_id",
+    # Links
+    "event_ids",
+    "detection_ids",
+    # Content
     "absolute_path",
-    "relative_path",
-    "run_json_path",
     "detections_count",
     "detections_summary",
     "classifications_count",
     "classifications_summary",
+    # Temporal
     "timestamp",
-    "image_width",
-    "image_height",
+    # Spatial
     "latitude",
     "longitude",
+    # Technical
+    "image_width",
+    "image_height",
+    # Kept for internal use but will be removed from exports
+    "relative_path",
+    "run_json_path",
     "detection_details",
 ]
 
@@ -757,24 +768,50 @@ def aggregate_detections_to_files(detections_df: pd.DataFrame) -> pd.DataFrame:
         latitude = first_non_null(group["latitude"])
         longitude = first_non_null(group["longitude"])
         run_json_path = first_non_null(group["run_json_path"])
+        file_id = first_non_null(group["file_id"])
+
+        # Collect unique event_ids for this file (if event_id column exists)
+        event_ids = None
+        if "event_id" in group.columns:
+            unique_event_ids = group["event_id"].dropna().unique()
+            if len(unique_event_ids) > 0:
+                event_ids = ",".join(sorted(str(eid) for eid in unique_event_ids))
+
+        # Collect unique detection_ids for this file (if detection_id column exists)
+        detection_ids = None
+        if "detection_id" in group.columns:
+            unique_detection_ids = group["detection_id"].dropna().unique()
+            if len(unique_detection_ids) > 0:
+                detection_ids = ",".join(sorted(str(did) for did in unique_detection_ids))
 
         aggregated_files.append(
             {
+                # Identity
+                "file_id": file_id,
+                # Hierarchy
                 "project_id": project_id,
                 "location_id": location_id,
                 "run_id": run_id,
+                # Links
+                "event_ids": event_ids,
+                "detection_ids": detection_ids,
+                # Content
                 "absolute_path": absolute_path,
-                "relative_path": relative_path,
-                "run_json_path": run_json_path,
                 "detections_count": detections_count,
                 "detections_summary": detections_summary,
                 "classifications_count": classifications_count,
                 "classifications_summary": classifications_summary,
+                # Temporal
                 "timestamp": timestamp_value,
-                "image_width": image_width,
-                "image_height": image_height,
+                # Spatial
                 "latitude": latitude,
                 "longitude": longitude,
+                # Technical
+                "image_width": image_width,
+                "image_height": image_height,
+                # Internal
+                "relative_path": relative_path,
+                "run_json_path": run_json_path,
                 "detection_details": detection_details,
             }
         )
@@ -802,23 +839,33 @@ def aggregate_detections_to_events(
     if detections_df is None or detections_df.empty:
         empty_events = pd.DataFrame(
             columns=[
+                # Identity
                 "event_id",
+                # Hierarchy
                 "project_id",
                 "location_id",
                 "run_id",
+                # Links
+                "detection_ids",
+                "file_ids",
+                # Content
+                "detection_label",
+                "classification_label",
+                "detections_count",
+                "classifications_count",
+                "image_count",
+                "max_detection_conf",
+                "max_classification_conf",
+                # Temporal
                 "start_timestamp",
                 "end_timestamp",
                 "duration_seconds",
-                "image_count",
-                "detections_count",
-                "classifications_count",
-                "species_list",
-                "dominant_species",
-                "max_detection_conf",
-                "max_classification_conf",
+                # Spatial
                 "latitude",
                 "longitude",
+                # Internal
                 "file_paths",
+                "event_files",
             ]
         )
         empty_detections = detections_df.copy() if detections_df is not None else pd.DataFrame()
@@ -826,7 +873,28 @@ def aggregate_detections_to_events(
             empty_detections["event_id"] = None
         return empty_events, empty_detections
 
+    # Keep original df to preserve all rows (including empty files)
+    original_detections_df = detections_df.copy()
+    original_detections_df["event_id"] = None
+
+    # Filter out empty files and rows with no valid labels for event aggregation only
     detections_df = detections_df.copy()
+
+    # Remove is_empty_file rows
+    if "is_empty_file" in detections_df.columns:
+        detections_df = detections_df[detections_df["is_empty_file"] != True].copy()
+
+    # Also remove rows where BOTH detection_label AND classification_label are null/empty
+    # (these can't create meaningful events)
+    if "detection_label" in detections_df.columns and "classification_label" in detections_df.columns:
+        has_detection = detections_df["detection_label"].notna() & (detections_df["detection_label"] != "")
+        has_classification = detections_df["classification_label"].notna() & (detections_df["classification_label"] != "")
+        detections_df = detections_df[has_detection | has_classification].copy()
+
+    if detections_df.empty:
+        # No actual detections to create events from
+        return pd.DataFrame(columns=list(empty_events.columns)), original_detections_df
+
     detections_df["_timestamp_dt"] = detections_df["timestamp"].apply(_parse_detection_timestamp)
     detections_df = detections_df.sort_values(by=["project_id", "location_id", "run_id", "_timestamp_dt"])
 
@@ -836,67 +904,86 @@ def aggregate_detections_to_events(
     grouped = detections_df.groupby(["project_id", "location_id", "run_id"], dropna=False, sort=False)
 
     events = []
-    event_detection_mapping = []  # Track which detections belong to which event
 
     for (project_id, location_id, run_id), group in grouped:
-        group = group.sort_values("_timestamp_dt").reset_index(drop=True)
-        current_event_rows = []
-        current_event_indices = []  # Track dataframe indices for this event
+        # Keep original index so we can map event_ids back to original dataframe
+        group = group.sort_values("_timestamp_dt")
+
+        # Step 1: Identify time windows based on time gaps
+        time_windows = []
+        current_window_indices = []
         last_timestamp = None
-        last_species = None
 
         for idx, row in group.iterrows():
             timestamp_dt = row.get("_timestamp_dt")
-            species_label = _normalize_species_label(row.get("classification_label"))
 
-            if not current_event_rows:
-                current_event_rows.append(row)
-                current_event_indices.append(idx)
+            if last_timestamp is None:
+                # First detection starts first window
+                current_window_indices.append(idx)
                 last_timestamp = timestamp_dt
-                last_species = species_label
-                continue
+            else:
+                gap_seconds = None
+                if timestamp_dt is not None and last_timestamp is not None:
+                    gap_seconds = (timestamp_dt - last_timestamp).total_seconds()
 
-            gap_seconds = None
-            if timestamp_dt is not None and last_timestamp is not None:
-                gap_seconds = (timestamp_dt - last_timestamp).total_seconds()
+                if gap_seconds is not None and gap_seconds > time_gap_seconds:
+                    # Time gap exceeded - close current window and start new one
+                    time_windows.append(current_window_indices)
+                    current_window_indices = [idx]
+                else:
+                    # Continue current window
+                    current_window_indices.append(idx)
 
-            gap_exceeded = gap_seconds is not None and gap_seconds > time_gap_seconds
-            species_changed = species_label != last_species
+                last_timestamp = timestamp_dt
 
-            if gap_exceeded or species_changed:
-                # Finalize current event
-                event_record = _finalize_event(current_event_rows, project_id, location_id, run_id)
+        # Add final window
+        if current_window_indices:
+            time_windows.append(current_window_indices)
+
+        # Step 2: Within each time window, group by label and create events
+        for window_indices in time_windows:
+            window_rows = group.loc[window_indices]
+
+            # Group detections in this window by classification (if available) or detection label
+            label_groups = {}
+            for idx, row in window_rows.iterrows():
+                classification_label = _normalize_species_label(row.get("classification_label"))
+                detection_label = _normalize_species_label(row.get("detection_label"))
+                # Use classification for grouping if available, otherwise use detection label
+                grouping_label = classification_label if classification_label != "unclassified" else detection_label
+
+                if grouping_label not in label_groups:
+                    label_groups[grouping_label] = []
+                label_groups[grouping_label].append((idx, row))
+
+            # Create one event per unique label in this window
+            for grouping_label, label_detections in label_groups.items():
+                indices = [idx for idx, _ in label_detections]
+                rows = [row for _, row in label_detections]
+
+                # Create event for this label
+                event_record = _finalize_event(rows, project_id, location_id, run_id)
                 event_id = event_record["event_id"]
 
-                # Tag all detections in this event with the event_id
-                for det_idx in current_event_indices:
+                # Tag all detections of this label with the event_id
+                for det_idx in indices:
                     detections_df.at[det_idx, "event_id"] = event_id
 
                 events.append(event_record)
-                current_event_rows = [row]
-                current_event_indices = [idx]
-            else:
-                current_event_rows.append(row)
-                current_event_indices.append(idx)
-
-            last_timestamp = timestamp_dt
-            last_species = species_label
-
-        if current_event_rows:
-            # Finalize last event
-            event_record = _finalize_event(current_event_rows, project_id, location_id, run_id)
-            event_id = event_record["event_id"]
-
-            # Tag all detections in this event with the event_id
-            for det_idx in current_event_indices:
-                detections_df.at[det_idx, "event_id"] = event_id
-
-            events.append(event_record)
 
     events_df = pd.DataFrame(events)
 
+    # Merge event_ids back into original dataframe (preserving empty file rows)
+    # Update original_detections_df with event_ids from detections_df
+    if not detections_df.empty and "event_id" in detections_df.columns:
+        # Use index to map event_ids back to original dataframe
+        event_id_map = detections_df["event_id"].to_dict()
+        for idx, event_id in event_id_map.items():
+            if idx in original_detections_df.index:
+                original_detections_df.at[idx, "event_id"] = event_id
+
     # Return both events and detections (now with event_id column)
-    return events_df, detections_df
+    return events_df, original_detections_df
 
 
 def _finalize_event(rows, project_id, location_id, run_id):
@@ -909,9 +996,13 @@ def _finalize_event(rows, project_id, location_id, run_id):
         (end_ts - start_ts).total_seconds() if start_ts is not None and end_ts is not None else 0
     )
 
-    species_series = df_event["classification_label"].dropna().astype(str).str.strip()
-    species_list = sorted(species_series.unique()) if not species_series.empty else []
-    dominant_species = species_series.mode().iloc[0] if not species_series.empty else None
+    # Get the single detection_label (should all be same since we grouped by it)
+    detection_series = df_event["detection_label"].dropna().astype(str).str.strip()
+    detection_label = detection_series.mode().iloc[0] if not detection_series.empty else None
+
+    # Get the single classification_label (should all be same, or null if detection-only)
+    classification_series = df_event["classification_label"].dropna().astype(str).str.strip()
+    classification_label = classification_series.mode().iloc[0] if not classification_series.empty else None
 
     relative_series = df_event.get("relative_path")
     absolute_series = df_event.get("absolute_path")
@@ -937,23 +1028,59 @@ def _finalize_event(rows, project_id, location_id, run_id):
         for rel in unique_relative_paths
     ]
 
+    # Generate deterministic UUID based on event characteristics
+    # This ensures the same event gets the same UUID across app restarts
+    import uuid
+    import hashlib
+
+    # Create a unique identifier string from event characteristics
+    # Use classification if available, otherwise detection
+    event_species = classification_label if classification_label else detection_label
+    event_identifier = f"{run_id}_{start_ts.isoformat() if start_ts is not None else 'none'}_{event_species}"
+
+    # Generate UUID5 (deterministic) from the identifier
+    event_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, event_identifier))
+
+    # Collect detection_ids for this event (if detection_id column exists)
+    detection_ids = None
+    if "detection_id" in df_event.columns:
+        unique_detection_ids = df_event["detection_id"].dropna().unique()
+        if len(unique_detection_ids) > 0:
+            detection_ids = ",".join(sorted(str(did) for did in unique_detection_ids))
+
+    # Collect file_ids for this event (if file_id column exists)
+    file_ids = None
+    if "file_id" in df_event.columns:
+        unique_file_ids = df_event["file_id"].dropna().unique()
+        if len(unique_file_ids) > 0:
+            file_ids = ",".join(sorted(str(fid) for fid in unique_file_ids))
+
     return {
-        "event_id": f"{run_id}_{start_ts.strftime('%Y%m%dT%H%M%S')}" if start_ts is not None else f"{run_id}_event",
+        # Identity
+        "event_id": event_uuid,
+        # Hierarchy
         "project_id": project_id,
         "location_id": location_id,
         "run_id": run_id,
+        # Links
+        "detection_ids": detection_ids,
+        "file_ids": file_ids,
+        # Content
+        "detection_label": detection_label,
+        "classification_label": classification_label,
+        "detections_count": len(df_event),
+        "classifications_count": df_event["classification_label"].notna().sum(),
+        "image_count": len(unique_relative_paths),  # Fixed: count unique files, not detection rows
+        "max_detection_conf": df_event["detection_confidence"].max(skipna=True),
+        "max_classification_conf": df_event["classification_confidence"].max(skipna=True),
+        # Temporal
         "start_timestamp": start_ts.isoformat() if start_ts is not None else None,
         "end_timestamp": end_ts.isoformat() if end_ts is not None else None,
         "duration_seconds": duration_seconds,
-        "image_count": len(unique_relative_paths),  # Fixed: count unique files, not detection rows
-        "detections_count": len(df_event),
-        "classifications_count": df_event["classification_label"].notna().sum(),
-        "species_list": species_list,
-        "dominant_species": dominant_species,
-        "max_detection_conf": df_event["detection_confidence"].max(skipna=True),
-        "max_classification_conf": df_event["classification_confidence"].max(skipna=True),
+        # Spatial
         "latitude": df_event["latitude"].dropna().iloc[0] if "latitude" in df_event and not df_event["latitude"].dropna().empty else None,
         "longitude": df_event["longitude"].dropna().iloc[0] if "longitude" in df_event and not df_event["longitude"].dropna().empty else None,
+        # Internal
         "file_paths": unique_relative_paths,
         "event_files": event_files,
     }
