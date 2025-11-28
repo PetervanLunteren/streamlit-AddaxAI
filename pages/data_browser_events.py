@@ -384,7 +384,7 @@ def show_event_modal():
                     st.error("Could not load collage")
                 st.write("")
 
-            st.caption("Use shortcuts `←` `→` to navigate and `Esc` to close")
+            st.caption("&nbsp;&nbsp;&nbsp;&nbsp;Use shortcuts `←` `→` to navigate and `Esc` to close", unsafe_allow_html=True)
 
         with meta_col:
             top_col_export, top_col_close = st.columns([1, 1])
@@ -428,6 +428,8 @@ def show_event_modal():
                     width="stretch",
                     key="event_modal_close_button",
                 ):
+                    from components.shortcut_utils import clear_shortcut_listeners
+                    clear_shortcut_listeners()
                     set_session_var("explore_results", "modal_source", None)
                     set_session_var("explore_results", "show_modal_event_viewer", False)
                     st.rerun()
@@ -513,7 +515,8 @@ def show_event_modal():
                 for label, value in metadata_rows:
                     st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
 
-        # Register keyboard shortcuts
+        # Register keyboard shortcuts on every render
+        # This ensures they work after navigation when DOM is rebuilt
         from components.shortcut_utils import register_shortcuts
         register_shortcuts(
             event_modal_prev_button=["arrowleft"],

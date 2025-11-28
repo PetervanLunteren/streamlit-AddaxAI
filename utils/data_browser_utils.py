@@ -873,7 +873,7 @@ def image_viewer_modal():
                 st.error("Could not load image")
             st.write("")
 
-        st.caption("Use shortcuts `←` `→` to navigate and `Esc` to close")
+        st.caption("&nbsp;&nbsp;&nbsp;&nbsp;Use shortcuts `←` `→` to navigate and `Esc` to close", unsafe_allow_html=True)
 
     with meta_col:
         top_col_export, top_col_close = st.columns([1, 1])
@@ -1005,6 +1005,8 @@ def image_viewer_modal():
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
 
+        # Register keyboard shortcuts on every render
+        # This ensures they work after navigation when DOM is rebuilt
         register_shortcuts(
             observation_modal_prev_button=["arrowleft"],
             observation_modal_next_button=["arrowright"],
@@ -1056,7 +1058,7 @@ def image_viewer_modal_file():
                 st.error("Could not load image")
             st.write("")
 
-        st.caption("Use shortcuts `←` `→` to navigate and `Esc` to close")
+        st.caption("&nbsp;&nbsp;&nbsp;&nbsp;Use shortcuts `←` `→` to navigate and `Esc` to close", unsafe_allow_html=True)
 
     with meta_col:
         top_col_export, top_col_close = st.columns([1, 1])
@@ -1163,6 +1165,8 @@ def image_viewer_modal_file():
             for label, value in metadata_rows:
                 st.markdown(f"**{label}** {code_span(value)}", unsafe_allow_html=True)
 
+        # Register keyboard shortcuts on every render
+        # This ensures they work after navigation when DOM is rebuilt
         register_shortcuts(
             file_modal_prev_button=["arrowleft"],
             file_modal_next_button=["arrowright"],
