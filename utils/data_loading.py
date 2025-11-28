@@ -1055,6 +1055,15 @@ def _finalize_event(rows, project_id, location_id, run_id):
         if len(unique_file_ids) > 0:
             file_ids = ",".join(sorted(str(fid) for fid in unique_file_ids))
 
+    # Calculate individual_count using max-per-image method
+    # Count detections per file, then take the maximum
+    individual_count = None
+    if "file_id" in df_event.columns and not df_event.empty:
+        # Group by file_id and count detections per file
+        detections_per_file = df_event.groupby("file_id").size()
+        if not detections_per_file.empty:
+            individual_count = int(detections_per_file.max())
+
     return {
         # Identity
         "event_id": event_uuid,
@@ -1069,6 +1078,7 @@ def _finalize_event(rows, project_id, location_id, run_id):
         "detection_label": detection_label,
         "classification_label": classification_label,
         "detections_count": len(df_event),
+        "individual_count": individual_count,
         "classifications_count": df_event["classification_label"].notna().sum(),
         "image_count": len(unique_relative_paths),  # Fixed: count unique files, not detection rows
         "max_detection_conf": df_event["detection_confidence"].max(skipna=True),

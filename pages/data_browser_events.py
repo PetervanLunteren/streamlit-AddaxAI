@@ -44,6 +44,7 @@ def render_events_view(events_df: pd.DataFrame, export_col, sort_col):
         ("start_timestamp", "Timestamp"),
         ("duration_seconds", "Duration"),
         ("image_count", "Images"),
+        ("individual_count", "Individuals"),
         ("location_id", "Location"),
     ]
 
@@ -204,12 +205,14 @@ def render_event_table(
 
     preferred_order = [
         "collage_image",
+        "individual_count",
         "detection_label",
         "classification_label",
-        "start_timestamp",
-        "end_timestamp",
         "duration_seconds",
         "image_count",
+        "start_timestamp",
+        "location_id",
+        "end_timestamp",
         "detections_count",
         "classifications_count",
     ]
@@ -281,8 +284,9 @@ def render_event_table(
     gb.configure_column("classification_label", headerName="Classification", flex=1)
     gb.configure_column("start_timestamp", headerName="Timestamp", flex=1)
     gb.configure_column("duration_seconds", headerName="Duration (s)", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
-    gb.configure_column("image_count", headerName="Images", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
+    gb.configure_column("image_count", headerName="Files", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
     gb.configure_column("detections_count", headerName="Detections", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
+    gb.configure_column("individual_count", headerName="Individuals", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
     gb.configure_column("classifications_count", headerName="Classifications", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
     gb.configure_column("location_id", headerName="Location", flex=1)
 
@@ -378,6 +382,9 @@ def show_event_modal():
             st.markdown(f"**Start:** {current_row.get('start_timestamp', 'N/A')}")
             st.markdown(f"**Location:** {current_row.get('location_id', 'N/A')}")
             st.markdown(f"**Detections:** {current_row.get('detections_count', 0)}")
+            individual_count = current_row.get('individual_count')
+            individual_display = individual_count if individual_count is not None else 'N/A'
+            st.markdown(f"**Individuals:** {individual_display}")
             st.markdown(f"**Detection:** {current_row.get('detection_label', 'N/A')}")
             classification = current_row.get('classification_label') or 'N/A'
             st.markdown(f"**Classification:** {classification}")

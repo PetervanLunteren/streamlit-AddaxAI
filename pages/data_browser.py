@@ -46,15 +46,15 @@ def on_view_mode_change():
 
 
 def render_view_mode_control(current_view):
-    columns = st.columns((2, 6, 1, 1, 1, 1, 1))
+    columns = st.columns((2, 5, 1, 1, 1, 1, 1))
     (
         level_col,
         _spacer_one,
-        _spacer_two,
         sort_col,
         filter_col,
         export_col,
         settings_col,
+        help_col,
     ) = columns
 
     with level_col:
@@ -70,7 +70,7 @@ def render_view_mode_control(current_view):
             on_change=on_view_mode_change,
         )
 
-    return sort_col, filter_col, export_col, settings_col
+    return sort_col, filter_col, export_col, settings_col, help_col
 
 
 def render_settings_popover(settings_col, saved_settings):
@@ -135,11 +135,27 @@ def render_data_browser_page():
         current_view = VIEW_LABELS[0]
         set_session_var("explore_results", "browser_view_mode", current_view)
 
-    sort_col, filter_col, export_col, settings_col = render_view_mode_control(current_view)
+    sort_col, filter_col, export_col, settings_col, help_col = render_view_mode_control(current_view)
     current_view = get_session_var("explore_results", "browser_view_mode", VIEW_LABELS[0])
 
     render_settings_popover(settings_col, saved_settings)
     render_filter_popover(filter_col, df, saved_settings, detection_import_threshold)
+
+    # Help popover
+    with help_col:
+        with st.popover(":material/question_mark:", help="Learn more", width="stretch"):
+            with st.container(border=True):
+                if current_view == "Observations":
+                    print_widget_label("Observations table")
+                    st.markdown("Individual AI detections with bounding boxes, species classifications, and confidence scores. Each row represents one detected animal or object.")
+                elif current_view == "Files":
+                    print_widget_label("Files table")
+                    st.markdown("Camera trap images with detection summaries. Each row represents one image file showing all animals detected in that photo.")
+                elif current_view == "Events":
+                    print_widget_label("Events table")
+                    time_gap_seconds = int(app_settings.get("events", {}).get("time_gap_seconds", 60))
+                    st.markdown(f"Sequences of detections grouped by species and time proximity. Each event represents a single species' continuous presence, with gaps ≤{time_gap_seconds}s between detections (configurable in Settings > Event grouping).")
+                    st.markdown(f"Individual counts estimated using max-per-image method: the highest number of animals detected in any single image within the event.")
 
     st.subheader(f"{ICON_LOOKUP[current_view]} {current_view}", divider="grey")
 
