@@ -39,13 +39,12 @@ def render_events_view(events_df: pd.DataFrame, export_col, sort_col):
         st.stop()
 
     sortable_columns = [
-        ("start_timestamp", "Start time"),
-        ("end_timestamp", "End time"),
+        ("dominant_species", "Dominant species"),
+        ("species_list_display", "Species"),
+        ("start_timestamp", "Timestamp"),
         ("duration_seconds", "Duration"),
         ("image_count", "Images"),
-        ("detections_count", "Detections"),
-        ("classifications_count", "Classifications"),
-        ("dominant_species", "Dominant species"),
+        ("location_id", "Location"),
     ]
 
     sort_settings = {
@@ -201,20 +200,28 @@ def render_event_table(
             row.get("event_files") or [],
             thumb_height,
             thumb_width,
+            event_data={
+                "run_id": row.get("run_id"),
+                "project_id": row.get("project_id"),
+                "location_id": row.get("location_id"),
+                "start_timestamp": row.get("start_timestamp"),
+                "end_timestamp": row.get("end_timestamp"),
+                "dominant_species": row.get("dominant_species"),
+            },
         ),
         axis=1,
     )
 
     preferred_order = [
         "collage_image",
+        "dominant_species",
+        "species_list_display",
         "start_timestamp",
         "end_timestamp",
         "duration_seconds",
         "image_count",
         "detections_count",
         "classifications_count",
-        "dominant_species",
-        "species_list_display",
     ]
     ordered_cols = [col for col in preferred_order if col in display_df.columns]
     ordered_cols += [col for col in display_df.columns if col not in ordered_cols]
@@ -227,6 +234,18 @@ def render_event_table(
     gb.configure_column("file_paths", hide=True)
     gb.configure_column("event_files", hide=True)
     gb.configure_column("species_list", hide=True)
+
+    # Hide technical/detailed columns (user-requested)
+    gb.configure_column("event_id", hide=True)
+    gb.configure_column("project_id", hide=True)
+    gb.configure_column("run_id", hide=True)
+    gb.configure_column("max_detection_conf", hide=True)
+    gb.configure_column("max_classification_conf", hide=True)
+    gb.configure_column("latitude", hide=True)
+    gb.configure_column("longitude", hide=True)
+    gb.configure_column("end_timestamp", hide=True)
+    gb.configure_column("detections_count", hide=True)
+    gb.configure_column("classifications_count", hide=True)
 
     collage_renderer = JsCode(
         """
@@ -263,17 +282,18 @@ def render_event_table(
         headerName="",
         cellRenderer=collage_renderer,
         width=thumb_width + 20,
+        minWidth=thumb_width + 20,
         suppressNavigable=True,
     )
 
     gb.configure_column("species_list_display", headerName="Species", flex=2)
-    gb.configure_column("start_timestamp", headerName="Start", flex=1)
-    gb.configure_column("end_timestamp", headerName="End", flex=1)
-    gb.configure_column("duration_seconds", headerName="Duration (s)", type="numericColumn", flex=1)
-    gb.configure_column("image_count", headerName="Images", type="numericColumn", flex=1)
-    gb.configure_column("detections_count", headerName="Detections", type="numericColumn", flex=1)
-    gb.configure_column("classifications_count", headerName="Classifications", type="numericColumn", flex=1)
+    gb.configure_column("start_timestamp", headerName="Timestamp", flex=1)
+    gb.configure_column("duration_seconds", headerName="Duration (s)", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
+    gb.configure_column("image_count", headerName="Images", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
+    gb.configure_column("detections_count", headerName="Detections", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
+    gb.configure_column("classifications_count", headerName="Classifications", type="numericColumn", flex=1, headerClass="ag-left-aligned-header")
     gb.configure_column("dominant_species", headerName="Dominant species", flex=1)
+    gb.configure_column("location_id", headerName="Location", flex=1)
 
     gb.configure_default_column(
         resizable=True,
@@ -287,7 +307,7 @@ def render_event_table(
         headerClass="ag-left-aligned-header",
     )
 
-    gb.configure_selection(selection_mode="single", use_checkbox=True)
+    gb.configure_selection(selection_mode="single", use_checkbox=False)
 
     row_height = base_row_height + 10
     gb.configure_grid_options(domLayout="normal", rowHeight=row_height)
@@ -297,7 +317,7 @@ def render_event_table(
     grid_height = (len(display_df) * row_height) + header_height + buffer_height
 
     grid_response = AgGrid(
-        display_df.drop(columns=["species_list_display"]),
+        display_df,
         gridOptions=gb.build(),
         height=grid_height,
         update_on=["selectionChanged"],
@@ -350,6 +370,14 @@ def show_event_modal():
             event_files,
             thumb_height=240,
             thumb_width=320,
+            event_data={
+                "run_id": current_row.get("run_id"),
+                "project_id": current_row.get("project_id"),
+                "location_id": current_row.get("location_id"),
+                "start_timestamp": current_row.get("start_timestamp"),
+                "end_timestamp": current_row.get("end_timestamp"),
+                "dominant_species": current_row.get("dominant_species"),
+            },
         )
 
         col_image, col_meta = st.columns([2, 1])
@@ -401,7 +429,7 @@ def show_event_modal():
                 st.rerun()
 
 
-def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=None):
+def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=None, event_data=None):
     cache = st.session_state.setdefault("events_collage_cache", {})
     identifier = event_id or "unknown"
     cache_key = f"{identifier}_{thumb_height}_{thumb_width or thumb_height}"
@@ -411,6 +439,7 @@ def get_cached_event_collage(event_id, event_files, thumb_height, thumb_width=No
                 event_files,
                 thumb_height=thumb_height,
                 thumb_width=thumb_width,
+                event_data=event_data,
             )
             or PLACEHOLDER_IMAGE
         )

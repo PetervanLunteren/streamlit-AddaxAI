@@ -66,3 +66,13 @@ div[data-testid="stPopoverBody"] > div {
     top: 16px;
     right: 20px;
 }
+
+/* Left-align AgGrid column headers */
+.ag-left-aligned-header {
+    text-align: left !important;
+    justify-content: flex-start !important;
+}
+
+.ag-left-aligned-header .ag-header-cell-label {
+    justify-content: flex-start !important;
+}

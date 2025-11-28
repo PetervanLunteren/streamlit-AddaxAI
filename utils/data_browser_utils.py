@@ -520,13 +520,76 @@ def image_to_base64_with_boxes(image_path, detection_details, max_height, max_wi
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
 
 
-def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_width=None):
+def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_width=None,
+                                event_data=None):
+    """
+    Build a collage of event images with bounding boxes for event-specific detections only.
+
+    Args:
+        event_files: List of file dicts with relative_path and absolute_path
+        max_grid: Maximum grid size (default 4x4)
+        thumb_height: Thumbnail height in pixels
+        thumb_width: Thumbnail width in pixels (default 4:3 ratio)
+        event_data: Dict with event metadata for filtering detections:
+            - run_id: Analysis run ID
+            - project_id: Project ID
+            - location_id: Location ID
+            - start_timestamp: Event start time (ISO format)
+            - end_timestamp: Event end time (ISO format)
+            - dominant_species: Primary species in event
+
+    Returns:
+        Base64 encoded image string
+    """
     if not event_files:
         return None
 
     import streamlit as st
 
     detections_df = st.session_state.get("observations_source_df", pd.DataFrame())
+
+    # Filter detections to only those belonging to this specific event
+    if event_data and not detections_df.empty:
+        from datetime import datetime
+
+        # Start with run_id filter
+        run_id = event_data.get("run_id")
+        if run_id:
+            detections_df = detections_df[detections_df["run_id"] == run_id].copy()
+
+        # Apply timestamp + species filters to match how events were created
+        start_ts = event_data.get("start_timestamp")
+        end_ts = event_data.get("end_timestamp")
+        dominant_species = event_data.get("dominant_species")
+
+        if start_ts and end_ts:
+            try:
+                # Convert event timestamps from ISO format
+                start_dt = pd.to_datetime(start_ts)
+                end_dt = pd.to_datetime(end_ts)
+
+                # Convert detection timestamps (they're in "YYYY:MM:DD HH:MM:SS" or similar format)
+                detections_df["_parsed_dt"] = pd.to_datetime(detections_df["timestamp"], errors="coerce")
+
+                # Filter by timestamp range
+                detections_df = detections_df[
+                    (detections_df["_parsed_dt"] >= start_dt) &
+                    (detections_df["_parsed_dt"] <= end_dt)
+                ]
+
+                # Clean up temp column
+                if "_parsed_dt" in detections_df.columns:
+                    detections_df = detections_df.drop(columns=["_parsed_dt"])
+
+            except Exception:
+                # If timestamp filtering fails, continue with run_id filter only
+                pass
+
+        # Filter by species if present (events are species-aware)
+        if dominant_species:
+            detections_df = detections_df[
+                detections_df["classification_label"] == dominant_species
+            ]
 
     if thumb_width is None:
         thumb_width = int(thumb_height * 4 / 3)
@@ -537,7 +600,7 @@ def build_event_collage_base64(event_files, max_grid=4, thumb_height=180, thumb_
     collage = Image.new(
         "RGB",
         (grid_size * thumb_width, grid_size * thumb_height),
-        color=(30, 30, 30),
+        color=(231, 239, 239),  # #e7efef
     )
 
     for idx, file_info in enumerate(event_files[:slots]):
@@ -579,7 +642,7 @@ def _fit_image_with_letterbox(image, box_width, box_height=None):
     new_height = max(1, int(img_height * scale))
     img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
-    canvas = Image.new("RGB", (box_width, box_height), color=(30, 30, 30))
+    canvas = Image.new("RGB", (box_width, box_height), color=(231, 239, 239))  # #e7efef
     offset_x = (box_width - new_width) // 2
     offset_y = (box_height - new_height) // 2
     canvas.paste(img, (offset_x, offset_y))

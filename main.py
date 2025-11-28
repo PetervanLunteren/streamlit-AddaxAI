@@ -14,8 +14,11 @@ Architecture:
 Test images:
 https://drive.google.com/uc?export=download&id=1secwdgHOo7dxWywabdW3ehyVb9t3_89k
 
-Run with micromamba:
-./bin/macos/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
+Start app for macOS:
+./bin/darwin/micromamba run -p ./envs/env-addaxai-base streamlit run main.py
+
+Start app for Linux:
+./bin/linux/micromamba run -p ./envs/env-addaxai-base stream
 
 How to pip install into an environment:
 ./bin/macos/micromamba run -p ./envs/env-addaxai-base pip install [package-name]

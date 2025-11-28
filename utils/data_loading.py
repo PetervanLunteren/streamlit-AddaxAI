@@ -895,7 +895,7 @@ def _finalize_event(rows, project_id, location_id, run_id):
         "start_timestamp": start_ts.isoformat() if start_ts is not None else None,
         "end_timestamp": end_ts.isoformat() if end_ts is not None else None,
         "duration_seconds": duration_seconds,
-        "image_count": len(df_event),
+        "image_count": len(unique_relative_paths),  # Fixed: count unique files, not detection rows
         "detections_count": len(df_event),
         "classifications_count": df_event["classification_label"].notna().sum(),
         "species_list": species_list,

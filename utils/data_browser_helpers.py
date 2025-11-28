@@ -369,13 +369,27 @@ def render_filter_popover(
                     saved_start_str = saved_settings.get("date_start", min_date.isoformat())
                     saved_end_str = saved_settings.get("date_end", max_date.isoformat())
 
+                    # Handle case where saved values might be None, date objects, or strings
                     try:
-                        saved_start = datetime.fromisoformat(saved_start_str).date()
-                    except ValueError:
+                        if saved_start_str is None:
+                            saved_start = min_date
+                        elif isinstance(saved_start_str, str):
+                            saved_start = datetime.fromisoformat(saved_start_str).date()
+                        else:
+                            # Already a date/datetime object
+                            saved_start = saved_start_str if hasattr(saved_start_str, 'year') else min_date
+                    except (ValueError, TypeError, AttributeError):
                         saved_start = min_date
+
                     try:
-                        saved_end = datetime.fromisoformat(saved_end_str).date()
-                    except ValueError:
+                        if saved_end_str is None:
+                            saved_end = max_date
+                        elif isinstance(saved_end_str, str):
+                            saved_end = datetime.fromisoformat(saved_end_str).date()
+                        else:
+                            # Already a date/datetime object
+                            saved_end = saved_end_str if hasattr(saved_end_str, 'year') else max_date
+                    except (ValueError, TypeError, AttributeError):
                         saved_end = max_date
 
                     if saved_start > saved_end:
